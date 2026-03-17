@@ -7,9 +7,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Node
-        uses: actions/setup-node@v4
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
         with:
-          node-version: 20
-      - run: npm install
-      - run: npm run lint
+          dotnet-version: 9.0.x
+      - run: dotnet format --verify-no-changes --verbosity diagnostic
