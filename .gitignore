@@ -6,6 +6,7 @@ __pycache__/
 ##
 ## Get latest from `dotnet new gitignore`
 
+.scripts
 # dotenv files
 .env
 

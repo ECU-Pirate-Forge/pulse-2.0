@@ -1,6 +1,7 @@
 using LiteDB;
 using Pulse.WebApi.Middleware;
-using Pulse.Shared.Models;
+using Pulse.Common.Models;
+using Pulse.Common.Services;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
