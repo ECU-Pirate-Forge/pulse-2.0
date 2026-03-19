@@ -1,6 +1,6 @@
 using System;
 
-namespace Pulse.Core.Models
+namespace Pulse.Shared.Models
 {
     public class Session
     {

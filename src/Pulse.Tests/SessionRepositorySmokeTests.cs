@@ -1,3 +1,5 @@
+using Pulse.WebApi;
+using Pulse.Shared.Repositories;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Pulse.Tests.Tests;

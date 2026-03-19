@@ -1,3 +1,4 @@
+using Pulse.WebApi;
 using LiteDB;
 using Pulse.Shared.Models;
 using Scalar.AspNetCore;
@@ -5,24 +6,16 @@ using Scalar.AspNetCore;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
-// builder.Host.UseDefaultServiceProvider((context, options) =>
-// {
-//     // validate service registrations at build time in development
-//     options.ValidateScopes = context.HostingEnvironment.IsDevelopment();
-//     options.ValidateOnBuild = true;
-// });
 
 var connectionString = builder.Configuration.GetConnectionString("pulse-db") ?? "Filename=pulse.db;Connection=shared";
 
 builder.Services.AddPulseWebApiCoreServices(connectionString);
+builder.Services.AddControllers(); // needed for SessionsController
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -30,20 +23,11 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.MapControllers(); // needed for SessionsController
 
-
-app.MapGet("/questions", (QuestionRepository repo) =>
-{
-    return repo.GetAll();
-});
-
-app.MapPost("/questions", (QuestionRepository repo, Question q) =>
-{
-    return repo.Insert(q);
-});
+app.MapGet("/questions", (QuestionRepository repo) => repo.GetAll());
+app.MapPost("/questions", (QuestionRepository repo, Question q) => repo.Insert(q));
 
 app.MapDefaultEndpoints();
 
 app.Run();
-
-
