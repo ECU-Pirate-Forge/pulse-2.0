@@ -1,0 +1,21 @@
+using System;
+
+namespace Pulse.Core.Models
+{
+    public class Session
+    {
+        public Guid Id { get; set; } = Guid.NewGuid();
+
+        public string Title { get; set; } = string.Empty;
+
+        public string InstructorCode { get; set; } = string.Empty;
+
+        public string JoinCode { get; set; } = string.Empty;
+
+        public string Status { get; set; } = string.Empty;
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    }
+}
