@@ -1,5 +1,7 @@
 using LiteDB;
-using Pulse.Shared.Models;
+using Pulse.Common.Models;
+
+namespace Pulse.Common.Services;
 
 public class QuestionRepository
 {
