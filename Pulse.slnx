@@ -5,6 +5,7 @@
     <Project Path="src/Pulse.MigrationManager/Pulse.MigrationManager.csproj" />
     <Project Path="src/Pulse.ServiceDefaults/Pulse.ServiceDefaults.csproj" />
     <Project Path="src/Pulse.Shared/Pulse.Shared.csproj" />
+    <Project Path="src/Pulse.Tests/Pulse.Tests.csproj" />
     <Project Path="src/Pulse.WebApi/Pulse.WebApi.csproj" />
     <Project Path="src/Pulse.WebApp/Pulse.WebApp.csproj" />
   </Folder>

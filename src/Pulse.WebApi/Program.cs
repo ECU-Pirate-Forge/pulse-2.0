@@ -5,11 +5,17 @@ using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.AddServiceDefaults();
+// builder.Host.UseDefaultServiceProvider((context, options) =>
+// {
+//     // validate service registrations at build time in development
+//     options.ValidateScopes = context.HostingEnvironment.IsDevelopment();
+//     options.ValidateOnBuild = true;
+// });
+
 var connectionString = builder.Configuration.GetConnectionString("pulse-db") ?? "Filename=pulse.db;Connection=shared";
 
-builder.Services.AddSingleton<LiteDatabase>(_ => new LiteDatabase(connectionString));
-
-builder.Services.AddSingleton<QuestionRepository>();
+builder.Services.AddPulseWebApiCoreServices(connectionString);
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
@@ -39,6 +45,7 @@ app.MapPost("/questions", (QuestionRepository repo, Question q) =>
     return repo.Insert(q);
 });
 
+app.MapDefaultEndpoints();
 
 app.Run();
 
