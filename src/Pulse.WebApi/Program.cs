@@ -1,4 +1,5 @@
 using LiteDB;
+using Pulse.WebApi.Middleware;
 using Pulse.Shared.Models;
 using Scalar.AspNetCore;
 
@@ -15,6 +16,8 @@ builder.Services.AddSingleton<QuestionRepository>();
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+
+app.UseMiddleware<GlobalExceptionMiddleware>();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
