@@ -1,6 +1,6 @@
 using System;
 
-namespace Pulse.Shared.Models;
+namespace Pulse.Common.Models;
 
 public class Question
 {

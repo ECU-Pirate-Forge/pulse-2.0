@@ -1,4 +1,5 @@
 using LiteDB;
+using Pulse.Common.Services;
 
 public static class ServiceCollectionExtensions
 {
