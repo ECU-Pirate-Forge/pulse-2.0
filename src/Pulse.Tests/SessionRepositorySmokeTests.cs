@@ -1,13 +1,14 @@
 using Pulse.WebApi;
 using Pulse.Shared.Repositories;
 using Microsoft.Extensions.DependencyInjection;
+using Pulse.Common.Services;
 
 namespace Pulse.Tests.Tests;
 
 public class SessionRepositorySmokeTests
 {
     [Fact]
-    public void AddPulseWebApiCoreServices_RegistersSessionRepository()
+    public void AddPulseWebApiCoreServicesRegistersSessionRepository()
     {
         // Use an in-memory LiteDB to keep this test isolated and fast.
         var services = new ServiceCollection();

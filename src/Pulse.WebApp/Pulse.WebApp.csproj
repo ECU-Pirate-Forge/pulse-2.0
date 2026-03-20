@@ -13,7 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Pulse.ServiceDefaults\Pulse.ServiceDefaults.csproj" />
-    <ProjectReference Include="..\Pulse.Shared\Pulse.Shared.csproj" />
+    <ProjectReference Include="..\Pulse.Shared\Pulse.Common.csproj" />
   </ItemGroup>
 
 </Project>

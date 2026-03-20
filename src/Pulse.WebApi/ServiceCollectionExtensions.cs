@@ -13,7 +13,6 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ILiteDatabase>(_ => new LiteDatabase(connectionString));
         services.AddSingleton<ISessionRepository, SessionRepository>();
         services.AddSingleton<IJoinCodeGenerator, JoinCodeGenerator>();
-
         return services;
     }
 }
