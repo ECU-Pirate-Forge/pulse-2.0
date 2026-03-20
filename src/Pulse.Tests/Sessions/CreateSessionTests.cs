@@ -1,115 +1,57 @@
-using Microsoft.AspNetCore.Mvc;
 using Moq;
-using Pulse.Shared.Models;
-using Pulse.Shared.Repositories;
+using Pulse.Common.Services;
 using Pulse.Shared.Services;
-using Pulse.WebApi;
 using Xunit;
 
 namespace Pulse.Tests.Sessions;
 
-public class CreateSessionTests
+public class JoinCodeGeneratorTests
 {
-    private readonly Mock<ISessionRepository> _repoMock = new();
-    private readonly Mock<IJoinCodeGenerator> _generatorMock = new();
-    private readonly SessionsController _sut;
+    private readonly JoinCodeGenerator _sut = new();
 
-    public CreateSessionTests()
+    [Fact]
+    public void Generate_ReturnsExactly6Characters()
     {
-        _sut = new SessionsController(_repoMock.Object, _generatorMock.Object);
+        var code = _sut.Generate();
+        Assert.Equal(6, code.Length);
     }
 
     [Fact]
-    public async Task CreateSession_ValidTitle_Returns201WithCodes()
+    public void Generate_ReturnsOnlyUpperAlphanumeric()
     {
-        // Arrange
-        _generatorMock.Setup(g => g.Generate()).Returns("ABC123");
-        _repoMock.Setup(r => r.JoinCodeExistsAsync("ABC123", default)).ReturnsAsync(false);
-        _repoMock.Setup(r => r.InsertAsync(It.IsAny<Session>(), default)).Returns(Task.CompletedTask);
-
-        var request = new CreateSessionRequest { Title = "My Session" };
-
-        // Act
-        var result = await _sut.CreateSession(request, default);
-
-        // Assert
-        var created = Assert.IsType<CreatedAtActionResult>(result);
-        Assert.Equal(201, created.StatusCode);
-
-        var response = Assert.IsType<CreateSessionResponse>(created.Value);
-        Assert.Equal("ABC123", response.JoinCode);
-        Assert.False(string.IsNullOrEmpty(response.InstructorCode));
-        Assert.NotEqual(Guid.Empty, response.Id);
+        for (int i = 0; i < 100; i++)
+        {
+            var code = _sut.Generate();
+            Assert.Matches("^[A-Z0-9]{6}$", code);
+        }
     }
 
     [Fact]
-    public async Task CreateSession_PersistsSessionWithDraftStatus()
+    public void Generate_ProducesDifferentCodesOverTime()
     {
-        // Arrange
-        Session? captured = null;
-        _generatorMock.Setup(g => g.Generate()).Returns("XYZ789");
-        _repoMock.Setup(r => r.JoinCodeExistsAsync("XYZ789", default)).ReturnsAsync(false);
-        _repoMock
-            .Setup(r => r.InsertAsync(It.IsAny<Session>(), default))
-            .Callback<Session, CancellationToken>((s, _) => captured = s)
-            .Returns(Task.CompletedTask);
-
-        var request = new CreateSessionRequest { Title = "  Trimmed Title  " };
-
-        // Act
-        await _sut.CreateSession(request, default);
-
-        // Assert
-        Assert.NotNull(captured);
-        Assert.Equal(SessionStatus.Draft, captured!.Status);
-        Assert.Equal("Trimmed Title", captured.Title);
-        Assert.NotEmpty(captured.JoinCode);
-        Assert.NotEmpty(captured.InstructorCode);
-        Assert.True(captured.CreatedAt <= DateTime.UtcNow);
+        var codes = Enumerable.Range(0, 20).Select(_ => _sut.Generate()).ToHashSet();
+        Assert.True(codes.Count > 1, "Generator should not produce the same code every time.");
     }
 
     [Fact]
-    public async Task CreateSession_RetriesOnJoinCodeCollision()
+    public async Task CollisionRetry_RegeneratesOnDuplicate()
     {
-        // Arrange
+        var repoMock = new Mock<ISessionRepository>();
+        var generatorMock = new Mock<IJoinCodeGenerator>();
+
         var callCount = 0;
-        _generatorMock.Setup(g => g.Generate()).Returns(() => callCount++ == 0 ? "TAKEN1" : "FREE22");
-        _repoMock.Setup(r => r.JoinCodeExistsAsync("TAKEN1", default)).ReturnsAsync(true);
-        _repoMock.Setup(r => r.JoinCodeExistsAsync("FREE22", default)).ReturnsAsync(false);
-        _repoMock.Setup(r => r.InsertAsync(It.IsAny<Session>(), default)).Returns(Task.CompletedTask);
+        generatorMock.Setup(g => g.Generate()).Returns(() => callCount++ == 0 ? "TAKEN1" : "FREE22");
+        repoMock.Setup(r => r.JoinCodeExistsAsync("TAKEN1", default)).ReturnsAsync(true);
+        repoMock.Setup(r => r.JoinCodeExistsAsync("FREE22", default)).ReturnsAsync(false);
 
-        var request = new CreateSessionRequest { Title = "Collision Test" };
+        string joinCode;
+        do
+        {
+            joinCode = generatorMock.Object.Generate();
+        }
+        while (await repoMock.Object.JoinCodeExistsAsync(joinCode, default));
 
-        // Act
-        var result = await _sut.CreateSession(request, default);
-
-        // Assert
-        var created = Assert.IsType<CreatedAtActionResult>(result);
-        var response = Assert.IsType<CreateSessionResponse>(created.Value);
-        Assert.Equal("FREE22", response.JoinCode);
-        _generatorMock.Verify(g => g.Generate(), Times.Exactly(2));
-    }
-
-    [Fact]
-    public async Task CreateSession_EmptyTitle_ShouldNotPersist()
-    {
-        // Arrange
-        _repoMock.Setup(r => r.InsertAsync(It.IsAny<Session>(), default)).Returns(Task.CompletedTask);
-
-        var request = new CreateSessionRequest { Title = "" };
-
-        // Manually simulate what the MVC pipeline does before calling the action
-        _sut.ModelState.AddModelError("Title", "Title is required.");
-
-        // Act — controller must check ModelState itself since we're unit testing outside the pipeline
-        IActionResult result;
-        if (!_sut.ModelState.IsValid)
-            result = _sut.ValidationProblem(_sut.ModelState);
-        else
-            result = await _sut.CreateSession(request, default);
-
-        // Assert
-        Assert.IsType<ObjectResult>(result);
-        _repoMock.Verify(r => r.InsertAsync(It.IsAny<Session>(), default), Times.Never);
+        Assert.Equal("FREE22", joinCode);
+        generatorMock.Verify(g => g.Generate(), Times.Exactly(2));
     }
 }

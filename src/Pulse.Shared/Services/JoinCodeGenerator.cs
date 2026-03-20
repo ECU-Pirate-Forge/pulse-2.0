@@ -9,7 +9,7 @@ public interface IJoinCodeGenerator
 
 public class JoinCodeGenerator : IJoinCodeGenerator
 {
-    private const string Chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no ambiguous chars (0/O, 1/I)
+    private const string Chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private const int Length = 6;
 
     public string Generate()
