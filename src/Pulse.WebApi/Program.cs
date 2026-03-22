@@ -35,6 +35,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+app.MapGet("/", () =>
+{
+    return "Pulse API is running";
+});
 
 app.MapGet("/questions", (QuestionRepository repo) =>
 {
@@ -49,5 +53,4 @@ app.MapPost("/questions", (QuestionRepository repo, Question q) =>
 app.MapDefaultEndpoints();
 
 app.Run();
-
 
