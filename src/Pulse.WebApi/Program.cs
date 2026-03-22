@@ -1,6 +1,6 @@
 using LiteDB;
+using Pulse.Domain.Entities;
 using Pulse.WebApi.Middleware;
-using Pulse.Common.Models;
 using Pulse.Common.Services;
 using Scalar.AspNetCore;
 
@@ -53,4 +53,3 @@ app.MapPost("/questions", (QuestionRepository repo, Question q) =>
 app.MapDefaultEndpoints();
 
 app.Run();
-

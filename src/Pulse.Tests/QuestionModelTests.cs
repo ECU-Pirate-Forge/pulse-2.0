@@ -1,4 +1,4 @@
-using Pulse.Common.Models;
+using Pulse.Domain.Entities;
 using System.ComponentModel.DataAnnotations;
 
 namespace Pulse.Tests.Tests;

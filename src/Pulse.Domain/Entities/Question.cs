@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace Pulse.Common.Models;
+namespace Pulse.Domain.Entities;
 
 public class Question
 {

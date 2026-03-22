@@ -7,8 +7,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="Models\" />
     <Folder Include="Services\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Pulse.Domain\Entities\Question.cs" Link="Models\Question.cs" />
+    <Compile Include="..\Pulse.Domain\Entities\QuestionType.cs" Link="Models\QuestionType.cs" />
   </ItemGroup>
 
   <ItemGroup>

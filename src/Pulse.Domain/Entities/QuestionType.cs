@@ -1,4 +1,4 @@
-namespace Pulse.Common.Models;
+namespace Pulse.Domain.Entities;
 
 public enum QuestionType
 {

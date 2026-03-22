@@ -1,5 +1,5 @@
 using LiteDB;
-using Pulse.Common.Models;
+using Pulse.Domain.Entities;
 
 namespace Pulse.Common.Services;
 
