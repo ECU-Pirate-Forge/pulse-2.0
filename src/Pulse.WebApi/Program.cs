@@ -9,6 +9,7 @@ var connectionString = builder.Configuration.GetConnectionString("pulse-db") ?? 
 builder.Services.AddSingleton<LiteDatabase>(_ => new LiteDatabase(connectionString));
 
 builder.Services.AddSingleton<QuestionRepository>();
+builder.Services.AddSingleton<ISessionRepository, SessionRepository>();
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
@@ -36,6 +37,11 @@ app.MapPost("/questions", (QuestionRepository repo, Question q) =>
     return repo.Insert(q);
 });
 
+app.MapGet("/sessions/by-join-code/{joinCode}", (ISessionRepository repo, string joinCode) =>
+{
+    var session = repo.GetByJoinCode(joinCode);
+    return session is null ? Results.NotFound() : Results.Ok(session);
+});
 
 app.Run();
 
