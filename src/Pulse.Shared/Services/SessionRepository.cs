@@ -1,6 +1,8 @@
 using LiteDB;
 using Pulse.Shared.Models;
 
+namespace Pulse.Shared.Services;
+
 public class SessionRepository : ISessionRepository
 {
     private readonly LiteDatabase _db;
