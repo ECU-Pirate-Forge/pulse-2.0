@@ -38,4 +38,11 @@ public class SessionRepository : ISessionRepository
 
         return await Task.FromResult(code);
     }
+
+    public Task<bool> JoinCodeExistsAsync(string joinCode, CancellationToken ct = default)
+    {
+        var collection = _db.GetCollection(SessionCollectionName);
+        var exists = collection.Exists(Query.EQ("JoinCode", joinCode));
+        return Task.FromResult(exists);
+    }
 }

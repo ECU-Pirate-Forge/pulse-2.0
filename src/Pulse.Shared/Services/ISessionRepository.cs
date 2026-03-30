@@ -17,4 +17,6 @@ public interface ISessionRepository
     /// </summary>
     /// <returns>A unique 6-character join code</returns>
     Task<string> GenerateUniqueJoinCodeAsync();
+
+    Task<bool> JoinCodeExistsAsync(string joinCode, CancellationToken ct = default);
 }
