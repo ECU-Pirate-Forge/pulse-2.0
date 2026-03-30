@@ -11,4 +11,11 @@ public class SessionRepository : ISessionRepository
     {
         _db = db;
     }
+
+    public Task<bool> JoinCodeExistsAsync(string joinCode, CancellationToken ct = default)
+    {
+        var collection = _db.GetCollection("sessions");
+        var exists = collection.Exists(Query.EQ("JoinCode", joinCode));
+        return Task.FromResult(exists);
+    }
 }
