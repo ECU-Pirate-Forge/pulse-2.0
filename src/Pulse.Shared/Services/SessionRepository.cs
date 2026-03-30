@@ -37,5 +37,10 @@ public class SessionRepository : ISessionRepository
         } while (collection.FindOne(s => s.JoinCode == code) != null);
 
         return await Task.FromResult(code);
+    public Task<bool> JoinCodeExistsAsync(string joinCode, CancellationToken ct = default)
+    {
+        var collection = _db.GetCollection("sessions");
+        var exists = collection.Exists(Query.EQ("JoinCode", joinCode));
+        return Task.FromResult(exists);
     }
 }
