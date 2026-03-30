@@ -1,6 +1,6 @@
 using LiteDB;
+using Pulse.Domain.Entities;
 using Pulse.WebApi.Middleware;
-using Pulse.Common.Models;
 using Pulse.Common.Services;
 using Scalar.AspNetCore;
 
@@ -35,6 +35,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+app.MapGet("/", () =>
+{
+    return "Pulse API is running";
+});
 
 app.MapGet("/questions", (QuestionRepository repo) =>
 {
@@ -49,5 +53,3 @@ app.MapPost("/questions", (QuestionRepository repo, Question q) =>
 app.MapDefaultEndpoints();
 
 app.Run();
-
-
