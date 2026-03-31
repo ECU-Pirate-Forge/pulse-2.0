@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Pulse.Common.Services;
 using Pulse.Shared.Models;
+using Pulse.WebApi;
 
 namespace Pulse.Tests.Tests;
 
@@ -25,12 +26,18 @@ public class SessionEndpointTests
 
         public Session? GetById(Guid id) =>
             _store.TryGetValue(id, out var s) ? s : null;
+
+        public Task<bool> JoinCodeExistsAsync(string joinCode, CancellationToken ct = default)
+        {
+            var exists = _store.Values.Any(s => string.Equals(s.JoinCode, joinCode, StringComparison.Ordinal));
+            return Task.FromResult(exists);
+        }
     }
 
     private HttpClient CreateClient(ISessionRepository? repo = null)
     {
         repo ??= new FakeSessionRepository();
-        return new WebApplicationFactory<Program>()
+        return new WebApplicationFactory<ApiAssemblyMarker>()
             .WithWebHostBuilder(b => b.ConfigureServices(services =>
             {
                 services.AddSingleton(repo);

@@ -57,4 +57,11 @@ public class SessionRepository : ISessionRepository
 
         return _sessions.FindById(id);
     }
+
+    public Task<bool> JoinCodeExistsAsync(string joinCode, CancellationToken ct = default)
+    {
+        var collection = _db.GetCollection("sessions");
+        var exists = collection.Exists(Query.EQ("JoinCode", joinCode));
+        return Task.FromResult(exists);
+    }
 }
