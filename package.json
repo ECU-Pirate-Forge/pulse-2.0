@@ -1,0 +1,12 @@
+{
+  "name": "pulse-2.0",
+  "version": "1.0.0",
+  "description": "Pulse - Interactive audience engagement platform",
+  "scripts": {
+    "lint": "echo 'No Node.js files to lint'",
+    "test": "echo 'Node.js tests skipped - using dotnet instead'"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT"
+}

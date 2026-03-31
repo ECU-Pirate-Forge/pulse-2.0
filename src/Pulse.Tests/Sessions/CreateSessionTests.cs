@@ -41,15 +41,15 @@ public class JoinCodeGeneratorTests
 
         var callCount = 0;
         generatorMock.Setup(g => g.Generate()).Returns(() => callCount++ == 0 ? "TAKEN1" : "FREE22");
-        repoMock.Setup(r => r.JoinCodeExistsAsync("TAKEN1", default)).ReturnsAsync(true);
-        repoMock.Setup(r => r.JoinCodeExistsAsync("FREE22", default)).ReturnsAsync(false);
+        repoMock.Setup(r => r.JoinCodeExistsAsync("TAKEN1", TestContext.Current.CancellationToken)).ReturnsAsync(true);
+        repoMock.Setup(r => r.JoinCodeExistsAsync("FREE22", TestContext.Current.CancellationToken)).ReturnsAsync(false);
 
         string joinCode;
         do
         {
             joinCode = generatorMock.Object.Generate();
         }
-        while (await repoMock.Object.JoinCodeExistsAsync(joinCode, default));
+        while (await repoMock.Object.JoinCodeExistsAsync(joinCode, TestContext.Current.CancellationToken));
 
         Assert.Equal("FREE22", joinCode);
         generatorMock.Verify(g => g.Generate(), Times.Exactly(2));
