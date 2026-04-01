@@ -38,7 +38,11 @@ public static class QuestionEndpointHandlers
         existing.Type = request.Type.Value;
         existing.Options = normalizedOptions;
 
-        repo.Update(existing);
+        var updateSucceeded = repo.Update(existing);
+        if (!updateSucceeded)
+        {
+            return TypedResults.BadRequest("Failed to update the question.");
+        }
 
         return TypedResults.Ok(existing);
     }

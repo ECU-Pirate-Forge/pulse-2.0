@@ -50,7 +50,7 @@ app.MapPost("/questions", (QuestionRepository repo, Question q) =>
     return repo.Insert(q);
 });
 
-app.MapPut("/api/questions/{id:guid}",
+app.MapPut("/questions/{id:guid}",
     QuestionEndpointHandlers.UpdateQuestion);
 
 app.MapDefaultEndpoints();
