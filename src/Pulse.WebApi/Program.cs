@@ -1,7 +1,7 @@
-using LiteDB;
 using Pulse.Domain.Entities;
 using Pulse.WebApi.Middleware;
 using Pulse.Common.Services;
+using Pulse.WebApi;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -49,6 +49,9 @@ app.MapPost("/questions", (QuestionRepository repo, Question q) =>
 {
     return repo.Insert(q);
 });
+
+app.MapPut("/api/questions/{id:guid}",
+    QuestionEndpointHandlers.UpdateQuestion);
 
 app.MapDefaultEndpoints();
 

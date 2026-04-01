@@ -36,6 +36,8 @@ public class JoinCodeGeneratorTests
     [Fact]
     public async Task CollisionRetry_RegeneratesOnDuplicate()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
         var repoMock = new Mock<ISessionRepository>();
         var generatorMock = new Mock<IJoinCodeGenerator>();
 
@@ -49,7 +51,7 @@ public class JoinCodeGeneratorTests
         {
             joinCode = generatorMock.Object.Generate();
         }
-        while (await repoMock.Object.JoinCodeExistsAsync(joinCode, default));
+        while (await repoMock.Object.JoinCodeExistsAsync(joinCode, cancellationToken));
 
         Assert.Equal("FREE22", joinCode);
         generatorMock.Verify(g => g.Generate(), Times.Exactly(2));
