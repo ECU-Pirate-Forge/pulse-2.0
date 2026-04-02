@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Pulse.Shared\Pulse.Shared.csproj" />
+    <ProjectReference Include="..\..\src\Pulse.Shared\Pulse.Common.csproj" />
   </ItemGroup>
 
 </Project>
