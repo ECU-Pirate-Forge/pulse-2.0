@@ -51,12 +51,13 @@ public class SessionEndpointTests
     public async Task Post_WithValidTitle_Returns201WithCodes()
     {
         var client = CreateClient();
+        var ct = TestContext.Current.CancellationToken;
 
-        var response = await client.PostAsJsonAsync("/api/sessions", new { Title = "Week 1 Review" });
+        var response = await client.PostAsJsonAsync("/api/sessions", new { Title = "Week 1 Review" }, ct);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync<CreateSessionResponse>();
+        var body = await response.Content.ReadFromJsonAsync<CreateSessionResponse>(ct);
         Assert.NotNull(body);
         Assert.NotEqual(Guid.Empty, body!.Id);
         Assert.False(string.IsNullOrWhiteSpace(body.JoinCode));
@@ -67,8 +68,9 @@ public class SessionEndpointTests
     public async Task Post_WithEmptyTitle_Returns400()
     {
         var client = CreateClient();
+        var ct = TestContext.Current.CancellationToken;
 
-        var response = await client.PostAsJsonAsync("/api/sessions", new { Title = "" });
+        var response = await client.PostAsJsonAsync("/api/sessions", new { Title = "" }, ct);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -77,8 +79,9 @@ public class SessionEndpointTests
     public async Task Post_WithWhitespaceTitle_Returns400()
     {
         var client = CreateClient();
+        var ct = TestContext.Current.CancellationToken;
 
-        var response = await client.PostAsJsonAsync("/api/sessions", new { Title = "   " });
+        var response = await client.PostAsJsonAsync("/api/sessions", new { Title = "   " }, ct);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -88,6 +91,7 @@ public class SessionEndpointTests
     [Fact]
     public async Task Get_WithValidInstructorCode_Returns200WithSession()
     {
+        var ct = TestContext.Current.CancellationToken;
         var repo = new FakeSessionRepository();
         var session = repo.Insert(new Session
         {
@@ -102,10 +106,10 @@ public class SessionEndpointTests
 
         var request = new HttpRequestMessage(HttpMethod.Get, $"/api/sessions/{session.Id}");
         request.Headers.Add("InstructorCode", "SECRETCODE");
-        var response = await client.SendAsync(request);
+        var response = await client.SendAsync(request, ct);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<Session>();
+        var body = await response.Content.ReadFromJsonAsync<Session>(ct);
         Assert.NotNull(body);
         Assert.Equal(session.Id, body!.Id);
         Assert.Equal("Test Session", body.Title);
@@ -114,11 +118,12 @@ public class SessionEndpointTests
     [Fact]
     public async Task Get_WithMissingInstructorCodeHeader_Returns401()
     {
+        var ct = TestContext.Current.CancellationToken;
         var repo = new FakeSessionRepository();
         var session = repo.Insert(new Session { Title = "Test", InstructorCode = "CODE" });
         var client = CreateClient(repo);
 
-        var response = await client.GetAsync($"/api/sessions/{session.Id}");
+        var response = await client.GetAsync($"/api/sessions/{session.Id}", ct);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -126,13 +131,14 @@ public class SessionEndpointTests
     [Fact]
     public async Task Get_WithWrongInstructorCode_Returns403()
     {
+        var ct = TestContext.Current.CancellationToken;
         var repo = new FakeSessionRepository();
         var session = repo.Insert(new Session { Title = "Test", InstructorCode = "RIGHTCODE" });
         var client = CreateClient(repo);
 
         var request = new HttpRequestMessage(HttpMethod.Get, $"/api/sessions/{session.Id}");
         request.Headers.Add("InstructorCode", "WRONGCODE");
-        var response = await client.SendAsync(request);
+        var response = await client.SendAsync(request, ct);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
@@ -140,11 +146,12 @@ public class SessionEndpointTests
     [Fact]
     public async Task Get_WithNonExistentId_Returns404()
     {
+        var ct = TestContext.Current.CancellationToken;
         var client = CreateClient();
 
         var request = new HttpRequestMessage(HttpMethod.Get, $"/api/sessions/{Guid.NewGuid()}");
         request.Headers.Add("InstructorCode", "ANYCODE");
-        var response = await client.SendAsync(request);
+        var response = await client.SendAsync(request, ct);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
