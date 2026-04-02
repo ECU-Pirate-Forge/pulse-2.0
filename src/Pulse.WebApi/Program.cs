@@ -3,6 +3,8 @@ using Pulse.WebApi.Middleware;
 using Pulse.Common.Services;
 using Pulse.WebApi;
 using Scalar.AspNetCore;
+using System.Security.Cryptography;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -53,6 +55,43 @@ app.MapPost("/questions", (QuestionRepository repo, Question q) =>
 app.MapPut("/questions/{id:guid}",
     QuestionEndpointHandlers.UpdateQuestion);
 
+app.MapGet("/sessions",
+    (HttpRequest request, ISessionRepository repo, IConfiguration configuration) =>
+        SessionEndpointHandlers.GetSessions(request, repo, configuration));
+
 app.MapDefaultEndpoints();
 
 app.Run();
+
+public static class SessionEndpointHandlers
+{
+    public static async Task<IResult> GetSessions(HttpRequest request, ISessionRepository repo, IConfiguration configuration)
+    {
+        var instructorCode = request.Headers[InstructorCodeMiddleware.HeaderName].ToString();
+
+        if (string.IsNullOrWhiteSpace(instructorCode))
+        {
+            return Results.Json(new { error = "InstructorCode is required." }, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var configuredInstructorCode = configuration["Security:InstructorCode"];
+        if (string.IsNullOrWhiteSpace(configuredInstructorCode) ||
+            !CryptographicOperations.FixedTimeEquals(
+                Encoding.UTF8.GetBytes(instructorCode),
+                Encoding.UTF8.GetBytes(configuredInstructorCode)))
+        {
+            return Results.Json(new { error = "InstructorCode is invalid." }, statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        var sessions = await repo.GetByInstructorCodeAsync(instructorCode);
+        return Results.Ok(sessions);
+    }
+}
+
+namespace Pulse.WebApi.Middleware
+{
+    public static class InstructorCodeMiddleware
+    {
+        public const string HeaderName = "InstructorCode";
+    }
+}
