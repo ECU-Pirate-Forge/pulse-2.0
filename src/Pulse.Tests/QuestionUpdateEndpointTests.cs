@@ -110,4 +110,36 @@ public class QuestionUpdateEndpointTests
         var badRequest = Assert.IsType<BadRequest<string>>(result.Result);
         Assert.Equal("Question id is invalid.", badRequest.Value);
     }
+
+    [Fact]
+    public void DeleteReturnsNoContentAndRemovesExistingQuestion()
+    {
+        using var db = new LiteDB.LiteDatabase("Filename=:memory:");
+        var repo = new QuestionRepository(db);
+
+        var question = new Question
+        {
+            Id = Guid.NewGuid(),
+            Text = "To be deleted",
+            Type = QuestionType.OpenEnded,
+            Options = new List<string>()
+        };
+        repo.Insert(question);
+
+        var result = QuestionEndpointHandlers.DeleteQuestion(question.Id, repo);
+
+        Assert.IsType<NoContent>(result.Result);
+        Assert.Null(repo.GetById(question.Id));
+    }
+
+    [Fact]
+    public void DeleteReturnsNotFoundForUnknownId()
+    {
+        using var db = new LiteDB.LiteDatabase("Filename=:memory:");
+        var repo = new QuestionRepository(db);
+
+        var result = QuestionEndpointHandlers.DeleteQuestion(Guid.NewGuid(), repo);
+
+        Assert.IsType<NotFound>(result.Result);
+    }
 }

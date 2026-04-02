@@ -117,7 +117,15 @@ public class InstructorCodeMiddlewareTests
     [InlineData("DELETE", "/questions/11111111-1111-1111-1111-111111111111", true)]
     [InlineData("GET", "/questions", false)]
     [InlineData("GET", "/", false)]
-    [InlineData("POST", "/sessions", false)]
+    [InlineData("POST", "/sessions", true)]
+    [InlineData("GET", "/sessions", true)]
+    [InlineData("PUT", "/sessions/11111111-1111-1111-1111-111111111111", true)]
+    [InlineData("DELETE", "/sessions/11111111-1111-1111-1111-111111111111", true)]
+    [InlineData("GET", "/sessions/11111111-1111-1111-1111-111111111111/results", true)]
+    [InlineData("GET", "/sessions/11111111-1111-1111-1111-111111111111/qr", true)]
+    [InlineData("GET", "/sessions/11111111-1111-1111-1111-111111111111/qr-code", true)]
+    [InlineData("POST", "/sessions/11111111-1111-1111-1111-111111111111/join", false)]
+    [InlineData("POST", "/sessions/11111111-1111-1111-1111-111111111111/responses", false)]
     public void InstructorOnlyMatcherIdentifiesIntendedRoutes(string method, string path, bool expected)
     {
         var isProtected = InstructorOnlyEndpointMatcher.IsInstructorOnly(method, new PathString(path));

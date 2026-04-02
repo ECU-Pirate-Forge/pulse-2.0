@@ -53,6 +53,9 @@ app.MapPost("/questions", (QuestionRepository repo, Question q) =>
 app.MapPut("/questions/{id:guid}",
     QuestionEndpointHandlers.UpdateQuestion);
 
+app.MapDelete("/questions/{id:guid}",
+    QuestionEndpointHandlers.DeleteQuestion);
+
 app.MapDefaultEndpoints();
 
 app.Run();

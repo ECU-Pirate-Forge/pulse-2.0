@@ -50,13 +50,27 @@ public static class InstructorOnlyEndpointMatcher
 {
     public static bool IsInstructorOnly(string method, PathString path)
     {
-        if (!path.StartsWithSegments("/questions", StringComparison.OrdinalIgnoreCase))
+        if (path.StartsWithSegments("/questions", StringComparison.OrdinalIgnoreCase))
         {
-            return false;
+            return HttpMethods.IsPost(method)
+                || HttpMethods.IsPut(method)
+                || HttpMethods.IsDelete(method);
         }
 
-        return HttpMethods.IsPost(method)
-            || HttpMethods.IsPut(method)
-            || HttpMethods.IsDelete(method);
+        if (path.StartsWithSegments("/sessions", StringComparison.OrdinalIgnoreCase, out var remaining))
+        {
+            var segments = (remaining.Value ?? string.Empty)
+                .Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (segments.Length == 2
+                && (segments[1].Equals("join", StringComparison.OrdinalIgnoreCase)
+                    || segments[1].Equals("responses", StringComparison.OrdinalIgnoreCase)))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        return false;
     }
 }
