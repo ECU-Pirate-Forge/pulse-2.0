@@ -27,6 +27,33 @@ public class SessionEndpointTests
         public Session? GetById(Guid id) =>
             _store.TryGetValue(id, out var s) ? s : null;
 
+        public Task<Session?> GetByJoinCodeAsync(string joinCode)
+        {
+            if (string.IsNullOrWhiteSpace(joinCode))
+            {
+                return Task.FromResult<Session?>(null);
+            }
+
+            var session = _store.Values.FirstOrDefault(s =>
+                string.Equals(s.JoinCode, joinCode, StringComparison.Ordinal));
+            return Task.FromResult(session);
+        }
+
+        public async Task<string> GenerateUniqueJoinCodeAsync()
+        {
+            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+            string code;
+            do
+            {
+                code = new string(Enumerable.Range(0, 6)
+                    .Select(_ => chars[Random.Shared.Next(chars.Length)])
+                    .ToArray());
+            }
+            while (await JoinCodeExistsAsync(code));
+
+            return code;
+        }
+
         public Task<bool> JoinCodeExistsAsync(string joinCode, CancellationToken ct = default)
         {
             var exists = _store.Values.Any(s => string.Equals(s.JoinCode, joinCode, StringComparison.Ordinal));

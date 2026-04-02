@@ -1,9 +1,12 @@
 // src/Pulse.Shared/Models/Session.cs
 
+using LiteDB;
+
 namespace Pulse.Shared.Models;
 
 public class Session
 {
+    [BsonField("Id")]
     public Guid Id { get; set; }
     public string Title { get; set; } = string.Empty;
     public string InstructorCode { get; set; } = string.Empty;
