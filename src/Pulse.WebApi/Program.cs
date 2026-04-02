@@ -3,8 +3,6 @@ using Pulse.WebApi.Middleware;
 using Pulse.Common.Services;
 using Pulse.WebApi;
 using Scalar.AspNetCore;
-using System.Security.Cryptography;
-using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -75,23 +73,12 @@ public static class SessionEndpointHandlers
         }
 
         var configuredInstructorCode = configuration["Security:InstructorCode"];
-        if (string.IsNullOrWhiteSpace(configuredInstructorCode) ||
-            !CryptographicOperations.FixedTimeEquals(
-                Encoding.UTF8.GetBytes(instructorCode),
-                Encoding.UTF8.GetBytes(configuredInstructorCode)))
+        if (!InstructorCodeMiddleware.IsInstructorCodeValid(instructorCode, configuredInstructorCode))
         {
             return Results.Json(new { error = "InstructorCode is invalid." }, statusCode: StatusCodes.Status403Forbidden);
         }
 
         var sessions = await repo.GetByInstructorCodeAsync(instructorCode);
         return Results.Ok(sessions);
-    }
-}
-
-namespace Pulse.WebApi.Middleware
-{
-    public static class InstructorCodeMiddleware
-    {
-        public const string HeaderName = "InstructorCode";
     }
 }
