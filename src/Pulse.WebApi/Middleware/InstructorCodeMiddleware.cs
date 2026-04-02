@@ -1,11 +1,12 @@
 using Microsoft.AspNetCore.Http;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Pulse.WebApi.Middleware;
 
 public sealed class InstructorCodeMiddleware
 {
     public const string HeaderName = "InstructorCode";
-    private const string DefaultInstructorCode = "INST001";
 
     private readonly RequestDelegate _next;
     private readonly string _expectedInstructorCode;
@@ -13,7 +14,8 @@ public sealed class InstructorCodeMiddleware
     public InstructorCodeMiddleware(RequestDelegate next, IConfiguration configuration)
     {
         _next = next;
-        _expectedInstructorCode = configuration["Security:InstructorCode"] ?? DefaultInstructorCode;
+        _expectedInstructorCode = configuration["Security:InstructorCode"]
+            ?? throw new InvalidOperationException("Security:InstructorCode is not configured. Provide it via user-secrets or environment variables.");
     }
 
     public async Task Invoke(HttpContext context)
@@ -31,7 +33,9 @@ public sealed class InstructorCodeMiddleware
             return;
         }
 
-        if (!string.Equals(instructorCode.ToString(), _expectedInstructorCode, StringComparison.Ordinal))
+        var providedBytes = Encoding.UTF8.GetBytes(instructorCode.ToString());
+        var expectedBytes = Encoding.UTF8.GetBytes(_expectedInstructorCode);
+        if (providedBytes.Length != expectedBytes.Length || !CryptographicOperations.FixedTimeEquals(providedBytes, expectedBytes))
         {
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
             await context.Response.WriteAsJsonAsync(new { error = "InstructorCode is invalid." });

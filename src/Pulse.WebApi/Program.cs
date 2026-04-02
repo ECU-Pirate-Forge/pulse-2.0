@@ -25,6 +25,7 @@ builder.Services.AddOpenApi();
 var app = builder.Build();
 
 app.UseMiddleware<GlobalExceptionMiddleware>();
+app.UseHttpsRedirection();
 app.UseMiddleware<InstructorCodeMiddleware>();
 
 // Configure the HTTP request pipeline.
@@ -33,8 +34,6 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
     app.MapScalarApiReference();
 }
-
-app.UseHttpsRedirection();
 
 app.MapGet("/", () =>
 {

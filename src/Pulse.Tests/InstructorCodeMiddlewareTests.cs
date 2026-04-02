@@ -126,26 +126,14 @@ public class InstructorCodeMiddlewareTests
     }
 
     [Fact]
-    public async Task ProtectedRouteUsesDefaultInstructorCodeWhenConfigIsMissing()
+    public void MiddlewareThrowsWhenSecurityInstructorCodeConfigIsMissing()
     {
-        var nextCalled = false;
         var config = new ConfigurationBuilder().Build();
-        var middleware = new InstructorCodeMiddleware(context =>
-        {
-            nextCalled = true;
-            context.Response.StatusCode = StatusCodes.Status204NoContent;
-            return Task.CompletedTask;
-        }, config);
 
-        var context = new DefaultHttpContext();
-        context.Request.Method = HttpMethods.Post;
-        context.Request.Path = "/questions";
-        context.Request.Headers[InstructorCodeMiddleware.HeaderName] = "INST001";
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            new InstructorCodeMiddleware(_ => Task.CompletedTask, config));
 
-        await middleware.Invoke(context);
-
-        Assert.True(nextCalled);
-        Assert.Equal(StatusCodes.Status204NoContent, context.Response.StatusCode);
+        Assert.Contains("Security:InstructorCode", ex.Message);
     }
 
     private static InstructorCodeMiddleware CreateMiddleware(string expectedCode, RequestDelegate next)
