@@ -18,7 +18,7 @@ public class SessionRepositoryTests
         // Arrange
         var db = new LiteDatabase("Filename=:memory:");
         var collection = db.GetCollection<Session>("sessions");
-        
+
         var session = new Session
         {
             Id = Guid.NewGuid(),
@@ -30,7 +30,7 @@ public class SessionRepositoryTests
             UpdatedAt = DateTime.UtcNow
         };
         collection.Insert(session);
-        
+
         var repo = new SessionRepository(db);
 
         // Act
@@ -88,7 +88,7 @@ public class SessionRepositoryTests
         // Arrange
         var db = new LiteDatabase("Filename=:memory:");
         var collection = db.GetCollection<Session>("sessions");
-        
+
         var session = new Session
         {
             Id = Guid.NewGuid(),
@@ -100,7 +100,7 @@ public class SessionRepositoryTests
             UpdatedAt = DateTime.UtcNow
         };
         collection.Insert(session);
-        
+
         var repo = new SessionRepository(db);
 
         // Act

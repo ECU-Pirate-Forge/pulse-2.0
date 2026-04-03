@@ -21,5 +21,10 @@ public interface ISessionRepository
     /// <returns>A unique 6-character join code</returns>
     Task<string> GenerateUniqueJoinCodeAsync();
 
+    /// <summary>
+    /// Returns all sessions owned by the given instructor code.
+    /// </summary>
+    Task<IEnumerable<Session>> GetByInstructorCodeAsync(string instructorCode);
+
     Task<bool> JoinCodeExistsAsync(string joinCode, CancellationToken ct = default);
 }
