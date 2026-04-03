@@ -31,8 +31,8 @@ jobs:
         shell: pwsh
         run: |
           pwsh -NoProfile -ExecutionPolicy Bypass -File ./.scripts/test-coverage.ps1
-      - name: Upload coverage HTML reports
+      - name: Upload coverage reports
         uses: actions/upload-artifact@v4
         with:
           name: coverage-reports
-          path: src/Pulse.Tests/TestResults/**/coverage-report
+          path: src/Pulse.Tests/TestResults/**/coverage.cobertura.xml

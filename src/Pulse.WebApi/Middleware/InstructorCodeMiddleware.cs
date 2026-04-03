@@ -35,6 +35,14 @@ public sealed class InstructorCodeMiddleware
         }
 
         var configuredInstructorCode = _configuration["Security:InstructorCode"];
+        if (string.IsNullOrWhiteSpace(configuredInstructorCode))
+        {
+            context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+            context.Response.ContentType = "application/json";
+            await context.Response.WriteAsJsonAsync(new { error = "Server misconfiguration: Security:InstructorCode is not set." });
+            return;
+        }
+
         if (!IsInstructorCodeValid(instructorCode, configuredInstructorCode))
         {
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
