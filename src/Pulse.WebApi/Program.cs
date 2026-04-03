@@ -1,7 +1,7 @@
-using LiteDB;
 using Pulse.Domain.Entities;
 using Pulse.WebApi.Middleware;
 using Pulse.Common.Services;
+using Pulse.WebApi;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -25,6 +25,7 @@ builder.Services.AddOpenApi();
 var app = builder.Build();
 
 app.UseMiddleware<GlobalExceptionMiddleware>();
+app.UseMiddleware<InstructorCodeMiddleware>();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -50,6 +51,26 @@ app.MapPost("/questions", (QuestionRepository repo, Question q) =>
     return repo.Insert(q);
 });
 
+app.MapPut("/questions/{id:guid}",
+    QuestionEndpointHandlers.UpdateQuestion);
+
+app.MapDelete("/questions/{id:guid}",
+    QuestionEndpointHandlers.DeleteQuestion);
+
+app.MapGet("/sessions", SessionEndpointHandlers.GetSessions);
+
 app.MapDefaultEndpoints();
 
 app.Run();
+
+public static class SessionEndpointHandlers
+{
+    public static async Task<IResult> GetSessions(HttpContext context, ISessionRepository repo)
+    {
+        var instructorCode = context.Items[InstructorCodeMiddleware.HeaderName]?.ToString()
+            ?? throw new InvalidOperationException(
+                "InstructorCode was not set by InstructorCodeMiddleware. Ensure the middleware is registered.");
+        var sessions = await repo.GetByInstructorCodeAsync(instructorCode);
+        return Results.Ok(sessions);
+    }
+}
