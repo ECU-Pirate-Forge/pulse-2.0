@@ -1,6 +1,7 @@
 using LiteDB;
 using Pulse.Shared.Models;
 using Pulse.Common.Services;
+using Pulse.Shared.Services;
 
 namespace Pulse.Tests.Tests;
 
@@ -9,7 +10,7 @@ public class SessionRepositoryTests
     private SessionRepository CreateRepository()
     {
         var db = new LiteDatabase("Filename=:memory:");
-        return new SessionRepository(db);
+        return new SessionRepository(db, new JoinCodeGenerator());
     }
 
     [Fact]
@@ -31,7 +32,7 @@ public class SessionRepositoryTests
         };
         collection.Insert(session);
 
-        var repo = new SessionRepository(db);
+        var repo = new SessionRepository(db, new JoinCodeGenerator());
 
         // Act
         var result = await repo.GetByJoinCodeAsync("ABC123");
@@ -101,7 +102,7 @@ public class SessionRepositoryTests
         };
         collection.Insert(session);
 
-        var repo = new SessionRepository(db);
+        var repo = new SessionRepository(db, new JoinCodeGenerator());
 
         // Act
         var code1 = await repo.GenerateUniqueJoinCodeAsync();

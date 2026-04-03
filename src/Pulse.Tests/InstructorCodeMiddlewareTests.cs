@@ -137,4 +137,35 @@ public class InstructorCodeMiddlewareTests
 
         Assert.False(isProtected);
     }
+
+    [Fact]
+    public async Task ValidInstructorCodeSetsContextItemAndCallsNext()
+    {
+        const string validCode = "INST001";
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Security:InstructorCode"] = validCode
+            })
+            .Build();
+
+        var nextCalled = false;
+        RequestDelegate next = ctx =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        };
+
+        var middleware = new InstructorCodeMiddleware(next, configuration);
+        var context = new DefaultHttpContext();
+        context.Request.Method = HttpMethods.Get;
+        context.Request.Path = "/sessions";
+        context.Request.Headers[InstructorCodeMiddleware.HeaderName] = validCode;
+        context.Response.Body = new MemoryStream();
+
+        await middleware.Invoke(context);
+
+        Assert.True(nextCalled);
+        Assert.Equal(validCode, context.Items[InstructorCodeMiddleware.HeaderName]?.ToString());
+    }
 }

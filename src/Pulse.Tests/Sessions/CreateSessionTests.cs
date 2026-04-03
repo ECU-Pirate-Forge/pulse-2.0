@@ -92,7 +92,7 @@ public class GetSessionsByInstructorCodeEndpointTests
             UpdatedAt = DateTime.UtcNow
         });
 
-        var repo = new SessionRepository(db);
+        var repo = new SessionRepository(db, new JoinCodeGenerator());
 
         var context = new DefaultHttpContext();
         context.Items[InstructorCodeMiddleware.HeaderName] = "INST001";
@@ -126,7 +126,7 @@ public class GetSessionsByInstructorCodeEndpointTests
             UpdatedAt = DateTime.UtcNow
         });
 
-        var repo = new SessionRepository(db);
+        var repo = new SessionRepository(db, new JoinCodeGenerator());
 
         var context = new DefaultHttpContext();
         context.Items[InstructorCodeMiddleware.HeaderName] = "INST001";
@@ -148,7 +148,7 @@ public class SessionQrEndpointTests
     public async Task GetSessionQrReturnsPngWhenSessionExists()
     {
         using var db = new LiteDatabase("Filename=:memory:");
-        var repo = new SessionRepository(db);
+        var repo = new SessionRepository(db, new JoinCodeGenerator());
         var collection = db.GetCollection<Session>("sessions");
 
         var sessionId = Guid.NewGuid();
@@ -190,7 +190,7 @@ public class SessionQrEndpointTests
     public async Task GetSessionQrReturnsNotFoundWhenSessionDoesNotExist()
     {
         using var db = new LiteDatabase("Filename=:memory:");
-        var repo = new SessionRepository(db);
+        var repo = new SessionRepository(db, new JoinCodeGenerator());
 
         var context = new DefaultHttpContext();
         context.Request.Scheme = "https";

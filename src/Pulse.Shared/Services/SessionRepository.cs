@@ -1,17 +1,20 @@
 using LiteDB;
 using Pulse.Shared.Models;
 using Pulse.Common.Services;
+using Pulse.Shared.Services;
 
 namespace Pulse.Common.Services;
 
 public class SessionRepository : ISessionRepository
 {
     private readonly LiteDatabase _db;
+    private readonly IJoinCodeGenerator _joinCodeGenerator;
     private const string SessionCollectionName = "sessions";
 
-    public SessionRepository(LiteDatabase db)
+    public SessionRepository(LiteDatabase db, IJoinCodeGenerator joinCodeGenerator)
     {
         _db = db;
+        _joinCodeGenerator = joinCodeGenerator;
     }
 
     public async Task<Session?> GetByIdAsync(Guid id)
@@ -36,17 +39,13 @@ public class SessionRepository : ISessionRepository
 
     public async Task<string> GenerateUniqueJoinCodeAsync()
     {
-        const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-        var random = new Random();
-        var collection = _db.GetCollection<Session>(SessionCollectionName);
-
         string code;
         do
         {
-            code = new string(Enumerable.Range(0, 6).Select(_ => chars[random.Next(chars.Length)]).ToArray());
-        } while (collection.FindOne(s => s.JoinCode == code) != null);
+            code = _joinCodeGenerator.Generate();
+        } while (await JoinCodeExistsAsync(code));
 
-        return await Task.FromResult(code);
+        return code;
     }
 
     public Task<IEnumerable<Session>> GetByInstructorCodeAsync(string instructorCode)

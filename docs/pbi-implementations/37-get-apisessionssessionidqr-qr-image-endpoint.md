@@ -1,4 +1,4 @@
-## PBI: GET /api/sessions/{sessionId}/qr - QR image endpoint #37
+## PBI: GET /sessions/{sessionId}/qr - QR image endpoint #37
 
 ### Description
 Endpoint that generates and returns a PNG-encoded QR code containing the session join URL (`https://host/join/{joinCode}`).
@@ -9,7 +9,7 @@ Endpoint that generates and returns a PNG-encoded QR code containing the session
 
 ### Implementation checklist
 - [ ] Add/confirm a QR code generation library to the project (e.g. QRCoder).
-- [ ] Add/confirm endpoint handler for `GET /api/sessions/{id}/qr` (or equivalent) in Web API.
+- [ ] Add/confirm endpoint handler for `GET /sessions/{id}/qr` in Web API.
 - [ ] Lookup the session by id; return 404 when not found.
 - [ ] Construct the join URL string (e.g. `https://host/join/{joinCode}`) using the session's `JoinCode` and the configured host.
 - [ ] Pass the join URL to the QR code library to generate a PNG-encoded QR code.
