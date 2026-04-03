@@ -59,6 +59,19 @@ public class SessionEndpointTests
             var exists = _store.Values.Any(s => string.Equals(s.JoinCode, joinCode, StringComparison.Ordinal));
             return Task.FromResult(exists);
         }
+
+        public Task<IEnumerable<Session>> GetByInstructorCodeAsync(string instructorCode)
+        {
+            if (string.IsNullOrWhiteSpace(instructorCode))
+            {
+                return Task.FromResult(Enumerable.Empty<Session>());
+            }
+
+            var sessions = _store.Values
+                .Where(s => string.Equals(s.InstructorCode, instructorCode, StringComparison.Ordinal))
+                .ToList();
+            return Task.FromResult<IEnumerable<Session>>(sessions);
+        }
     }
 
     private HttpClient CreateClient(ISessionRepository? repo = null)
