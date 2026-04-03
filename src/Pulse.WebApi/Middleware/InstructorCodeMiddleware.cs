@@ -1,6 +1,6 @@
-using Microsoft.AspNetCore.Http;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Pulse.WebApi.Middleware;
 
@@ -9,65 +9,108 @@ public sealed class InstructorCodeMiddleware
     public const string HeaderName = "InstructorCode";
 
     private readonly RequestDelegate _next;
-    private readonly string _expectedInstructorCode;
+    private readonly IConfiguration _configuration;
 
     public InstructorCodeMiddleware(RequestDelegate next, IConfiguration configuration)
     {
         _next = next;
-        _expectedInstructorCode = configuration["Security:InstructorCode"]
-            ?? throw new InvalidOperationException("Security:InstructorCode is not configured. Provide it via user-secrets or environment variables.");
+        _configuration = configuration;
     }
 
     public async Task Invoke(HttpContext context)
     {
-        if (!InstructorOnlyEndpointMatcher.IsInstructorOnly(context.Request.Method, context.Request.Path))
+        if (!InstructorOnlyEndpointMatcher.IsInstructorOnly(context.Request))
         {
             await _next(context);
             return;
         }
 
-        if (!context.Request.Headers.TryGetValue(HeaderName, out var instructorCode) || string.IsNullOrWhiteSpace(instructorCode))
+        var instructorCode = context.Request.Headers[HeaderName].ToString();
+        if (string.IsNullOrWhiteSpace(instructorCode))
         {
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            context.Response.ContentType = "application/json";
             await context.Response.WriteAsJsonAsync(new { error = "InstructorCode is required." });
             return;
         }
 
-        var providedBytes = Encoding.UTF8.GetBytes(instructorCode.ToString());
-        var expectedBytes = Encoding.UTF8.GetBytes(_expectedInstructorCode);
-        if (providedBytes.Length != expectedBytes.Length || !CryptographicOperations.FixedTimeEquals(providedBytes, expectedBytes))
+        var configuredInstructorCode = _configuration["Security:InstructorCode"];
+        if (!IsInstructorCodeValid(instructorCode, configuredInstructorCode))
         {
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            context.Response.ContentType = "application/json";
             await context.Response.WriteAsJsonAsync(new { error = "InstructorCode is invalid." });
             return;
         }
 
+        context.Items[HeaderName] = instructorCode;
         await _next(context);
+    }
+
+    public static bool IsInstructorCodeValid(string? instructorCode, string? configuredInstructorCode)
+    {
+        if (string.IsNullOrWhiteSpace(instructorCode) || string.IsNullOrWhiteSpace(configuredInstructorCode))
+        {
+            return false;
+        }
+
+        var instructorCodeHash = SHA256.HashData(Encoding.UTF8.GetBytes(instructorCode));
+        var configuredHash = SHA256.HashData(Encoding.UTF8.GetBytes(configuredInstructorCode));
+        return CryptographicOperations.FixedTimeEquals(instructorCodeHash, configuredHash);
     }
 }
 
 public static class InstructorOnlyEndpointMatcher
 {
-    public static bool IsInstructorOnly(string method, PathString path)
+    private static readonly Regex SessionIdRouteRegex = new("^/sessions/[^/]+$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex SessionResultsRouteRegex = new("^/sessions/[^/]+/results$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex SessionQrRouteRegex = new("^/sessions/[^/]+/(qr|qr-code)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex PublicStudentSessionRouteRegex = new("^/sessions/[^/]+/(join|responses)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    public static bool IsInstructorOnly(HttpRequest request)
     {
-        if (path.StartsWithSegments("/questions", StringComparison.OrdinalIgnoreCase))
+        var method = request.Method;
+        var path = request.Path.Value?.TrimEnd('/') ?? string.Empty;
+        if (string.IsNullOrEmpty(path))
         {
-            return HttpMethods.IsPost(method)
-                || HttpMethods.IsPut(method)
-                || HttpMethods.IsDelete(method);
+            path = "/";
         }
 
-        if (path.StartsWithSegments("/sessions", StringComparison.OrdinalIgnoreCase, out var remaining))
+        if (HttpMethods.IsGet(method) && path == "/")
         {
-            var segments = (remaining.Value ?? string.Empty)
-                .Split('/', StringSplitOptions.RemoveEmptyEntries);
-            if (segments.Length == 2
-                && (segments[1].Equals("join", StringComparison.OrdinalIgnoreCase)
-                    || segments[1].Equals("responses", StringComparison.OrdinalIgnoreCase)))
-            {
-                return false;
-            }
+            return false;
+        }
 
+        if (HttpMethods.IsGet(method) && path.StartsWith("/questions", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (HttpMethods.IsPost(method) && PublicStudentSessionRouteRegex.IsMatch(path))
+        {
+            return false;
+        }
+
+        if (path.StartsWith("/questions", StringComparison.OrdinalIgnoreCase)
+            && (HttpMethods.IsPost(method) || HttpMethods.IsPut(method) || HttpMethods.IsDelete(method)))
+        {
+            return true;
+        }
+
+        if ((HttpMethods.IsPost(method) || HttpMethods.IsGet(method))
+            && path.Equals("/sessions", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if ((HttpMethods.IsPut(method) || HttpMethods.IsDelete(method))
+            && SessionIdRouteRegex.IsMatch(path))
+        {
+            return true;
+        }
+
+        if (HttpMethods.IsGet(method) && (SessionResultsRouteRegex.IsMatch(path) || SessionQrRouteRegex.IsMatch(path)))
+        {
             return true;
         }
 

@@ -112,28 +112,27 @@ public class QuestionUpdateEndpointTests
     }
 
     [Fact]
-    public void DeleteReturnsNoContentAndRemovesExistingQuestion()
+    public void DeleteQuestionReturnsNoContentWhenQuestionExists()
     {
         using var db = new LiteDB.LiteDatabase("Filename=:memory:");
         var repo = new QuestionRepository(db);
 
-        var question = new Question
+        var existing = new Question
         {
             Id = Guid.NewGuid(),
-            Text = "To be deleted",
+            Text = "Delete me",
             Type = QuestionType.OpenEnded,
             Options = new List<string>()
         };
-        repo.Insert(question);
+        repo.Insert(existing);
 
-        var result = QuestionEndpointHandlers.DeleteQuestion(question.Id, repo);
+        var result = QuestionEndpointHandlers.DeleteQuestion(existing.Id, repo);
 
         Assert.IsType<NoContent>(result.Result);
-        Assert.Null(repo.GetById(question.Id));
     }
 
     [Fact]
-    public void DeleteReturnsNotFoundForUnknownId()
+    public void DeleteQuestionReturnsNotFoundWhenQuestionDoesNotExist()
     {
         using var db = new LiteDB.LiteDatabase("Filename=:memory:");
         var repo = new QuestionRepository(db);

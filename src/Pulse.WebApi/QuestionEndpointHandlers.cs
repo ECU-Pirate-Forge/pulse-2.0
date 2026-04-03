@@ -47,8 +47,13 @@ public static class QuestionEndpointHandlers
         return TypedResults.Ok(existing);
     }
 
-    public static Results<NoContent, NotFound> DeleteQuestion(Guid id, QuestionRepository repo)
+    public static Results<NoContent, BadRequest<string>, NotFound> DeleteQuestion(Guid id, QuestionRepository repo)
     {
+        if (id == Guid.Empty)
+        {
+            return TypedResults.BadRequest("Question id is invalid.");
+        }
+
         var deleted = repo.Delete(id);
         if (!deleted)
         {

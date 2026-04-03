@@ -19,7 +19,7 @@ Ensure middleware is applied to all instructor-only APIs.
 
 ## Definition of Done
 
-### Checklist
+### PBI Checklist
 - [ ] Middleware is wired to all intended instructor-only endpoints.
 - [ ] Missing `InstructorCode` returns 401.
 - [ ] Invalid `InstructorCode` returns 403.

@@ -39,6 +39,16 @@ public class SessionRepository : ISessionRepository
         return await Task.FromResult(code);
     }
 
+    public Task<IEnumerable<Session>> GetByInstructorCodeAsync(string instructorCode)
+    {
+        if (string.IsNullOrWhiteSpace(instructorCode))
+            return Task.FromResult(Enumerable.Empty<Session>());
+
+        var collection = _db.GetCollection<Session>(SessionCollectionName);
+        var sessions = collection.Find(s => s.InstructorCode == instructorCode).ToList();
+        return Task.FromResult<IEnumerable<Session>>(sessions);
+    }
+
     public Task<bool> JoinCodeExistsAsync(string joinCode, CancellationToken ct = default)
     {
         var collection = _db.GetCollection(SessionCollectionName);

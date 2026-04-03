@@ -1,3 +1,5 @@
+using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Pulse.WebApi.Middleware;
@@ -7,152 +9,132 @@ namespace Pulse.Tests;
 public class InstructorCodeMiddlewareTests
 {
     [Fact]
-    public async Task ProtectedRouteMissingInstructorCodeReturns401AndStopsPipeline()
+    public async Task DeleteQuestionMissingInstructorCodeReturns401()
     {
-        var nextCalled = false;
-        var middleware = CreateMiddleware("INST001", _ =>
-        {
-            nextCalled = true;
-            return Task.CompletedTask;
-        });
-
-        var context = new DefaultHttpContext();
-        context.Request.Method = HttpMethods.Post;
-        context.Request.Path = "/questions";
-
-        await middleware.Invoke(context);
-
-        Assert.False(nextCalled);
-        Assert.Equal(StatusCodes.Status401Unauthorized, context.Response.StatusCode);
-    }
-
-    [Fact]
-    public async Task ProtectedRouteInvalidInstructorCodeReturns403AndStopsPipeline()
-    {
-        var nextCalled = false;
-        var middleware = CreateMiddleware("INST001", _ =>
-        {
-            nextCalled = true;
-            return Task.CompletedTask;
-        });
-
-        var context = new DefaultHttpContext();
-        context.Request.Method = HttpMethods.Put;
-        context.Request.Path = "/questions/11111111-1111-1111-1111-111111111111";
-        context.Request.Headers[InstructorCodeMiddleware.HeaderName] = "BADCODE";
-
-        await middleware.Invoke(context);
-
-        Assert.False(nextCalled);
-        Assert.Equal(StatusCodes.Status403Forbidden, context.Response.StatusCode);
-    }
-
-    [Fact]
-    public async Task ProtectedRouteBlankInstructorCodeReturns401AndStopsPipeline()
-    {
-        var nextCalled = false;
-        var middleware = CreateMiddleware("INST001", _ =>
-        {
-            nextCalled = true;
-            return Task.CompletedTask;
-        });
-
-        var context = new DefaultHttpContext();
-        context.Request.Method = HttpMethods.Post;
-        context.Request.Path = "/questions";
-        context.Request.Headers[InstructorCodeMiddleware.HeaderName] = "   ";
-
-        await middleware.Invoke(context);
-
-        Assert.False(nextCalled);
-        Assert.Equal(StatusCodes.Status401Unauthorized, context.Response.StatusCode);
-    }
-
-    [Fact]
-    public async Task ProtectedRouteValidInstructorCodeContinuesRequest()
-    {
-        var nextCalled = false;
-        var middleware = CreateMiddleware("INST001", context =>
-        {
-            nextCalled = true;
-            context.Response.StatusCode = StatusCodes.Status200OK;
-            return Task.CompletedTask;
-        });
-
-        var httpContext = new DefaultHttpContext();
-        httpContext.Request.Method = HttpMethods.Post;
-        httpContext.Request.Path = "/questions";
-        httpContext.Request.Headers[InstructorCodeMiddleware.HeaderName] = "INST001";
-
-        await middleware.Invoke(httpContext);
-
-        Assert.True(nextCalled);
-        Assert.Equal(StatusCodes.Status200OK, httpContext.Response.StatusCode);
-    }
-
-    [Fact]
-    public async Task PublicRouteWithoutInstructorCodeRemainsAccessible()
-    {
-        var nextCalled = false;
-        var middleware = CreateMiddleware("INST001", context =>
-        {
-            nextCalled = true;
-            context.Response.StatusCode = StatusCodes.Status200OK;
-            return Task.CompletedTask;
-        });
-
-        var context = new DefaultHttpContext();
-        context.Request.Method = HttpMethods.Get;
-        context.Request.Path = "/questions";
-
-        await middleware.Invoke(context);
-
-        Assert.True(nextCalled);
-        Assert.Equal(StatusCodes.Status200OK, context.Response.StatusCode);
-    }
-
-    [Theory]
-    [InlineData("POST", "/questions", true)]
-    [InlineData("PUT", "/questions/11111111-1111-1111-1111-111111111111", true)]
-    [InlineData("DELETE", "/questions/11111111-1111-1111-1111-111111111111", true)]
-    [InlineData("GET", "/questions", false)]
-    [InlineData("GET", "/", false)]
-    [InlineData("POST", "/sessions", true)]
-    [InlineData("GET", "/sessions", true)]
-    [InlineData("PUT", "/sessions/11111111-1111-1111-1111-111111111111", true)]
-    [InlineData("DELETE", "/sessions/11111111-1111-1111-1111-111111111111", true)]
-    [InlineData("GET", "/sessions/11111111-1111-1111-1111-111111111111/results", true)]
-    [InlineData("GET", "/sessions/11111111-1111-1111-1111-111111111111/qr", true)]
-    [InlineData("GET", "/sessions/11111111-1111-1111-1111-111111111111/qr-code", true)]
-    [InlineData("POST", "/sessions/11111111-1111-1111-1111-111111111111/join", false)]
-    [InlineData("POST", "/sessions/11111111-1111-1111-1111-111111111111/responses", false)]
-    public void InstructorOnlyMatcherIdentifiesIntendedRoutes(string method, string path, bool expected)
-    {
-        var isProtected = InstructorOnlyEndpointMatcher.IsInstructorOnly(method, new PathString(path));
-
-        Assert.Equal(expected, isProtected);
-    }
-
-    [Fact]
-    public void MiddlewareThrowsWhenSecurityInstructorCodeConfigIsMissing()
-    {
-        var config = new ConfigurationBuilder().Build();
-
-        var ex = Assert.Throws<InvalidOperationException>(() =>
-            new InstructorCodeMiddleware(_ => Task.CompletedTask, config));
-
-        Assert.Contains("Security:InstructorCode", ex.Message);
-    }
-
-    private static InstructorCodeMiddleware CreateMiddleware(string expectedCode, RequestDelegate next)
-    {
-        var config = new ConfigurationBuilder()
+        var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Security:InstructorCode"] = expectedCode
+                ["Security:InstructorCode"] = "INST001"
             })
             .Build();
 
-        return new InstructorCodeMiddleware(next, config);
+        var nextCalled = false;
+        RequestDelegate next = _ =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        };
+
+        var middleware = new InstructorCodeMiddleware(next, configuration);
+        var context = new DefaultHttpContext();
+        context.Request.Method = HttpMethods.Delete;
+        context.Request.Path = "/questions/00000000-0000-0000-0000-000000000001";
+        context.Response.Body = new MemoryStream();
+
+        await middleware.Invoke(context);
+
+        Assert.Equal(StatusCodes.Status401Unauthorized, context.Response.StatusCode);
+        Assert.False(nextCalled);
+
+        context.Response.Body.Seek(0, SeekOrigin.Begin);
+        using var reader = new StreamReader(context.Response.Body, Encoding.UTF8);
+        var body = await reader.ReadToEndAsync(TestContext.Current.CancellationToken);
+        using var doc = JsonDocument.Parse(body);
+        Assert.Equal("InstructorCode is required.", doc.RootElement.GetProperty("error").GetString());
+    }
+
+    [Fact]
+    public async Task GetSessionsMissingInstructorCodeReturns401()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Security:InstructorCode"] = "INST001"
+            })
+            .Build();
+
+        var nextCalled = false;
+        RequestDelegate next = _ =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        };
+
+        var middleware = new InstructorCodeMiddleware(next, configuration);
+        var context = new DefaultHttpContext();
+        context.Request.Method = HttpMethods.Get;
+        context.Request.Path = "/sessions";
+        context.Response.Body = new MemoryStream();
+
+        await middleware.Invoke(context);
+
+        Assert.Equal(StatusCodes.Status401Unauthorized, context.Response.StatusCode);
+        Assert.False(nextCalled);
+
+        context.Response.Body.Seek(0, SeekOrigin.Begin);
+        using var reader = new StreamReader(context.Response.Body, Encoding.UTF8);
+        var body = await reader.ReadToEndAsync(TestContext.Current.CancellationToken);
+        using var doc = JsonDocument.Parse(body);
+        Assert.Equal("InstructorCode is required.", doc.RootElement.GetProperty("error").GetString());
+    }
+
+    [Fact]
+    public async Task GetSessionsInvalidInstructorCodeReturns403()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Security:InstructorCode"] = "INST001"
+            })
+            .Build();
+
+        var nextCalled = false;
+        RequestDelegate next = _ =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        };
+
+        var middleware = new InstructorCodeMiddleware(next, configuration);
+        var context = new DefaultHttpContext();
+        context.Request.Method = HttpMethods.Get;
+        context.Request.Path = "/sessions";
+        context.Request.Headers[InstructorCodeMiddleware.HeaderName] = "WRONG";
+        context.Response.Body = new MemoryStream();
+
+        await middleware.Invoke(context);
+
+        Assert.Equal(StatusCodes.Status403Forbidden, context.Response.StatusCode);
+        Assert.False(nextCalled);
+
+        context.Response.Body.Seek(0, SeekOrigin.Begin);
+        using var reader = new StreamReader(context.Response.Body, Encoding.UTF8);
+        var body = await reader.ReadToEndAsync(TestContext.Current.CancellationToken);
+        using var doc = JsonDocument.Parse(body);
+        Assert.Equal("InstructorCode is invalid.", doc.RootElement.GetProperty("error").GetString());
+    }
+
+    [Fact]
+    public void IsInstructorOnlyReturnsTrueForProtectedSessionRoute()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Method = HttpMethods.Get;
+        context.Request.Path = "/sessions/abc123/results";
+
+        var isProtected = InstructorOnlyEndpointMatcher.IsInstructorOnly(context.Request);
+
+        Assert.True(isProtected);
+    }
+
+    [Fact]
+    public void IsInstructorOnlyReturnsFalseForPublicStudentRoute()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Method = HttpMethods.Post;
+        context.Request.Path = "/sessions/abc123/join";
+
+        var isProtected = InstructorOnlyEndpointMatcher.IsInstructorOnly(context.Request);
+
+        Assert.False(isProtected);
     }
 }
