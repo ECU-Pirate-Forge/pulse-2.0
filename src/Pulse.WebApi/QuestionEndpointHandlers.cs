@@ -46,6 +46,17 @@ public static class QuestionEndpointHandlers
 
         return TypedResults.Ok(existing);
     }
+
+    public static Results<NoContent, NotFound> DeleteQuestion(Guid id, QuestionRepository repo)
+    {
+        var deleted = repo.Delete(id);
+        if (!deleted)
+        {
+            return TypedResults.NotFound();
+        }
+
+        return TypedResults.NoContent();
+    }
 }
 
 public sealed class UpdateQuestionRequest

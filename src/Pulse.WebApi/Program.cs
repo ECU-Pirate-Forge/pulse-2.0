@@ -25,6 +25,7 @@ builder.Services.AddOpenApi();
 var app = builder.Build();
 
 app.UseMiddleware<GlobalExceptionMiddleware>();
+app.UseMiddleware<InstructorCodeMiddleware>();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -52,6 +53,9 @@ app.MapPost("/questions", (QuestionRepository repo, Question q) =>
 
 app.MapPut("/questions/{id:guid}",
     QuestionEndpointHandlers.UpdateQuestion);
+
+app.MapDelete("/questions/{id:guid}",
+    QuestionEndpointHandlers.DeleteQuestion);
 
 app.MapGet("/sessions",
     (HttpRequest request, ISessionRepository repo, IConfiguration configuration) =>

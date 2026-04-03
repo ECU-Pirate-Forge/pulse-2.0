@@ -16,4 +16,5 @@ public class QuestionRepository
     public Question Insert(Question q) { _col.Insert(q); return q; }
     public Question? GetById(Guid id) => _col.FindById(id);
     public bool Update(Question q) => _col.Update(q);
+    public bool Delete(Guid id) => _col.Delete(id);
 }
