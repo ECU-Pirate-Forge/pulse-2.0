@@ -2,6 +2,7 @@ using Pulse.Domain.Entities;
 using Pulse.WebApi.Middleware;
 using Pulse.Common.Services;
 using Pulse.WebApi;
+using QRCoder;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -58,6 +59,7 @@ app.MapDelete("/questions/{id:guid}",
     QuestionEndpointHandlers.DeleteQuestion);
 
 app.MapGet("/sessions", SessionEndpointHandlers.GetSessions);
+app.MapGet("/sessions/{id:guid}/qr", SessionEndpointHandlers.GetSessionQr);
 
 app.MapDefaultEndpoints();
 
@@ -72,5 +74,29 @@ public static class SessionEndpointHandlers
                 "InstructorCode was not set by InstructorCodeMiddleware. Ensure the middleware is registered.");
         var sessions = await repo.GetByInstructorCodeAsync(instructorCode);
         return Results.Ok(sessions);
+    }
+
+    public static async Task<IResult> GetSessionQr(Guid id, HttpRequest request, ISessionRepository repo, IConfiguration configuration)
+    {
+        var session = await repo.GetByIdAsync(id);
+        if (session is null)
+        {
+            return Results.NotFound();
+        }
+
+        var baseUrl = configuration["App:JoinBaseUrl"];
+        if (string.IsNullOrWhiteSpace(baseUrl))
+        {
+            baseUrl = $"{request.Scheme}://{request.Host}";
+        }
+
+        var joinUrl = $"{baseUrl.TrimEnd('/')}/join/{session.JoinCode}";
+
+        using var generator = new QRCodeGenerator();
+        using var qrData = generator.CreateQrCode(joinUrl, QRCodeGenerator.ECCLevel.Q);
+        var qrCode = new PngByteQRCode(qrData);
+        var pngBytes = qrCode.GetGraphic(20);
+
+        return Results.File(pngBytes, "image/png");
     }
 }

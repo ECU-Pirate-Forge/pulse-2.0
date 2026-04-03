@@ -14,6 +14,16 @@ public class SessionRepository : ISessionRepository
         _db = db;
     }
 
+    public async Task<Session?> GetByIdAsync(Guid id)
+    {
+        if (id == Guid.Empty)
+            return null;
+
+        var collection = _db.GetCollection<Session>(SessionCollectionName);
+        var session = collection.FindById(id);
+        return await Task.FromResult(session);
+    }
+
     public async Task<Session?> GetByJoinCodeAsync(string joinCode)
     {
         if (string.IsNullOrWhiteSpace(joinCode))
