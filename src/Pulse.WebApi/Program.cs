@@ -25,8 +25,8 @@ builder.Services.AddOpenApi();
 var app = builder.Build();
 
 app.UseMiddleware<GlobalExceptionMiddleware>();
-app.UseHttpsRedirection();
 app.UseMiddleware<InstructorCodeMiddleware>();
+app.UseHttpsRedirection();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
