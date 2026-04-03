@@ -1,37 +1,39 @@
-## PBI: Instructor session list API - GET /api/sessions?instructorCode=... #28
+## PBI: Instructor session list API - GET /sessions #28
 
 ### Description
 Endpoint that returns all sessions belonging to the instructor identified by their `InstructorCode`.
 
+The `InstructorCode` is passed as an HTTP request header (not a query parameter). Access control is enforced by `InstructorCodeMiddleware` before the endpoint handler is reached.
+
 ### Acceptance Criteria
-- [ ] Returns 200 and an array of sessions when the `InstructorCode` is valid.
-- [ ] Returns 401/403 when the `InstructorCode` is missing or invalid.
+- [x] Returns 200 and an array of sessions when the `InstructorCode` is valid.
+- [x] Returns 401/403 when the `InstructorCode` is missing or invalid.
 
 ### Implementation checklist
-- [ ] Add/confirm endpoint handler for `GET /api/sessions` (or equivalent) in Web API.
-- [ ] Extract and validate the `InstructorCode` from the request (e.g. header or query parameter).
-- [ ] Return 401 when `InstructorCode` is missing.
-- [ ] Return 403 when `InstructorCode` is present but invalid/unrecognised.
-- [ ] Lookup all sessions associated with the valid `InstructorCode` from the repository.
-- [ ] Return 200 with the array of session models on success.
-- [ ] Return an empty array (not 404) if the instructor has no sessions.
-- [ ] Add/confirm unit tests for valid code, missing code, and invalid code scenarios.
+- [x] Add/confirm endpoint handler for `GET /sessions` in Web API.
+- [x] Extract and validate the `InstructorCode` from the `InstructorCode` request header via `InstructorCodeMiddleware`.
+- [x] Return 401 when `InstructorCode` is missing.
+- [x] Return 403 when `InstructorCode` is present but invalid/unrecognised.
+- [x] Lookup all sessions associated with the valid `InstructorCode` from the repository.
+- [x] Return 200 with the array of session models on success.
+- [x] Return an empty array (not 404) if the instructor has no sessions.
+- [x] Add/confirm unit tests for valid code and no-match scenarios.
 
 ## Definition of Done
 
 ### PBI Checklist
-- [ ] Endpoint implemented and reachable.
-- [ ] Returns 200 + array of sessions for a valid `InstructorCode`.
-- [ ] Returns 401 for a missing `InstructorCode`.
-- [ ] Returns 403 for an invalid/unrecognised `InstructorCode`.
-- [ ] Automated tests added/updated and passing.
-- [ ] `dotnet build` succeeds.
-- [ ] Linting passes (`dotnet format --verify-no-changes`).
+- [x] Endpoint implemented and reachable.
+- [x] Returns 200 + array of sessions for a valid `InstructorCode`.
+- [x] Returns 401 for a missing `InstructorCode`.
+- [x] Returns 403 for an invalid/unrecognised `InstructorCode`.
+- [x] Automated tests added/updated and passing.
+- [x] `dotnet build` succeeds.
+- [x] Linting passes (`dotnet format --verify-no-changes`).
 
 ### Manual Verification (API)
 - Configure instructor code before starting the API (required for valid-code success path):
-	- Temporary (current shell): `export Security__InstructorCode=INST001`
-	- or set `"Security": { "InstructorCode": "INST001" }` in `src/Pulse.WebApi/appsettings.Development.json`
+	- Recommended: `export Security__InstructorCode=INST001` (environment variable, not committed to source)
+	- Do **not** commit `InstructorCode` values to `appsettings.Development.json`; use environment variables or user-secrets instead.
 - Start the API:
 	- `dotnet run --project src/Pulse.WebApi/Pulse.WebApi.csproj`
 - Verify service health in browser:
@@ -69,5 +71,5 @@ curl -i -sS "http://localhost:5062/sessions" -H "InstructorCode: WRONG"
 ### Unit Test Location
 - `src/Pulse.Tests/Sessions/CreateSessionTests.cs`
   - `GetSessionsByInstructorCodeEndpointTests.GetSessionsValidInstructorCodeReturns200AndArray`
-  - `GetSessionsByInstructorCodeEndpointTests.GetSessionsMissingInstructorCodeReturns401`
-  - `GetSessionsByInstructorCodeEndpointTests.GetSessionsInvalidInstructorCodeReturns403`
+  - `GetSessionsByInstructorCodeEndpointTests.GetSessionsNoMatchingCodeReturnsEmptyArray`
+- `src/Pulse.Tests/InstructorCodeMiddlewareTests.cs` — covers 401/403 enforcement

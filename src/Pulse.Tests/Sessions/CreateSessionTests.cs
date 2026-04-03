@@ -1,10 +1,10 @@
 using Moq;
 using LiteDB;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Configuration;
 using Pulse.Common.Services;
 using Pulse.Shared.Models;
 using Pulse.Shared.Services;
+using Pulse.WebApi;
 using Pulse.WebApi.Middleware;
 
 namespace Pulse.Tests.Sessions;
@@ -91,17 +91,11 @@ public class GetSessionsByInstructorCodeEndpointTests
         });
 
         var repo = new SessionRepository(db);
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Security:InstructorCode"] = "INST001"
-            })
-            .Build();
 
         var context = new DefaultHttpContext();
-        context.Request.Headers[InstructorCodeMiddleware.HeaderName] = "INST001";
+        context.Items[InstructorCodeMiddleware.HeaderName] = "INST001";
 
-        var result = await SessionEndpointHandlers.GetSessions(context.Request, repo, configuration);
+        var result = await SessionEndpointHandlers.GetSessions(context, repo);
         var statusResult = Assert.IsAssignableFrom<IStatusCodeHttpResult>(result);
         var valueResult = Assert.IsAssignableFrom<IValueHttpResult>(result);
 
@@ -115,47 +109,33 @@ public class GetSessionsByInstructorCodeEndpointTests
     }
 
     [Fact]
-    public async Task GetSessionsMissingInstructorCodeReturns401()
+    public async Task GetSessionsNoMatchingCodeReturnsEmptyArray()
     {
         using var db = new LiteDatabase("Filename=:memory:");
+        var collection = db.GetCollection<Session>("sessions");
+        collection.Insert(new Session
+        {
+            Id = Guid.NewGuid(),
+            Title = "Session A",
+            InstructorCode = "OTHER",
+            JoinCode = "ABC123",
+            Status = "Active",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        });
+
         var repo = new SessionRepository(db);
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Security:InstructorCode"] = "INST001"
-            })
-            .Build();
 
         var context = new DefaultHttpContext();
+        context.Items[InstructorCodeMiddleware.HeaderName] = "INST001";
 
-        var result = await SessionEndpointHandlers.GetSessions(context.Request, repo, configuration);
+        var result = await SessionEndpointHandlers.GetSessions(context, repo);
         var statusResult = Assert.IsAssignableFrom<IStatusCodeHttpResult>(result);
         var valueResult = Assert.IsAssignableFrom<IValueHttpResult>(result);
 
-        Assert.Equal(StatusCodes.Status401Unauthorized, statusResult.StatusCode);
-        Assert.Equal("InstructorCode is required.", valueResult.Value?.GetType().GetProperty("error")?.GetValue(valueResult.Value)?.ToString());
-    }
+        Assert.Equal(StatusCodes.Status200OK, statusResult.StatusCode);
 
-    [Fact]
-    public async Task GetSessionsInvalidInstructorCodeReturns403()
-    {
-        using var db = new LiteDatabase("Filename=:memory:");
-        var repo = new SessionRepository(db);
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Security:InstructorCode"] = "INST001"
-            })
-            .Build();
-
-        var context = new DefaultHttpContext();
-        context.Request.Headers[InstructorCodeMiddleware.HeaderName] = "WRONG";
-
-        var result = await SessionEndpointHandlers.GetSessions(context.Request, repo, configuration);
-        var statusResult = Assert.IsAssignableFrom<IStatusCodeHttpResult>(result);
-        var valueResult = Assert.IsAssignableFrom<IValueHttpResult>(result);
-
-        Assert.Equal(StatusCodes.Status403Forbidden, statusResult.StatusCode);
-        Assert.Equal("InstructorCode is invalid.", valueResult.Value?.GetType().GetProperty("error")?.GetValue(valueResult.Value)?.ToString());
+        var sessions = Assert.IsAssignableFrom<IEnumerable<Session>>(valueResult.Value);
+        Assert.Empty(sessions);
     }
 }

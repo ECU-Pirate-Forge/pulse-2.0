@@ -57,9 +57,7 @@ app.MapPut("/questions/{id:guid}",
 app.MapDelete("/questions/{id:guid}",
     QuestionEndpointHandlers.DeleteQuestion);
 
-app.MapGet("/sessions",
-    (HttpRequest request, ISessionRepository repo, IConfiguration configuration) =>
-        SessionEndpointHandlers.GetSessions(request, repo, configuration));
+app.MapGet("/sessions", SessionEndpointHandlers.GetSessions);
 
 app.MapDefaultEndpoints();
 
@@ -67,21 +65,11 @@ app.Run();
 
 public static class SessionEndpointHandlers
 {
-    public static async Task<IResult> GetSessions(HttpRequest request, ISessionRepository repo, IConfiguration configuration)
+    public static async Task<IResult> GetSessions(HttpContext context, ISessionRepository repo)
     {
-        var instructorCode = request.Headers[InstructorCodeMiddleware.HeaderName].ToString();
-
-        if (string.IsNullOrWhiteSpace(instructorCode))
-        {
-            return Results.Json(new { error = "InstructorCode is required." }, statusCode: StatusCodes.Status401Unauthorized);
-        }
-
-        var configuredInstructorCode = configuration["Security:InstructorCode"];
-        if (!InstructorCodeMiddleware.IsInstructorCodeValid(instructorCode, configuredInstructorCode))
-        {
-            return Results.Json(new { error = "InstructorCode is invalid." }, statusCode: StatusCodes.Status403Forbidden);
-        }
-
+        var instructorCode = context.Items[InstructorCodeMiddleware.HeaderName]?.ToString()
+            ?? throw new InvalidOperationException(
+                "InstructorCode was not set by InstructorCodeMiddleware. Ensure the middleware is registered.");
         var sessions = await repo.GetByInstructorCodeAsync(instructorCode);
         return Results.Ok(sessions);
     }

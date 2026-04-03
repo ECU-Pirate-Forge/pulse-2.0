@@ -43,6 +43,7 @@ public sealed class InstructorCodeMiddleware
             return;
         }
 
+        context.Items[HeaderName] = instructorCode;
         await _next(context);
     }
 
@@ -53,9 +54,9 @@ public sealed class InstructorCodeMiddleware
             return false;
         }
 
-        return CryptographicOperations.FixedTimeEquals(
-            Encoding.UTF8.GetBytes(instructorCode),
-            Encoding.UTF8.GetBytes(configuredInstructorCode));
+        var instructorCodeHash = SHA256.HashData(Encoding.UTF8.GetBytes(instructorCode));
+        var configuredHash = SHA256.HashData(Encoding.UTF8.GetBytes(configuredInstructorCode));
+        return CryptographicOperations.FixedTimeEquals(instructorCodeHash, configuredHash);
     }
 }
 
