@@ -15,6 +15,15 @@ public static class SessionEndpointHandlers
         return Results.Ok(sessions);
     }
 
+    public static string BuildJoinUrl(string? configuredBaseUrl, HttpRequest request, string joinCode)
+    {
+        var baseUrl = string.IsNullOrWhiteSpace(configuredBaseUrl)
+            ? $"{request.Scheme}://{request.Host}"
+            : configuredBaseUrl;
+
+        return $"{baseUrl.TrimEnd('/')}/join/{joinCode}";
+    }
+
     public static async Task<IResult> GetSessionQr(Guid id, HttpRequest request, ISessionRepository repo, IConfiguration configuration)
     {
         var session = await repo.GetByIdAsync(id);
@@ -23,13 +32,7 @@ public static class SessionEndpointHandlers
             return Results.NotFound();
         }
 
-        var baseUrl = configuration["App:JoinBaseUrl"];
-        if (string.IsNullOrWhiteSpace(baseUrl))
-        {
-            baseUrl = $"{request.Scheme}://{request.Host}";
-        }
-
-        var joinUrl = $"{baseUrl.TrimEnd('/')}/join/{session.JoinCode}";
+        var joinUrl = BuildJoinUrl(configuration["App:JoinBaseUrl"], request, session.JoinCode);
 
         using var generator = new QRCodeGenerator();
         using var qrData = generator.CreateQrCode(joinUrl, QRCodeGenerator.ECCLevel.Q);
