@@ -1,4 +1,5 @@
 using LiteDB;
+using System.Collections.Concurrent;
 using Pulse.Shared.Models;
 using Pulse.Common.Services;
 
@@ -7,8 +8,9 @@ namespace Pulse.Common.Services;
 public class SessionRepository : ISessionRepository
 {
     private readonly LiteDatabase _db;
-    private readonly ILiteCollection<Session> _sessions;
     private const string SessionCollectionName = "sessions";
+    private readonly ILiteCollection<Session> _sessions;
+    private readonly ConcurrentDictionary<Guid, Session> _cache = new();
 
     public SessionRepository(LiteDatabase db)
     {
@@ -46,6 +48,7 @@ public class SessionRepository : ISessionRepository
         }
 
         _sessions.Insert(session);
+        _cache[session.Id] = session;
         return session;
     }
 
@@ -56,7 +59,18 @@ public class SessionRepository : ISessionRepository
             return null;
         }
 
-        return _sessions.FindById(id);
+        if (_cache.TryGetValue(id, out var cached))
+        {
+            return cached;
+        }
+
+        var persisted = _sessions.FindOne(s => s.Id == id);
+        if (persisted is not null)
+        {
+            _cache[id] = persisted;
+        }
+
+        return persisted;
     }
 
     public async Task<Session?> GetByJoinCodeAsync(string joinCode)
@@ -96,7 +110,7 @@ public class SessionRepository : ISessionRepository
 
     public Task<bool> JoinCodeExistsAsync(string joinCode, CancellationToken ct = default)
     {
-        var collection = _db.GetCollection(SessionCollectionName);
+        var collection = _db.GetCollection<Session>(SessionCollectionName);
         var exists = collection.Exists(Query.EQ("JoinCode", joinCode));
         return Task.FromResult(exists);
     }
