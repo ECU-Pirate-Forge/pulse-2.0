@@ -41,7 +41,6 @@ public class JoinCodeGeneratorTests
     public async Task CollisionRetry_RegeneratesOnDuplicate()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-
         var repoMock = new Mock<ISessionRepository>();
         var generatorMock = new Mock<IJoinCodeGenerator>();
 
