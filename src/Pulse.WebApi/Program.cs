@@ -58,6 +58,7 @@ app.MapDelete("/questions/{id:guid}",
     QuestionEndpointHandlers.DeleteQuestion);
 
 app.MapGet("/sessions", SessionEndpointHandlers.GetSessions);
+app.MapGet("/sessions/join/{joinCode}", SessionEndpointHandlers.JoinSessionByCode);
 
 app.MapDefaultEndpoints();
 
@@ -72,5 +73,17 @@ public static class SessionEndpointHandlers
                 "InstructorCode was not set by InstructorCodeMiddleware. Ensure the middleware is registered.");
         var sessions = await repo.GetByInstructorCodeAsync(instructorCode);
         return Results.Ok(sessions);
+    }
+
+    public static async Task<IResult> JoinSessionByCode(string joinCode, ISessionRepository repo)
+    {
+        if (string.IsNullOrWhiteSpace(joinCode))
+            return Results.BadRequest(new { error = "Join code is required." });
+
+        var session = await repo.GetByJoinCodeAsync(joinCode);
+        if (session == null)
+            return Results.NotFound(new { error = "Session not found. Please check your code." });
+
+        return Results.Ok(new { title = session.Title });
     }
 }
