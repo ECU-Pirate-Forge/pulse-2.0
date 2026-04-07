@@ -99,7 +99,7 @@ app.MapDelete("/questions/{id:guid}",
     QuestionEndpointHandlers.DeleteQuestion);
 
 app.MapGet("/sessions", SessionEndpointHandlers.GetSessions);
-app.MapGet("/sessions/join/{joinCode}", SessionEndpointHandlers.JoinSessionByCode);
+app.MapGet("/api/sessions/join/{joinCode}", SessionEndpointHandlers.JoinSessionByCode);
 
 app.MapDefaultEndpoints();
 
