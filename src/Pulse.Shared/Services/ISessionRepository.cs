@@ -4,6 +4,9 @@ namespace Pulse.Common.Services;
 
 public interface ISessionRepository
 {
+    Session Insert(Session session);
+    Session? GetById(Guid id);
+
     /// <summary>
     /// Retrieves a session by its id.
     /// </summary>
