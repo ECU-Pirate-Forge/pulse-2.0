@@ -110,6 +110,13 @@ public class SessionRepository : ISessionRepository
         return Task.FromResult<IEnumerable<Session>>(sessions);
     }
 
+    public Task<Session> InsertAsync(Session session, CancellationToken ct = default)
+    {
+        var collection = _db.GetCollection<Session>(SessionCollectionName);
+        collection.Insert(session);
+        return Task.FromResult(session);
+    }
+
     public Task<bool> JoinCodeExistsAsync(string joinCode, CancellationToken ct = default)
     {
         var exists = _sessions.Exists(s => s.JoinCode == joinCode);

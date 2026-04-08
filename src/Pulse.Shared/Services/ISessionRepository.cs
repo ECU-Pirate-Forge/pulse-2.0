@@ -34,4 +34,9 @@ public interface ISessionRepository
     Task<IEnumerable<Session>> GetByInstructorCodeAsync(string instructorCode);
 
     Task<bool> JoinCodeExistsAsync(string joinCode, CancellationToken ct = default);
+
+    /// <summary>
+    /// Persists a new session to the database.
+    /// </summary>
+    Task<Session> InsertAsync(Session session, CancellationToken ct = default);
 }

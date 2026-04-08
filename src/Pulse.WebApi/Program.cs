@@ -1,5 +1,6 @@
 using Pulse.Domain.Entities;
 using Pulse.Shared.Models;
+using Pulse.Shared.Services;
 using Pulse.WebApi.Middleware;
 using Pulse.Common.Services;
 using Pulse.WebApi;
@@ -8,19 +9,11 @@ using Scalar.AspNetCore;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
-// builder.Host.UseDefaultServiceProvider((context, options) =>
-// {
-//     // validate service registrations at build time in development
-//     options.ValidateScopes = context.HostingEnvironment.IsDevelopment();
-//     options.ValidateOnBuild = true;
-// });
 
 var connectionString = builder.Configuration.GetConnectionString("pulse-db") ?? "Filename=pulse.db;Connection=shared";
 
 builder.Services.AddPulseWebApiCoreServices(connectionString);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
@@ -29,7 +22,6 @@ app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseMiddleware<InstructorCodeMiddleware>();
 app.UseHttpsRedirection();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -51,29 +43,6 @@ app.MapPost("/questions", (QuestionRepository repo, Question q) =>
     return repo.Insert(q);
 });
 
-app.MapPost("/api/sessions", (ISessionRepository repo, CreateSessionRequest req) =>
-{
-    if (string.IsNullOrWhiteSpace(req.Title))
-        return Results.BadRequest(new { error = "Title is required." });
-
-    var now = DateTime.UtcNow;
-    var session = new Session
-    {
-        Title = req.Title,
-        JoinCode = GenerateCode(6),
-        InstructorCode = GenerateCode(8),
-        Status = "Draft",
-        CreatedAt = now,
-        UpdatedAt = now
-    };
-
-    repo.Insert(session);
-
-    return Results.Created(
-        $"/api/sessions/{session.Id}",
-        new CreateSessionResponse(session.Id, session.JoinCode, session.InstructorCode));
-});
-
 app.MapGet("/api/sessions/{id:guid}", (ISessionRepository repo, Guid id, HttpContext ctx) =>
 {
     var instructorCode = ctx.Request.Headers["InstructorCode"].FirstOrDefault();
@@ -91,13 +60,11 @@ app.MapGet("/api/sessions/{id:guid}", (ISessionRepository repo, Guid id, HttpCon
     return Results.Ok(session);
 });
 
-app.MapPut("/questions/{id:guid}",
-    QuestionEndpointHandlers.UpdateQuestion);
-
-app.MapDelete("/questions/{id:guid}",
-    QuestionEndpointHandlers.DeleteQuestion);
+app.MapPut("/questions/{id:guid}", QuestionEndpointHandlers.UpdateQuestion);
+app.MapDelete("/questions/{id:guid}", QuestionEndpointHandlers.DeleteQuestion);
 
 app.MapGet("/sessions", SessionEndpointHandlers.GetSessions);
+app.MapPost("/api/sessions", SessionEndpointHandlers.CreateSession);
 app.MapGet("/api/sessions/join/{joinCode}", SessionEndpointHandlers.JoinSessionByCode);
 app.MapGet("/sessions/{id:guid}/qr", SessionEndpointHandlers.GetSessionQr);
 
@@ -105,15 +72,7 @@ app.MapDefaultEndpoints();
 
 app.Run();
 
-static string GenerateCode(int length)
-{
-    const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    return new string(Enumerable.Range(0, length)
-        .Select(_ => chars[Random.Shared.Next(chars.Length)])
-        .ToArray());
-}
-
-record CreateSessionRequest(string Title);
-record CreateSessionResponse(Guid Id, string JoinCode, string InstructorCode);
+public record CreateSessionRequest(string Title);
+public record CreateSessionResponse(Guid Id, string JoinCode, string InstructorCode);
 
 public partial class Program { }

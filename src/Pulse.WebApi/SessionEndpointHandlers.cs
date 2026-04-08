@@ -1,3 +1,5 @@
+using Pulse.Shared.Models;
+using Pulse.Shared.Services;
 using Pulse.Common.Services;
 using Pulse.WebApi.Middleware;
 using QRCoder;
@@ -52,5 +54,43 @@ public static class SessionEndpointHandlers
             return Results.NotFound(new { error = "Session not found. Please check your code." });
 
         return Results.Ok(new { title = session.Title });
+    }
+
+    public static async Task<IResult> CreateSession(
+        HttpContext context,
+        CreateSessionRequest request,
+        ISessionRepository repo,
+        IJoinCodeGenerator joinCodeGenerator)
+    {
+        if (string.IsNullOrWhiteSpace(request.Title))
+            return Results.BadRequest("Title is required.");
+
+        var instructorCode = context.Items[InstructorCodeMiddleware.HeaderName]?.ToString()
+            ?? throw new InvalidOperationException(
+                "InstructorCode was not set by InstructorCodeMiddleware.");
+
+        string joinCode;
+        do
+        {
+            joinCode = joinCodeGenerator.Generate();
+        } while (await repo.JoinCodeExistsAsync(joinCode));
+
+        var session = new Session
+        {
+            Id = Guid.NewGuid(),
+            Title = request.Title,
+            JoinCode = joinCode,
+            InstructorCode = instructorCode,
+            Status = "Draft",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        var created = await repo.InsertAsync(session);
+
+        return Results.Created($"/api/sessions/{created.Id}", new CreateSessionResponse(
+            created.Id,
+            created.JoinCode,
+            created.InstructorCode));
     }
 }
