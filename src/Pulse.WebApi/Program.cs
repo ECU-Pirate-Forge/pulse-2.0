@@ -1,4 +1,5 @@
 using LiteDB;
+using Pulse.WebApi;
 using Pulse.WebApi.Middleware;
 using Pulse.Common.Models;
 using Pulse.Common.Services;

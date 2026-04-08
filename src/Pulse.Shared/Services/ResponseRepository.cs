@@ -1,4 +1,3 @@
-using System;
 using LiteDB;
 using Pulse.Shared.Models;
 
@@ -13,6 +12,7 @@ public class ResponseRepository
     {
         _db = db;
         _col = _db.GetCollection<Response>("responses");
+        _col.EnsureIndex("ix_questionId_deviceId", "$.QuestionId + '|' + $.DeviceId", true);
     }
 
     public Response UpsertByQuestionAndDevice(string questionId, string deviceId, string value)
