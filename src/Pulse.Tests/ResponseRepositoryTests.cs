@@ -57,4 +57,22 @@ public class ResponseRepositoryTests
         Assert.Throws<ArgumentException>(() =>
             repo.UpsertByQuestionAndDevice("q1", "not-a-guid", "A"));
     }
+
+    [Fact]
+    public void UpsertByQuestionAndDevice_EmptyDeviceId_ThrowsArgumentException()
+    {
+        var repo = CreateRepository();
+
+        Assert.Throws<ArgumentException>(() =>
+            repo.UpsertByQuestionAndDevice("q1", "", "A"));
+    }
+
+    [Fact]
+    public void UpsertByQuestionAndDevice_NullDeviceId_ThrowsArgumentException()
+    {
+        var repo = CreateRepository();
+
+        Assert.Throws<ArgumentException>(() =>
+            repo.UpsertByQuestionAndDevice("q1", null!, "A"));
+    }
 }

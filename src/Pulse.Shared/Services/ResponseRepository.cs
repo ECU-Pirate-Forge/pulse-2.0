@@ -12,6 +12,8 @@ public class ResponseRepository
     {
         _db = db;
         _col = _db.GetCollection<Response>("responses");
+        // Compound unique index using string concatenation with a separator to enforce
+        // one response per device per question at the database level.
         _col.EnsureIndex("ix_questionId_deviceId", "$.QuestionId + '|' + $.DeviceId", true);
     }
 
