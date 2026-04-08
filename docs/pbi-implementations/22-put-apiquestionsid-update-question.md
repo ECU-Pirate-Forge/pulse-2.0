@@ -55,19 +55,19 @@ echo "$QUESTION_ID"
 2. Update the question with a valid payload (expect HTTP 200 + updated model).
 
 ```bash
-curl -i -sS -X PUT "http://localhost:5062/api/questions/<QUESTION_ID>" -H "Content-Type: application/json" -d '{"text":"Updated question text","type":0,"options":["Option A","Option B"]}'
+curl -i -sS -X PUT "http://localhost:5062/questions/<QUESTION_ID>" -H "Content-Type: application/json" -d '{"text":"Updated question text","type":0,"options":["Option A","Option B"]}'
 ```
 
 3. Validate invalid MC payload (expect HTTP 400).
 
 ```bash
-curl -i -sS -X PUT "http://localhost:5062/api/questions/<QUESTION_ID>" -H "Content-Type: application/json" -d '{"text":"Invalid MC payload","type":0,"options":["Only one option"]}'
+curl -i -sS -X PUT "http://localhost:5062/questions/<QUESTION_ID>" -H "Content-Type: application/json" -d '{"text":"Invalid MC payload","type":0,"options":["Only one option"]}'
 ```
 
 4. Validate unknown id behavior (expect HTTP 404).
 
 ```bash
-curl -i -sS -X PUT "http://localhost:5062/api/questions/00000000-0000-0000-0000-000000000123" -H "Content-Type: application/json" -d '{"text":"Question not found","type":2,"options":[]}'
+curl -i -sS -X PUT "http://localhost:5062/questions/00000000-0000-0000-0000-000000000123" -H "Content-Type: application/json" -d '{"text":"Question not found","type":2,"options":[]}'
 ```
 
 ### Automated Verification

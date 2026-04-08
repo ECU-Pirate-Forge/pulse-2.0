@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Pulse.Shared.Models;
 using Pulse.Common.Services;
+using Pulse.WebApi;
 
 namespace Pulse.Tests.Tests;
 
@@ -11,7 +12,7 @@ public class SessionRepositorySmokeTests
     {
         // Use an in-memory LiteDB to keep this test isolated and fast.
         var services = new ServiceCollection();
-        services.AddPulseWebApiCoreServices("Filename=C:\\code\\pulse-2.0\\src\\Pulse.WebApi\\pulse.db;Connection=shared");
+        services.AddPulseWebApiCoreServices("Filename=:memory:");
 
         using var serviceProvider = services.BuildServiceProvider();
         var repo = serviceProvider.GetRequiredService<ISessionRepository>();
@@ -24,7 +25,7 @@ public class SessionRepositorySmokeTests
     public void SessionRepository_InsertThenGetById_PersistsAndRetrievesSession()
     {
         var services = new ServiceCollection();
-        services.AddPulseWebApiCoreServices("Filename=C:\\code\\pulse-2.0\\src\\Pulse.WebApi\\pulse.db;Connection=shared");
+        services.AddPulseWebApiCoreServices("Filename=:memory:");
 
         using var serviceProvider = services.BuildServiceProvider();
         var repo = serviceProvider.GetRequiredService<ISessionRepository>();

@@ -29,10 +29,12 @@ Ensure middleware is applied to all instructor-only APIs.
 - [ ] `dotnet build` and `dotnet test` succeed.
 
 ### Automated Verification
-- Run targeted middleware tests (or equivalent endpoint-level tests):
+- Run all tests via solution:
+	- `dotnet test Pulse.slnx`
+- Run tests for just the test project:
+	- `dotnet test src/Pulse.Tests/Pulse.Tests.csproj`
+- Run middleware-focused subset:
 	- `dotnet test src/Pulse.Tests/Pulse.Tests.csproj --filter InstructorCode`
-- Run all tests:
-	- `dotnet test`
 - Build impacted projects:
 	- `dotnet build src/Pulse.WebApi/Pulse.WebApi.csproj`
 	- `dotnet build src/Pulse.Tests/Pulse.Tests.csproj`

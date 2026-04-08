@@ -27,6 +27,7 @@ var app = builder.Build();
 
 app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseMiddleware<InstructorCodeMiddleware>();
+app.UseHttpsRedirection();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -34,8 +35,6 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
     app.MapScalarApiReference();
 }
-
-app.UseHttpsRedirection();
 
 app.MapGet("/", () =>
 {
@@ -100,6 +99,7 @@ app.MapDelete("/questions/{id:guid}",
 
 app.MapGet("/sessions", SessionEndpointHandlers.GetSessions);
 app.MapGet("/sessions/join/{joinCode}", SessionEndpointHandlers.JoinSessionByCode);
+app.MapGet("/sessions/{id:guid}/qr", SessionEndpointHandlers.GetSessionQr);
 
 app.MapDefaultEndpoints();
 
@@ -115,29 +115,5 @@ static string GenerateCode(int length)
 
 record CreateSessionRequest(string Title);
 record CreateSessionResponse(Guid Id, string JoinCode, string InstructorCode);
-
-public static class SessionEndpointHandlers
-{
-    public static async Task<IResult> GetSessions(HttpContext context, ISessionRepository repo)
-    {
-        var instructorCode = context.Items[InstructorCodeMiddleware.HeaderName]?.ToString()
-            ?? throw new InvalidOperationException(
-                "InstructorCode was not set by InstructorCodeMiddleware. Ensure the middleware is registered.");
-        var sessions = await repo.GetByInstructorCodeAsync(instructorCode);
-        return Results.Ok(sessions);
-    }
-
-    public static async Task<IResult> JoinSessionByCode(string joinCode, ISessionRepository repo)
-    {
-        if (string.IsNullOrWhiteSpace(joinCode))
-            return Results.BadRequest(new { error = "Join code is required." });
-
-        var session = await repo.GetByJoinCodeAsync(joinCode);
-        if (session == null)
-            return Results.NotFound(new { error = "Session not found. Please check your code." });
-
-        return Results.Ok(new { title = session.Title });
-    }
-}
 
 public partial class Program { }
