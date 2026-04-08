@@ -62,6 +62,7 @@ app.MapGet("/api/sessions/{id:guid}", (ISessionRepository repo, Guid id, HttpCon
 
 app.MapPut("/questions/{id:guid}", QuestionEndpointHandlers.UpdateQuestion);
 app.MapDelete("/questions/{id:guid}", QuestionEndpointHandlers.DeleteQuestion);
+app.MapPut("/api/questions/reorder", QuestionEndpointHandlers.ReorderQuestions);
 
 app.MapGet("/sessions", SessionEndpointHandlers.GetSessions);
 app.MapPost("/api/sessions", SessionEndpointHandlers.CreateSession);
