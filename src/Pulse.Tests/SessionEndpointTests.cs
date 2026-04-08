@@ -27,6 +27,9 @@ public class SessionEndpointTests
         public Session? GetById(Guid id) =>
             _store.TryGetValue(id, out var s) ? s : null;
 
+        public Task<Session?> GetByIdAsync(Guid id) =>
+            Task.FromResult(GetById(id));
+
         public Task<Session?> GetByJoinCodeAsync(string joinCode)
         {
             if (string.IsNullOrWhiteSpace(joinCode))

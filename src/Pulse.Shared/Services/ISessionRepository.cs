@@ -8,6 +8,13 @@ public interface ISessionRepository
     Session? GetById(Guid id);
 
     /// <summary>
+    /// Retrieves a session by its id.
+    /// </summary>
+    /// <param name="id">The session id to look up</param>
+    /// <returns>The session if found; null otherwise</returns>
+    Task<Session?> GetByIdAsync(Guid id);
+
+    /// <summary>
     /// Retrieves a session by its join code.
     /// </summary>
     /// <param name="joinCode">The join code to look up</param>

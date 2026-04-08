@@ -98,6 +98,7 @@ app.MapDelete("/questions/{id:guid}",
     QuestionEndpointHandlers.DeleteQuestion);
 
 app.MapGet("/sessions", SessionEndpointHandlers.GetSessions);
+app.MapGet("/sessions/{id:guid}/qr", SessionEndpointHandlers.GetSessionQr);
 
 app.MapDefaultEndpoints();
 
@@ -113,17 +114,3 @@ static string GenerateCode(int length)
 
 record CreateSessionRequest(string Title);
 record CreateSessionResponse(Guid Id, string JoinCode, string InstructorCode);
-
-public static class SessionEndpointHandlers
-{
-    public static async Task<IResult> GetSessions(HttpContext context, ISessionRepository repo)
-    {
-        var instructorCode = context.Items[InstructorCodeMiddleware.HeaderName]?.ToString()
-            ?? throw new InvalidOperationException(
-                "InstructorCode was not set by InstructorCodeMiddleware. Ensure the middleware is registered.");
-        var sessions = await repo.GetByInstructorCodeAsync(instructorCode);
-        return Results.Ok(sessions);
-    }
-}
-
-public partial class Program { }

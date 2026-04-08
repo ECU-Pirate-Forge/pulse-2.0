@@ -139,12 +139,13 @@ public class InstructorCodeMiddlewareTests
     }
 
     [Fact]
-    public async Task GetSessionsWithValidInstructorCodeAllowsRequest()
+    public async Task ValidInstructorCodeSetsContextItemAndCallsNext()
     {
+        const string validCode = "INST001";
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Security:InstructorCode"] = "INST001"
+                ["Security:InstructorCode"] = validCode
             })
             .Build();
 
@@ -152,7 +153,6 @@ public class InstructorCodeMiddlewareTests
         RequestDelegate next = ctx =>
         {
             nextCalled = true;
-            ctx.Response.StatusCode = StatusCodes.Status200OK;
             return Task.CompletedTask;
         };
 
@@ -160,12 +160,45 @@ public class InstructorCodeMiddlewareTests
         var context = new DefaultHttpContext();
         context.Request.Method = HttpMethods.Get;
         context.Request.Path = "/sessions";
-        context.Request.Headers[InstructorCodeMiddleware.HeaderName] = "INST001";
+        context.Request.Headers[InstructorCodeMiddleware.HeaderName] = validCode;
         context.Response.Body = new MemoryStream();
 
         await middleware.Invoke(context);
 
         Assert.True(nextCalled);
-        Assert.Equal(StatusCodes.Status200OK, context.Response.StatusCode);
+        Assert.Equal(validCode, context.Items[InstructorCodeMiddleware.HeaderName]?.ToString());
+    }
+
+    [Fact]
+    public async Task MissingConfiguredInstructorCodeReturns500()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>())
+            .Build();
+
+        var nextCalled = false;
+        RequestDelegate next = _ =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        };
+
+        var middleware = new InstructorCodeMiddleware(next, configuration);
+        var context = new DefaultHttpContext();
+        context.Request.Method = HttpMethods.Get;
+        context.Request.Path = "/sessions";
+        context.Request.Headers[InstructorCodeMiddleware.HeaderName] = "ANYCODE";
+        context.Response.Body = new MemoryStream();
+
+        await middleware.Invoke(context);
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, context.Response.StatusCode);
+        Assert.False(nextCalled);
+
+        context.Response.Body.Seek(0, SeekOrigin.Begin);
+        using var reader = new StreamReader(context.Response.Body, Encoding.UTF8);
+        var body = await reader.ReadToEndAsync(TestContext.Current.CancellationToken);
+        using var doc = JsonDocument.Parse(body);
+        Assert.Contains("Security:InstructorCode", doc.RootElement.GetProperty("error").GetString());
     }
 }
