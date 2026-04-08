@@ -1,6 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
 using Pulse.Common.Services;
-using Pulse.WebApi;
 
 namespace Pulse.Tests.Tests;
 
