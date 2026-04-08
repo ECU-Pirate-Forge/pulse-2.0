@@ -41,4 +41,16 @@ public static class SessionEndpointHandlers
 
         return Results.File(pngBytes, "image/png");
     }
+
+    public static async Task<IResult> JoinSessionByCode(string joinCode, ISessionRepository repo)
+    {
+        if (string.IsNullOrWhiteSpace(joinCode))
+            return Results.BadRequest(new { error = "Join code is required." });
+
+        var session = await repo.GetByJoinCodeAsync(joinCode);
+        if (session == null)
+            return Results.NotFound(new { error = "Session not found. Please check your code." });
+
+        return Results.Ok(new { title = session.Title });
+    }
 }

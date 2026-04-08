@@ -98,6 +98,7 @@ app.MapDelete("/questions/{id:guid}",
     QuestionEndpointHandlers.DeleteQuestion);
 
 app.MapGet("/sessions", SessionEndpointHandlers.GetSessions);
+app.MapGet("/api/sessions/join/{joinCode}", SessionEndpointHandlers.JoinSessionByCode);
 app.MapGet("/sessions/{id:guid}/qr", SessionEndpointHandlers.GetSessionQr);
 
 app.MapDefaultEndpoints();
@@ -114,3 +115,5 @@ static string GenerateCode(int length)
 
 record CreateSessionRequest(string Title);
 record CreateSessionResponse(Guid Id, string JoinCode, string InstructorCode);
+
+public partial class Program { }
