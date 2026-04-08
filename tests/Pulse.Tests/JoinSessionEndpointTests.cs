@@ -96,22 +96,3 @@ public class JoinSessionEndpointTests
         mockRepo.Verify(repo => repo.GetByJoinCodeAsync(It.IsAny<string>()), Times.Never);
     }
 }
-
-/// <summary>
-/// Mock implementation of SessionEndpointHandlers for testing purposes.
-/// This allows us to test the endpoint logic directly.
-/// </summary>
-public static class SessionEndpointHandlers
-{
-    public static async Task<IResult> JoinSessionByCode(string joinCode, ISessionRepository repo)
-    {
-        if (string.IsNullOrWhiteSpace(joinCode))
-            return Results.BadRequest(new { error = "Join code is required." });
-
-        var session = await repo.GetByJoinCodeAsync(joinCode);
-        if (session == null)
-            return Results.NotFound(new { error = "Session not found. Please check your code." });
-
-        return Results.Ok(new { title = session.Title });
-    }
-}
