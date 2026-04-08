@@ -9,34 +9,24 @@ using Scalar.AspNetCore;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
-// builder.Host.UseDefaultServiceProvider((context, options) =>
-// {
-//     // validate service registrations at build time in development
-//     options.ValidateScopes = context.HostingEnvironment.IsDevelopment();
-//     options.ValidateOnBuild = true;
-// });
 
 var connectionString = builder.Configuration.GetConnectionString("pulse-db") ?? "Filename=pulse.db;Connection=shared";
 
 builder.Services.AddPulseWebApiCoreServices(connectionString);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
 app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseMiddleware<InstructorCodeMiddleware>();
+app.UseHttpsRedirection();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
     app.MapScalarApiReference();
 }
-
-app.UseHttpsRedirection();
 
 app.MapGet("/", () =>
 {
@@ -53,18 +43,37 @@ app.MapPost("/questions", (QuestionRepository repo, Question q) =>
     return repo.Insert(q);
 });
 
-app.MapPut("/questions/{id:guid}",
-    QuestionEndpointHandlers.UpdateQuestion);
+app.MapGet("/api/sessions/{id:guid}", (ISessionRepository repo, Guid id, HttpContext ctx) =>
+{
+    var instructorCode = ctx.Request.Headers["InstructorCode"].FirstOrDefault();
 
-app.MapDelete("/questions/{id:guid}",
-    QuestionEndpointHandlers.DeleteQuestion);
+    if (string.IsNullOrWhiteSpace(instructorCode))
+        return Results.Unauthorized();
+
+    var session = repo.GetById(id);
+    if (session is null)
+        return Results.NotFound();
+
+    if (!string.Equals(session.InstructorCode, instructorCode, StringComparison.Ordinal))
+        return Results.StatusCode(403);
+
+    return Results.Ok(session);
+});
+
+app.MapPut("/questions/{id:guid}", QuestionEndpointHandlers.UpdateQuestion);
+app.MapDelete("/questions/{id:guid}", QuestionEndpointHandlers.DeleteQuestion);
 
 app.MapGet("/sessions", SessionEndpointHandlers.GetSessions);
 app.MapPost("/api/sessions", SessionEndpointHandlers.CreateSession);
+app.MapGet("/api/sessions/join/{joinCode}", SessionEndpointHandlers.JoinSessionByCode);
+app.MapGet("/sessions/{id:guid}/qr", SessionEndpointHandlers.GetSessionQr);
 
 app.MapDefaultEndpoints();
 
 app.Run();
+
+public record CreateSessionRequest(string Title);
+public record CreateSessionResponse(Guid Id, string JoinCode, string InstructorCode);
 
 public static class SessionEndpointHandlers
 {
@@ -100,12 +109,10 @@ public static class SessionEndpointHandlers
 
         var created = await repo.InsertAsync(session);
 
-        return Results.Created($"/api/sessions/{created.Id}", new CreateSessionResponse
-        {
-            Id = created.Id,
-            JoinCode = created.JoinCode,
-            InstructorCode = created.InstructorCode
-        });
+        return Results.Created($"/api/sessions/{created.Id}", new CreateSessionResponse(
+            created.Id,
+            created.JoinCode,
+            created.InstructorCode));
     }
 
     public static async Task<IResult> GetSessions(HttpContext context, ISessionRepository repo)
@@ -117,3 +124,5 @@ public static class SessionEndpointHandlers
         return Results.Ok(sessions);
     }
 }
+
+public partial class Program { }

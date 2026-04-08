@@ -16,7 +16,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pulse.WebApp", "src\Pulse.W
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pulse.AppHost", "src\Pulse.AppHost\Pulse.AppHost.csproj", "{C4E25EFD-6E05-3CBF-0253-4C7B1182B8B8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pulse.Shared", "src\Pulse.Shared\Pulse.Shared.csproj", "{9AEAE65A-188B-13E6-2A11-18E3CC153E06}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pulse.Common", "src\Pulse.Shared\Pulse.Common.csproj", "{9AEAE65A-188B-13E6-2A11-18E3CC153E06}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
