@@ -9,14 +9,10 @@ public static class QuestionEndpointHandlers
     public static Results<Ok<Question>, BadRequest<string>, NotFound> UpdateQuestion(Guid id, UpdateQuestionRequest request, QuestionRepository repo)
     {
         if (id == Guid.Empty)
-        {
             return TypedResults.BadRequest("Question id is invalid.");
-        }
 
         if (string.IsNullOrWhiteSpace(request.Text) || request.Type is null || request.Options is null)
-        {
             return TypedResults.BadRequest("Text, type, and options are required.");
-        }
 
         var normalizedOptions = request.Options
             .Where(option => !string.IsNullOrWhiteSpace(option))
@@ -24,15 +20,11 @@ public static class QuestionEndpointHandlers
             .ToList();
 
         if (request.Type == QuestionType.MultipleChoice && normalizedOptions.Count < 2)
-        {
             return TypedResults.BadRequest("Multiple-choice questions must include at least 2 options.");
-        }
 
         var existing = repo.GetById(id);
         if (existing is null)
-        {
             return TypedResults.NotFound();
-        }
 
         existing.Text = request.Text.Trim();
         existing.Type = request.Type.Value;
@@ -40,9 +32,7 @@ public static class QuestionEndpointHandlers
 
         var updateSucceeded = repo.Update(existing);
         if (!updateSucceeded)
-        {
             return TypedResults.BadRequest("Failed to update the question.");
-        }
 
         return TypedResults.Ok(existing);
     }
@@ -50,17 +40,34 @@ public static class QuestionEndpointHandlers
     public static Results<NoContent, BadRequest<string>, NotFound> DeleteQuestion(Guid id, QuestionRepository repo)
     {
         if (id == Guid.Empty)
-        {
             return TypedResults.BadRequest("Question id is invalid.");
-        }
 
         var deleted = repo.Delete(id);
         if (!deleted)
-        {
             return TypedResults.NotFound();
-        }
 
         return TypedResults.NoContent();
+    }
+
+    public static Results<Ok<List<Question>>, BadRequest<string>> ReorderQuestions(ReorderQuestionsRequest request, QuestionRepository repo)
+    {
+        if (request.QuestionIds is null || request.QuestionIds.Count == 0)
+            return TypedResults.BadRequest("Question ID list is required and must not be empty.");
+
+        var questions = new List<Question>();
+        for (int i = 0; i < request.QuestionIds.Count; i++)
+        {
+            var question = repo.GetById(request.QuestionIds[i]);
+            if (question is null)
+                return TypedResults.BadRequest($"Question ID {request.QuestionIds[i]} is invalid or not found.");
+            question.SortOrder = i;
+            questions.Add(question);
+        }
+
+        foreach (var question in questions)
+            repo.Update(question);
+
+        return TypedResults.Ok(questions);
     }
 }
 
@@ -69,4 +76,9 @@ public sealed class UpdateQuestionRequest
     public string? Text { get; init; }
     public QuestionType? Type { get; init; }
     public List<string>? Options { get; init; }
+}
+
+public sealed class ReorderQuestionsRequest
+{
+    public List<Guid> QuestionIds { get; init; } = [];
 }
