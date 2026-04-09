@@ -12,6 +12,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IJoinCodeGenerator, JoinCodeGenerator>();
         services.AddSingleton<ISessionRepository, SessionRepository>();
         services.AddSingleton<QuestionRepository>();
+        services.AddSingleton<IQuestionBankRepository, QuestionBankRepository>();
 
         return services;
     }
