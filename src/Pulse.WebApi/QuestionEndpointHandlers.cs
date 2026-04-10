@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http.HttpResults;
+using Pulse.Application.Services;
 using Pulse.Common.Services;
 using Pulse.Domain.Entities;
 
@@ -6,7 +7,7 @@ namespace Pulse.WebApi;
 
 public static class QuestionEndpointHandlers
 {
-    public static Results<Ok<Question>, BadRequest<string>, NotFound> UpdateQuestion(Guid id, UpdateQuestionRequest request, QuestionRepository repo)
+    public static Results<Ok<Question>, BadRequest<string>, NotFound> UpdateQuestion(Guid id, UpdateQuestionRequest request, QuestionRepository repo, QuestionService questionService)
     {
         if (id == Guid.Empty)
         {
@@ -23,9 +24,15 @@ public static class QuestionEndpointHandlers
             .Select(option => option.Trim())
             .ToList();
 
-        if (request.Type == QuestionType.MultipleChoice && normalizedOptions.Count < 2)
+        var validation = questionService.ValidateQuestion(new QuestionDTO
         {
-            return TypedResults.BadRequest("Multiple-choice questions must include at least 2 options.");
+            Type = request.Type.Value,
+            Options = normalizedOptions
+        });
+
+        if (!validation.IsValid)
+        {
+            return TypedResults.BadRequest(validation.ErrorMessage!);
         }
 
         var existing = repo.GetById(id);

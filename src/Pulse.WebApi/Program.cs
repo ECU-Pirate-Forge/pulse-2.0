@@ -1,3 +1,4 @@
+using Pulse.Application.Services;
 using Pulse.Domain.Entities;
 using Pulse.Shared.Models;
 using Pulse.Shared.Services;
@@ -38,9 +39,20 @@ app.MapGet("/questions", (QuestionRepository repo) =>
     return repo.GetAll();
 });
 
-app.MapPost("/questions", (QuestionRepository repo, Question q) =>
+app.MapPost("/questions", (QuestionRepository repo, QuestionService questionService, Question q) =>
 {
-    return repo.Insert(q);
+    var validation = questionService.ValidateQuestion(new QuestionDTO
+    {
+        Type = q.Type,
+        Options = q.Options
+    });
+
+    if (!validation.IsValid)
+    {
+        return Results.BadRequest(validation.ErrorMessage);
+    }
+
+    return Results.Ok(repo.Insert(q));
 });
 
 app.MapGet("/api/sessions/{id:guid}", (ISessionRepository repo, Guid id, HttpContext ctx) =>

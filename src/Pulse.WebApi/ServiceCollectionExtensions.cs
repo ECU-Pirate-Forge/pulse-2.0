@@ -1,4 +1,5 @@
 using LiteDB;
+using Pulse.Application.Services;
 using Pulse.Common.Services;
 using Pulse.Shared.Services;
 
@@ -12,6 +13,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IJoinCodeGenerator, JoinCodeGenerator>();
         services.AddSingleton<ISessionRepository, SessionRepository>();
         services.AddSingleton<QuestionRepository>();
+        services.AddSingleton<QuestionService>();
 
         return services;
     }
