@@ -7,6 +7,26 @@ namespace Pulse.WebApi;
 
 public static class QuestionEndpointHandlers
 {
+    public static Results<Ok<Question>, BadRequest<string>> CreateQuestion(Question q, QuestionRepository repo, QuestionService questionService)
+    {
+        var normalizedOptions = q.Options
+            .Where(option => !string.IsNullOrWhiteSpace(option))
+            .Select(option => option.Trim())
+            .ToList();
+
+        var validation = questionService.ValidateQuestion(new QuestionDTO
+        {
+            Type = q.Type,
+            Options = normalizedOptions
+        });
+
+        if (!validation.IsValid)
+            return TypedResults.BadRequest(validation.ErrorMessage!);
+
+        q.Options = normalizedOptions;
+        return TypedResults.Ok(repo.Insert(q));
+    }
+
     public static Results<Ok<Question>, BadRequest<string>, NotFound> UpdateQuestion(Guid id, UpdateQuestionRequest request, QuestionRepository repo, QuestionService questionService)
     {
         if (id == Guid.Empty)

@@ -39,21 +39,7 @@ app.MapGet("/questions", (QuestionRepository repo) =>
     return repo.GetAll();
 });
 
-app.MapPost("/questions", (QuestionRepository repo, QuestionService questionService, Question q) =>
-{
-    var validation = questionService.ValidateQuestion(new QuestionDTO
-    {
-        Type = q.Type,
-        Options = q.Options
-    });
-
-    if (!validation.IsValid)
-    {
-        return Results.BadRequest(validation.ErrorMessage);
-    }
-
-    return Results.Ok(repo.Insert(q));
-});
+app.MapPost("/questions", QuestionEndpointHandlers.CreateQuestion);
 
 app.MapGet("/api/sessions/{id:guid}", (ISessionRepository repo, Guid id, HttpContext ctx) =>
 {
