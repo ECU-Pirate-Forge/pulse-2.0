@@ -1,3 +1,4 @@
+using Pulse.Application.Services;
 using Pulse.Domain.Entities;
 using Pulse.Shared.Models;
 using Pulse.Shared.Services;
@@ -38,10 +39,7 @@ app.MapGet("/questions", (QuestionRepository repo) =>
     return repo.GetAll();
 });
 
-app.MapPost("/questions", (QuestionRepository repo, Question q) =>
-{
-    return repo.Insert(q);
-});
+app.MapPost("/questions", QuestionEndpointHandlers.CreateQuestion);
 
 app.MapGet("/api/sessions/{id:guid}", (ISessionRepository repo, Guid id, HttpContext ctx) =>
 {

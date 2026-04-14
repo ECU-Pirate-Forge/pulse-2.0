@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http.HttpResults;
+using Pulse.Application.Services;
 using Pulse.Common.Services;
 using Pulse.Domain.Entities;
 
@@ -6,7 +7,27 @@ namespace Pulse.WebApi;
 
 public static class QuestionEndpointHandlers
 {
-    public static Results<Ok<Question>, BadRequest<string>, NotFound> UpdateQuestion(Guid id, UpdateQuestionRequest request, QuestionRepository repo)
+    public static Results<Ok<Question>, BadRequest<string>> CreateQuestion(Question q, QuestionRepository repo, QuestionService questionService)
+    {
+        var normalizedOptions = q.Options
+            .Where(option => !string.IsNullOrWhiteSpace(option))
+            .Select(option => option.Trim())
+            .ToList();
+
+        var validation = questionService.ValidateQuestion(new QuestionDTO
+        {
+            Type = q.Type,
+            Options = normalizedOptions
+        });
+
+        if (!validation.IsValid)
+            return TypedResults.BadRequest(validation.ErrorMessage!);
+
+        q.Options = normalizedOptions;
+        return TypedResults.Ok(repo.Insert(q));
+    }
+
+    public static Results<Ok<Question>, BadRequest<string>, NotFound> UpdateQuestion(Guid id, UpdateQuestionRequest request, QuestionRepository repo, QuestionService questionService)
     {
         if (id == Guid.Empty)
             return TypedResults.BadRequest("Question id is invalid.");
@@ -19,8 +40,16 @@ public static class QuestionEndpointHandlers
             .Select(option => option.Trim())
             .ToList();
 
-        if (request.Type == QuestionType.MultipleChoice && normalizedOptions.Count < 2)
-            return TypedResults.BadRequest("Multiple-choice questions must include at least 2 options.");
+        var validation = questionService.ValidateQuestion(new QuestionDTO
+        {
+            Type = request.Type.Value,
+            Options = normalizedOptions
+        });
+
+        if (!validation.IsValid)
+        {
+            return TypedResults.BadRequest(validation.ErrorMessage!);
+        }
 
         var existing = repo.GetById(id);
         if (existing is null)

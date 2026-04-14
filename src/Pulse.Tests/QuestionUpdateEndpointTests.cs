@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http.HttpResults;
+using Pulse.Application.Services;
 using Pulse.Common.Services;
 using Pulse.Domain.Entities;
 using Pulse.WebApi;
@@ -30,7 +31,7 @@ public class QuestionUpdateEndpointTests
             Options = new List<string> { " Option A ", "Option B" }
         };
 
-        var result = QuestionEndpointHandlers.UpdateQuestion(original.Id, request, repo);
+        var result = QuestionEndpointHandlers.UpdateQuestion(original.Id, request, repo, new QuestionService());
 
         var ok = Assert.IsType<Ok<Question>>(result.Result);
         Assert.Equal(original.Id, ok.Value!.Id);
@@ -68,7 +69,7 @@ public class QuestionUpdateEndpointTests
             Options = new List<string> { "Only one" }
         };
 
-        var result = QuestionEndpointHandlers.UpdateQuestion(existing.Id, request, repo);
+        var result = QuestionEndpointHandlers.UpdateQuestion(existing.Id, request, repo, new QuestionService());
 
         var badRequest = Assert.IsType<BadRequest<string>>(result.Result);
         Assert.Equal("Multiple-choice questions must include at least 2 options.", badRequest.Value);
@@ -87,7 +88,7 @@ public class QuestionUpdateEndpointTests
             Options = new List<string>()
         };
 
-        var result = QuestionEndpointHandlers.UpdateQuestion(Guid.NewGuid(), request, repo);
+        var result = QuestionEndpointHandlers.UpdateQuestion(Guid.NewGuid(), request, repo, new QuestionService());
 
         Assert.IsType<NotFound>(result.Result);
     }
@@ -105,7 +106,7 @@ public class QuestionUpdateEndpointTests
             Options = new List<string>()
         };
 
-        var result = QuestionEndpointHandlers.UpdateQuestion(Guid.Empty, request, repo);
+        var result = QuestionEndpointHandlers.UpdateQuestion(Guid.Empty, request, repo, new QuestionService());
 
         var badRequest = Assert.IsType<BadRequest<string>>(result.Result);
         Assert.Equal("Question id is invalid.", badRequest.Value);
