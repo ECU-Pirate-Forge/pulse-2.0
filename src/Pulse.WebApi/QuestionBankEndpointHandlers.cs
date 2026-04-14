@@ -37,8 +37,30 @@ public static class QuestionBankEndpointHandlers
         };
 
         var created = repo.Insert(item);
-
         return TypedResults.Created($"/api/questionbank/{created.Id}", created);
+    }
+
+    public static Results<Ok<QuestionBankListResponse>, BadRequest<string>> GetQuestionBankItems(
+        IQuestionBankRepository repo,
+        string? text = null,
+        int? type = null,
+        int page = 1,
+        int pageSize = 20)
+    {
+        if (page < 1)
+            return TypedResults.BadRequest("Page must be greater than 0.");
+
+        if (pageSize < 1)
+            return TypedResults.BadRequest("PageSize must be greater than 0.");
+
+        var filtered = repo.Search(text, type).ToList();
+        var totalCount = filtered.Count;
+        var items = filtered
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+        return TypedResults.Ok(new QuestionBankListResponse(items, totalCount));
     }
 }
 
@@ -48,3 +70,5 @@ public sealed class CreateQuestionBankItemRequest
     public QuestionType? Type { get; init; }
     public List<string>? Options { get; init; }
 }
+
+public sealed record QuestionBankListResponse(List<QuestionBankItem> Items, int TotalCount);
