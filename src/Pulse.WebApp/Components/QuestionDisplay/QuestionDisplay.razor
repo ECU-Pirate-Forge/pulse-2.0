@@ -1,0 +1,231 @@
+@using Pulse.Domain.Entities
+@using System.ComponentModel.DataAnnotations
+
+<div class="question-display">
+    @if (Question != null)
+    {
+        <div class="question-container">
+            <h3 class="question-text">@Question.Text</h3>
+
+            @if (!string.IsNullOrEmpty(ValidationError))
+            {
+                <div class="alert alert-danger" role="alert">
+                    @ValidationError
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(SuccessMessage))
+            {
+                <div class="alert alert-success" role="alert">
+                    @SuccessMessage
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(ErrorMessage))
+            {
+                <div class="alert alert-danger" role="alert">
+                    @ErrorMessage
+                </div>
+            }
+
+            <div class="response-options">
+                @if (Question.Type == QuestionType.MultipleChoice)
+                {
+                    <div class="multiple-choice-options">
+                        @foreach (var option in Question.Options)
+                        {
+                            <div class="form-check">
+                                <input 
+                                    type="radio" 
+                                    class="form-check-input" 
+                                    id="option_@option.GetHashCode()" 
+                                    name="response" 
+                                    value="@option" 
+                                    @onchange="@((ChangeEventArgs e) => SelectedResponse = e.Value?.ToString() ?? string.Empty)" />
+                                <label class="form-check-label" for="option_@option.GetHashCode()">
+                                    @option
+                                </label>
+                            </div>
+                        }
+                    </div>
+                }
+                else if (Question.Type == QuestionType.LikertScale)
+                {
+                    <div class="likert-scale-options">
+                        @for (int i = 1; i <= 5; i++)
+                        {
+                            var scaleLabel = GetLikertLabel(i);
+                            <div class="form-check form-check-inline">
+                                <input 
+                                    type="radio" 
+                                    class="form-check-input" 
+                                    id="likert_@i" 
+                                    name="likert" 
+                                    value="@i" 
+                                    @onchange="@((ChangeEventArgs e) => SelectedResponse = e.Value?.ToString() ?? string.Empty)" />
+                                <label class="form-check-label" for="likert_@i">
+                                    @scaleLabel
+                                </label>
+                            </div>
+                        }
+                    </div>
+                }
+                else if (Question.Type == QuestionType.OpenEnded)
+                {
+                    <div class="open-ended-response">
+                        <textarea 
+                            class="form-control" 
+                            placeholder="Enter your response here..."
+                            @bind="SelectedResponse"
+                            rows="4"></textarea>
+                    </div>
+                }
+            </div>
+
+            <button 
+                class="btn btn-primary mt-3" 
+                @onclick="HandleSubmit" 
+                disabled="@IsSubmitting">
+                @if (IsSubmitting)
+                {
+                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    <span>Submitting...</span>
+                }
+                else
+                {
+                    <span>Submit Response</span>
+                }
+            </button>
+        </div>
+    }
+    else
+    {
+        <p>Loading question...</p>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public Question? Question { get; set; }
+
+    [Parameter]
+    public Guid SessionId { get; set; }
+
+    [Inject]
+    public HttpClient Http { get; set; } = null!;
+
+    private string SelectedResponse { get; set; } = string.Empty;
+    private string ValidationError { get; set; } = string.Empty;
+    private string SuccessMessage { get; set; } = string.Empty;
+    private string ErrorMessage { get; set; } = string.Empty;
+    private bool IsSubmitting { get; set; } = false;
+
+    protected override void OnInitialized()
+    {
+        // Clear messages when component initializes
+        ClearMessages();
+    }
+
+    private void ClearMessages()
+    {
+        ValidationError = string.Empty;
+        SuccessMessage = string.Empty;
+        ErrorMessage = string.Empty;
+    }
+
+    private bool ValidateResponse()
+    {
+        if (string.IsNullOrWhiteSpace(SelectedResponse))
+        {
+            ValidationError = "Please select or enter a response before submitting.";
+            return false;
+        }
+
+        return true;
+    }
+
+    private async Task HandleSubmit()
+    {
+        ClearMessages();
+
+        if (!ValidateResponse())
+        {
+            return;
+        }
+
+        if (Question == null)
+        {
+            ErrorMessage = "Question information is missing.";
+            return;
+        }
+
+        IsSubmitting = true;
+
+        try
+        {
+            var deviceId = await GetDeviceId();
+
+            var requestPayload = new
+            {
+                deviceId = deviceId,
+                value = SelectedResponse
+            };
+
+            var response = await Http.PostAsJsonAsync(
+                $"/api/sessions/{SessionId}/questions/{Question.Id}/respond",
+                requestPayload);
+
+            if (response.IsSuccessStatusCode)
+            {
+                SuccessMessage = "Response submitted successfully!";
+                SelectedResponse = string.Empty;
+                StateHasChanged();
+                
+                // Optional: Clear success message after 3 seconds
+                await Task.Delay(3000);
+                SuccessMessage = string.Empty;
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+            {
+                ErrorMessage = "Session is no longer active. Please wait for the next question.";
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                ErrorMessage = $"Invalid response: {errorContent}";
+            }
+            else
+            {
+                ErrorMessage = "Failed to submit response. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"An error occurred: {ex.Message}";
+        }
+        finally
+        {
+            IsSubmitting = false;
+        }
+    }
+
+    private async Task<string> GetDeviceId()
+    {
+        // Try to get deviceId from localStorage using JavaScript interop
+        // For now, generate a placeholder - this should be implemented with JS interop
+        return Guid.NewGuid().ToString();
+    }
+
+    private string GetLikertLabel(int scale)
+    {
+        return scale switch
+        {
+            1 => "Strongly Disagree",
+            2 => "Disagree",
+            3 => "Neutral",
+            4 => "Agree",
+            5 => "Strongly Agree",
+            _ => scale.ToString()
+        };
+    }
+}
