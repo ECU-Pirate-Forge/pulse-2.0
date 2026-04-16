@@ -5,6 +5,7 @@ using Pulse.Domain.Entities;
 
 namespace Pulse.Tests.WebApp;
 
+#pragma warning disable CS0618
 public class QuestionDisplayComponentTests : Bunit.TestContext
 {
     [Fact]
