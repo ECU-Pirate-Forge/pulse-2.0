@@ -1,0 +1,51 @@
+@page "/join/{JoinCode}"
+@inject HttpClient Http
+
+<h3>Join Session</h3>
+
+@if (isLoading)
+{
+    <p>Loading session...</p>
+}
+else if (errorMessage != null)
+{
+    <p style="color: red;">@errorMessage</p>
+}
+else if (sessionInfo != null)
+{
+    <p>Session: @sessionInfo</p>
+}
+
+@code {
+    [Parameter]
+    public string JoinCode { get; set; } = string.Empty;
+
+    private bool isLoading = true;
+    private string? errorMessage = null;
+    private string? sessionInfo = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var response = await Http.GetAsync($"/api/sessions/join/{JoinCode}");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                sessionInfo = await response.Content.ReadAsStringAsync();
+            }
+            else
+            {
+                errorMessage = "Session not found.";
+            }
+        }
+        catch (Exception)
+        {
+            errorMessage = "Unable to load session.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

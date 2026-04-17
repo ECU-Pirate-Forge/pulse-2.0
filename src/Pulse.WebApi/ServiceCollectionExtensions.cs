@@ -1,13 +1,21 @@
 using LiteDB;
+using Pulse.Application.Services;
 using Pulse.Common.Services;
+using Pulse.Shared.Services;
+
+namespace Pulse.WebApi;
 
 public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddPulseWebApiCoreServices(this IServiceCollection services, string connectionString)
     {
         services.AddSingleton<LiteDatabase>(_ => new LiteDatabase(connectionString));
+        services.AddSingleton<IJoinCodeGenerator, JoinCodeGenerator>();
         services.AddSingleton<ISessionRepository, SessionRepository>();
         services.AddSingleton<QuestionRepository>();
+        services.AddSingleton<QuestionService>();
+        services.AddSingleton<IQuestionBankRepository, QuestionBankRepository>();
+        services.AddSingleton<IResponseRepository, ResponseRepository>();
 
         return services;
     }
