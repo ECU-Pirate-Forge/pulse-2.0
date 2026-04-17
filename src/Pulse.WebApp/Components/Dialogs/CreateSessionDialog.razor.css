@@ -1,0 +1,130 @@
+.dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.dialog-content {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    min-width: 400px;
+    max-width: 500px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.dialog-content h3 {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+.form-group input:disabled {
+    background-color: #f5f5f5;
+    cursor: not-allowed;
+}
+
+.error-message {
+    color: #d32f2f;
+    margin: 0.5rem 0;
+    font-size: 0.9rem;
+}
+
+.success-message {
+    text-align: center;
+}
+
+.session-codes {
+    background-color: #f5f5f5;
+    padding: 1rem;
+    border-radius: 4px;
+    margin: 1rem 0;
+}
+
+.code-item {
+    margin: 0.75rem 0;
+}
+
+.code {
+    display: block;
+    font-family: monospace;
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #1976d2;
+    margin-top: 0.25rem;
+}
+
+.dialog-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    margin-top: 1.5rem;
+}
+
+.btn-submit,
+.btn-cancel,
+.btn-close {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+.btn-submit {
+    background-color: #1976d2;
+    color: white;
+}
+
+.btn-submit:hover:not(:disabled) {
+    background-color: #1565c0;
+}
+
+.btn-submit:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+.btn-cancel {
+    background-color: #f5f5f5;
+    color: #333;
+}
+
+.btn-cancel:hover:not(:disabled) {
+    background-color: #e0e0e0;
+}
+
+.btn-close {
+    background-color: #1976d2;
+    color: white;
+    width: 100%;
+    margin-top: 1rem;
+}
+
+.btn-close:hover {
+    background-color: #1565c0;
+}

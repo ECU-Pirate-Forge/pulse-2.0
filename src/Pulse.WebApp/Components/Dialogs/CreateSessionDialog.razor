@@ -1,0 +1,139 @@
+@inject HttpClient Http
+
+<div class="dialog-overlay" @onclick="Close">
+    <div class="dialog-content" @onclick:stopPropagation="true">
+        <h3>Create New Session</h3>
+
+        @if (sessionCreated)
+        {
+            <div class="success-message">
+                <p>Session created successfully!</p>
+                <div class="session-codes">
+                    <div class="code-item">
+                        <strong>Join Code:</strong>
+                        <span class="code">@joinCode</span>
+                    </div>
+                    <div class="code-item">
+                        <strong>Instructor Code:</strong>
+                        <span class="code">@instructorCode</span>
+                    </div>
+                </div>
+                <button @onclick="Close" class="btn-close">Close</button>
+            </div>
+        }
+        else
+        {
+            <div class="form-group">
+                <label for="title">Session Title:</label>
+                <input 
+                    type="text" 
+                    id="title" 
+                    @bind="title" 
+                    @bind:event="oninput"
+                    placeholder="Enter session title"
+                    disabled="@isLoading" />
+                
+                @if (showTitleError)
+                {
+                    <p class="error-message">Title is required.</p>
+                }
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <p class="error-message">@errorMessage</p>
+            }
+
+            <div class="dialog-actions">
+                <button @onclick="Submit" disabled="@isLoading" class="btn-submit">
+                    @if (isLoading)
+                    {
+                        <span>Creating...</span>
+                    }
+                    else
+                    {
+                        <span>Create Session</span>
+                    }
+                </button>
+                <button @onclick="Close" disabled="@isLoading" class="btn-cancel">Cancel</button>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private string title = string.Empty;
+    private bool isLoading = false;
+    private bool showTitleError = false;
+    private string? errorMessage = null;
+    private bool sessionCreated = false;
+    private string? joinCode = null;
+    private string? instructorCode = null;
+
+    private async Task Submit()
+    {
+        // Reset error states
+        showTitleError = false;
+        errorMessage = null;
+
+        // Validate title
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            showTitleError = true;
+            return;
+        }
+
+        isLoading = true;
+
+        try
+        {
+            var request = new { Title = title };
+            var response = await Http.PostAsJsonAsync("/api/sessions", request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<CreateSessionResponse>();
+                if (result != null)
+                {
+                    joinCode = result.JoinCode;
+                    instructorCode = result.InstructorCode;
+                    sessionCreated = true;
+                }
+            }
+            else
+            {
+                errorMessage = "Failed to create session. Please try again.";
+            }
+        }
+        catch (Exception)
+        {
+            errorMessage = "An error occurred. Please try again.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task Close()
+    {
+        // Reset state
+        title = string.Empty;
+        isLoading = false;
+        showTitleError = false;
+        errorMessage = null;
+        sessionCreated = false;
+        joinCode = null;
+        instructorCode = null;
+
+        await OnClose.InvokeAsync();
+    }
+
+    private class CreateSessionResponse
+    {
+        public string JoinCode { get; set; } = string.Empty;
+        public string InstructorCode { get; set; } = string.Empty;
+    }
+}
