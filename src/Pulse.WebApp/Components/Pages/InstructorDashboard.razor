@@ -1,0 +1,334 @@
+@page "/instructor"
+@using MudBlazor
+@using Microsoft.AspNetCore.Components
+@inject NavigationManager NavManager
+
+<PageTitle>Instructor Dashboard - Pulse</PageTitle>
+
+<style>
+    .dashboard-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 32px;
+        border-radius: 12px;
+        margin-bottom: 32px;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-top: 24px;
+    }
+
+    .stat-card {
+        background: rgba(255, 255, 255, 0.1);
+        padding: 16px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(10px);
+    }
+
+    .stat-number {
+        font-size: 2rem;
+        font-weight: 800;
+        margin-bottom: 4px;
+    }
+
+    .stat-label {
+        font-size: 0.95rem;
+        opacity: 0.9;
+    }
+
+    .create-session-form {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        margin-bottom: 32px;
+    }
+
+    .sessions-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 20px;
+    }
+
+    .session-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        overflow: hidden;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .session-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+    }
+
+    .session-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 16px;
+    }
+
+    .session-title {
+        font-size: 1.25rem;
+        font-weight: 700;
+        margin-bottom: 4px;
+    }
+
+    .session-code {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 8px 12px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-weight: 600;
+        font-size: 0.9rem;
+        display: inline-block;
+        margin-top: 8px;
+    }
+
+    .session-body {
+        padding: 16px;
+    }
+
+    .session-info {
+        margin-bottom: 16px;
+    }
+
+    .session-info-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+        font-size: 0.95rem;
+    }
+
+    .session-label {
+        color: #6b7280;
+        font-weight: 500;
+    }
+
+    .session-value {
+        color: #1f2937;
+        font-weight: 600;
+    }
+
+    .session-actions {
+        display: flex;
+        gap: 8px;
+        padding-top: 16px;
+        border-top: 1px solid #e5e7eb;
+    }
+
+    .action-button {
+        flex: 1;
+        font-weight: 600;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 48px 24px;
+        background: white;
+        border-radius: 12px;
+    }
+
+    .empty-icon {
+        font-size: 3rem;
+        margin-bottom: 12px;
+    }
+
+    .empty-title {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #1f2937;
+        margin-bottom: 8px;
+    }
+
+    .empty-text {
+        color: #6b7280;
+        margin-bottom: 24px;
+    }
+</style>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    <!-- Dashboard Header -->
+    <div class="dashboard-header">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+            <div>
+                <MudText Typo="Typo.h4" Style="font-weight: 700;">Instructor Dashboard</MudText>
+                <MudText Typo="Typo.subtitle1" Style="opacity: 0.9;">Manage your quiz sessions</MudText>
+            </div>
+            <MudIcon Icon="@Icons.Material.Filled.Dashboard" Style="font-size: 3rem; opacity: 0.8;" />
+        </MudStack>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number">@Sessions.Count</div>
+                <div class="stat-label">Active Sessions</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">@TotalQuestions</div>
+                <div class="stat-label">Questions Created</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">142</div>
+                <div class="stat-label">Student Responses</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Session Form -->
+    <div class="create-session-form">
+        <MudText Typo="Typo.h6" Style="font-weight: 700; margin-bottom: 16px;">Create New Session</MudText>
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.End">
+            <MudTextField @bind-Value="NewSessionTitle"
+                          Label="Session Title"
+                          Placeholder="e.g., Biology Quiz Chapter 5"
+                          Variant="Variant.Outlined"
+                          Style="flex: 1;" />
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Size="Size.Large"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       @onclick="CreateSession"
+                       Disabled="string.IsNullOrWhiteSpace(NewSessionTitle)"
+                       Style="height: 56px; font-weight: 600;">
+                Create
+            </MudButton>
+        </MudStack>
+    </div>
+
+    <!-- Sessions List -->
+    <MudText Typo="Typo.h5" Style="font-weight: 700; margin-bottom: 20px;">Your Sessions</MudText>
+
+    @if (Sessions.Count == 0)
+    {
+        <div class="empty-state">
+            <div class="empty-icon">📋</div>
+            <div class="empty-title">No Sessions Yet</div>
+            <div class="empty-text">Create your first quiz session using the form above</div>
+        </div>
+    }
+    else
+    {
+        <div class="sessions-grid">
+            @foreach (var session in Sessions)
+            {
+                <div class="session-card">
+                    <div class="session-header">
+                        <div class="session-title">@session.Title</div>
+                        <div class="session-code">@session.JoinCode</div>
+                    </div>
+                    <div class="session-body">
+                        <div class="session-info">
+                            <div class="session-info-row">
+                                <span class="session-label">Status:</span>
+                                <span class="session-value">Active</span>
+                            </div>
+                            <div class="session-info-row">
+                                <span class="session-label">Questions:</span>
+                                <span class="session-value">@session.QuestionCount</span>
+                            </div>
+                            <div class="session-info-row">
+                                <span class="session-label">Responses:</span>
+                                <span class="session-value">@session.ResponseCount</span>
+                            </div>
+                        </div>
+                        <div class="session-actions">
+                            <MudButton Variant="Variant.Outlined"
+                                       Size="Size.Small"
+                                       Color="Color.Primary"
+                                       Class="action-button"
+                                       @onclick="@(() => ManageQuestions(session.Id))">
+                                Edit
+                            </MudButton>
+                            <MudButton Variant="Variant.Outlined"
+                                       Size="Size.Small"
+                                       Color="Color.Info"
+                                       Class="action-button"
+                                       @onclick="@(() => ShowQR(session.Id))">
+                                QR Code
+                            </MudButton>
+                            <MudButton Variant="Variant.Outlined"
+                                       Size="Size.Small"
+                                       Color="Color.Error"
+                                       Class="action-button"
+                                       @onclick="@(() => DeleteSession(session.Id))">
+                                Delete
+                            </MudButton>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</MudContainer>
+
+@code {
+    private string NewSessionTitle = string.Empty;
+    private List<SessionModel> Sessions = new();
+    private int TotalQuestions = 8;
+
+    protected override void OnInitialized()
+    {
+        // Demo sessions
+        Sessions = new List<SessionModel>
+        {
+            new() { Id = Guid.NewGuid(), Title = "Biology Quiz - Chapter 5", JoinCode = "BIO123", QuestionCount = 10, ResponseCount = 24 },
+            new() { Id = Guid.NewGuid(), Title = "Math Concepts Test", JoinCode = "MATH45", QuestionCount = 15, ResponseCount = 18 },
+            new() { Id = Guid.NewGuid(), Title = "History Final Exam", JoinCode = "HIST99", QuestionCount = 20, ResponseCount = 32 }
+        };
+    }
+
+    private void CreateSession()
+    {
+        if (!string.IsNullOrWhiteSpace(NewSessionTitle))
+        {
+            var newSession = new SessionModel
+            {
+                Id = Guid.NewGuid(),
+                Title = NewSessionTitle,
+                JoinCode = GenerateCode(),
+                QuestionCount = 0,
+                ResponseCount = 0
+            };
+            Sessions.Add(newSession);
+            NewSessionTitle = string.Empty;
+        }
+    }
+
+    private void ManageQuestions(Guid sessionId)
+    {
+        NavManager.NavigateTo($"/instructor/questions/{sessionId}");
+    }
+
+    private void ShowQR(Guid sessionId)
+    {
+        NavManager.NavigateTo($"/instructor/qr/{sessionId}");
+    }
+
+    private void DeleteSession(Guid sessionId)
+    {
+        Sessions.RemoveAll(s => s.Id == sessionId);
+    }
+
+    private string GenerateCode()
+    {
+        const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        var random = new Random();
+        return new string(Enumerable.Range(0, 6)
+            .Select(_ => chars[random.Next(chars.Length)])
+            .ToArray());
+    }
+
+    public class SessionModel
+    {
+        public Guid Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string JoinCode { get; set; } = string.Empty;
+        public int QuestionCount { get; set; }
+        public int ResponseCount { get; set; }
+    }
+}
