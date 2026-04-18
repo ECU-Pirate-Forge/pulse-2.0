@@ -104,5 +104,75 @@ public class CsvParserTests
         Assert.Equal("Simulated parse failure.", result.Errors[0].Message);
     }
 
+    [Fact]
+    public void Parse_RethrowsOperationCanceledException()
+    {
+        var csv = string.Join('\n',
+            "Name,Age",
+            "Alice,30");
+
+        Assert.Throws<OperationCanceledException>(() =>
+            CsvParser.Parse<PersonRow>(csv, (_, _) =>
+                throw new OperationCanceledException("Cancelled.")));
+    }
+
+    [Fact]
+    public void Parse_ThrowsWhenRowParserReturnsIsValidTrueWithNullRow()
+    {
+        var csv = string.Join('\n',
+            "Name,Age",
+            "Alice,30");
+
+        Assert.Throws<InvalidOperationException>(() =>
+            CsvParser.Parse<PersonRow>(csv, (_, _) => (true, null, null)));
+    }
+
+    [Fact]
+    public void Parse_PreservesRowNumbersAcrossEmptyLines()
+    {
+        var csv = string.Join('\n',
+            "Name,Age",
+            "Alice,30",
+            "",
+            "Dana,abc");
+
+        var result = CsvParser.Parse<PersonRow>(csv, (values, _) =>
+        {
+            if (!int.TryParse(values[1].Trim(), out var age))
+            {
+                return (false, null, "Age must be a valid integer.");
+            }
+
+            return (true, new PersonRow(values[0].Trim(), age), null);
+        });
+
+        Assert.Single(result.Rows);
+        Assert.Single(result.Errors);
+        Assert.Equal(4, result.Errors[0].RowNumber);
+    }
+
+    [Fact]
+    public void Parse_ConvertsUnbalancedQuoteToRowError()
+    {
+        var csv = string.Join('\n',
+            "Name,Age",
+            "\"Smith,30");
+
+        var result = CsvParser.Parse<PersonRow>(csv, (values, _) =>
+        {
+            if (!int.TryParse(values[1].Trim(), out var age))
+            {
+                return (false, null, "Age must be a valid integer.");
+            }
+
+            return (true, new PersonRow(values[0].Trim(), age), null);
+        });
+
+        Assert.Empty(result.Rows);
+        Assert.Single(result.Errors);
+        Assert.Equal(2, result.Errors[0].RowNumber);
+        Assert.Equal("Unmatched quote in CSV field.", result.Errors[0].Message);
+    }
+
     private sealed record PersonRow(string Name, int Age);
 }

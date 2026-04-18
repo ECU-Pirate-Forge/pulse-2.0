@@ -31,42 +31,68 @@ public static class CsvParser
         var rows = new List<T>();
         var errors = new List<CsvRowValidationError>();
 
-        var lines = csv.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
-        for (int i = 0; i < lines.Length; i++)
+        using var reader = new System.IO.StringReader(csv);
+        string? line;
+        var rowNumber = 0;
+
+        while ((line = reader.ReadLine()) is not null)
         {
-            var rowNumber = i + 1;
+            rowNumber++;
 
             if (hasHeader && rowNumber == 1)
             {
                 continue;
             }
 
-            var values = SplitCsvLine(lines[i]);
+            if (line.Length == 0)
+            {
+                continue;
+            }
 
+            List<string> values;
             try
             {
-                var result = rowParser(values, rowNumber);
-                if (result.IsValid && result.ParsedRow is not null)
-                {
-                    rows.Add(result.ParsedRow);
-                }
-                else
-                {
-                    errors.Add(new CsvRowValidationError
-                    {
-                        RowNumber = rowNumber,
-                        Message = string.IsNullOrWhiteSpace(result.ErrorMessage)
-                            ? "Row validation failed."
-                            : result.ErrorMessage
-                    });
-                }
+                values = SplitCsvLine(line);
+            }
+            catch (FormatException ex)
+            {
+                errors.Add(new CsvRowValidationError { RowNumber = rowNumber, Message = ex.Message });
+                continue;
+            }
+
+            (bool IsValid, T? ParsedRow, string? ErrorMessage) result;
+            try
+            {
+                result = rowParser(values, rowNumber);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
+            {
+                errors.Add(new CsvRowValidationError { RowNumber = rowNumber, Message = ex.Message });
+                continue;
+            }
+
+            if (result.IsValid)
+            {
+                if (result.ParsedRow is null)
+                {
+                    throw new InvalidOperationException(
+                        $"Row parser returned a valid result without providing a row object at row {rowNumber}. This indicates a bug in the row parser implementation.");
+                }
+
+                rows.Add(result.ParsedRow);
+            }
+            else
             {
                 errors.Add(new CsvRowValidationError
                 {
                     RowNumber = rowNumber,
-                    Message = ex.Message
+                    Message = string.IsNullOrWhiteSpace(result.ErrorMessage)
+                        ? "Row validation failed."
+                        : result.ErrorMessage
                 });
             }
         }
@@ -106,6 +132,11 @@ public static class CsvParser
             }
 
             current.Append(ch);
+        }
+
+        if (inQuotes)
+        {
+            throw new FormatException("Unmatched quote in CSV field.");
         }
 
         values.Add(current.ToString());
