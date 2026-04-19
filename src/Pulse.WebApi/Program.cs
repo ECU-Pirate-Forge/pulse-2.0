@@ -63,6 +63,7 @@ app.MapDelete("/questions/{id:guid}", QuestionEndpointHandlers.DeleteQuestion);
 app.MapPut("/api/questions/reorder", QuestionEndpointHandlers.ReorderQuestions);
 
 app.MapPost("/api/questionbank", QuestionBankEndpointHandlers.CreateQuestionBankItem);
+app.MapGet("/api/questionbank", QuestionBankEndpointHandlers.GetQuestionBankItems);
 app.MapGet("/sessions", SessionEndpointHandlers.GetSessions);
 app.MapPost("/api/sessions", SessionEndpointHandlers.CreateSession);
 app.MapGet("/api/sessions/join/{joinCode}", SessionEndpointHandlers.JoinSessionByCode);
