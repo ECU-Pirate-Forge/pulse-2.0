@@ -200,7 +200,7 @@
                 <MudButton Variant="Variant.Filled"
                            Color="Color.Primary"
                            Size="Size.Large"
-                           Disabled="string.IsNullOrWhiteSpace(NewQuestion.Text)"
+                           Disabled="string.IsNullOrWhiteSpace(NewQuestion.Text) || !HasMinimumRequiredOptions(NewQuestion)"
                            OnClick="SaveQuestion"
                            Style="font-weight: 600;">
                     Add Question
@@ -284,20 +284,34 @@
         };
     }
 
+    private bool HasMinimumRequiredOptions(QuestionModel question)
+    {
+        if (question.Type != 0)
+            return true;
+
+        return question.Options.Count(o => !string.IsNullOrWhiteSpace(o)) >= 2;
+    }
+
     private void SaveQuestion()
     {
-        if (!string.IsNullOrWhiteSpace(NewQuestion.Text))
-        {
-            Questions.Add(new QuestionModel
-            {
-                Id = Guid.NewGuid(),
-                Text = NewQuestion.Text,
-                Type = NewQuestion.Type,
-                Options = new List<string>(NewQuestion.Options.Where(o => !string.IsNullOrWhiteSpace(o)))
-            });
+        var nonEmptyOptions = NewQuestion.Options
+            .Where(o => !string.IsNullOrWhiteSpace(o))
+            .ToList();
 
-            NewQuestion = new() { Options = new List<string> { "", "" }, Type = 0 };
+        if (string.IsNullOrWhiteSpace(NewQuestion.Text) || !HasMinimumRequiredOptions(NewQuestion))
+        {
+            return;
         }
+
+        Questions.Add(new QuestionModel
+        {
+            Id = Guid.NewGuid(),
+            Text = NewQuestion.Text,
+            Type = NewQuestion.Type,
+            Options = nonEmptyOptions
+        });
+
+        NewQuestion = new() { Options = new List<string> { "", "" }, Type = 0 };
     }
 
     private void DeleteQuestion(Guid id)

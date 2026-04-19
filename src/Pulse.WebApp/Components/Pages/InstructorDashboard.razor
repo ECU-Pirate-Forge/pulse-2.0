@@ -1,6 +1,7 @@
 @page "/instructor"
 @using MudBlazor
 @using Microsoft.AspNetCore.Components
+@using System.Security.Cryptography
 @inject NavigationManager NavManager
 
 <PageTitle>Instructor Dashboard - Pulse</PageTitle>
@@ -306,7 +307,9 @@
 
     private void ShowQR(Guid sessionId)
     {
-        NavManager.NavigateTo($"/instructor/qr/{sessionId}");
+        var session = Sessions.FirstOrDefault(s => s.Id == sessionId);
+        var joinCode = session?.JoinCode ?? string.Empty;
+        NavManager.NavigateTo($"/instructor/qr/{sessionId}?joinCode={joinCode}");
     }
 
     private void DeleteSession(Guid sessionId)
@@ -317,9 +320,8 @@
     private string GenerateCode()
     {
         const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-        var random = new Random();
         return new string(Enumerable.Range(0, 6)
-            .Select(_ => chars[random.Next(chars.Length)])
+            .Select(_ => chars[RandomNumberGenerator.GetInt32(chars.Length)])
             .ToArray());
     }
 

@@ -141,7 +141,7 @@
         <!-- Join Code -->
         <div class="join-code-section">
             <div class="join-code-label">Or enter this code manually:</div>
-            <div class="join-code">ABC123</div>
+            <div class="join-code">@(string.IsNullOrEmpty(JoinCode) ? "N/A" : JoinCode)</div>
         </div>
 
         <!-- Instructions -->
@@ -150,7 +150,7 @@
             <div class="instructions-text">
                 <ol style="margin: 0; padding-left: 20px;">
                     <li>Scan the QR code with their mobile device, or</li>
-                    <li>Visit Pulse Quiz and enter the code: <strong>ABC123</strong></li>
+                    <li>Visit Pulse Quiz and enter the code: <strong>@(string.IsNullOrEmpty(JoinCode) ? "N/A" : JoinCode)</strong></li>
                     <li>They will be able to access the quiz immediately</li>
                 </ol>
             </div>
@@ -177,6 +177,9 @@
 @code {
     [Parameter]
     public string SessionId { get; set; } = string.Empty;
+
+    [SupplyParameterFromQuery]
+    public string JoinCode { get; set; } = string.Empty;
 
     private void GoBack()
     {
