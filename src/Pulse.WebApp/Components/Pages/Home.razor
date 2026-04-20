@@ -1,14 +1,168 @@
 ﻿@page "/"
 @using MudBlazor
+@using Microsoft.AspNetCore.Components
+@inject NavigationManager NavManager
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Pulse Quiz - Home</PageTitle>
 
-<div class="container mt-5">
-    <h1>Pulse</h1>
-    <p>Welcome to Pulse</p>
-    
-    <MudButton Href="/question-demo" Color="Color.Primary" Variant="Variant.Filled">
-        View Question Display Demo
-    </MudButton>
-</div>
+<style>
+    .hero-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 60px 20px;
+        text-align: center;
+        border-radius: 16px;
+        margin: 0 auto 40px;
+        max-width: 1200px;
+    }
+
+    .hero-title {
+        font-size: 3.5rem;
+        font-weight: 800;
+        margin-bottom: 16px;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .hero-subtitle {
+        font-size: 1.25rem;
+        opacity: 0.95;
+        margin-bottom: 8px;
+    }
+
+    .role-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 24px;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 20px 60px;
+    }
+
+    .role-icon {
+        font-size: 4rem;
+        margin-bottom: 16px;
+        text-align: center;
+    }
+
+    .role-title {
+        font-size: 1.75rem;
+        font-weight: 700;
+        margin-bottom: 12px;
+        color: #1f2937;
+        text-align: center;
+    }
+
+    .role-description {
+        color: #6b7280;
+        margin-bottom: 24px;
+        line-height: 1.6;
+        text-align: center;
+    }
+
+    .role-features {
+        text-align: left;
+        margin: 20px 0;
+        padding: 16px;
+        background: #f9fafb;
+        border-radius: 8px;
+        list-style: none;
+        padding-left: 0;
+    }
+
+    .role-features li {
+        margin: 8px 0;
+        color: #4b5563;
+        display: flex;
+        align-items: center;
+    }
+
+    .role-features li::before {
+        content: "✓";
+        margin-right: 8px;
+        font-weight: bold;
+        color: #10b981;
+    }
+
+    .student-card {
+        border-top: 4px solid #3b82f6;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .student-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
+    }
+
+    .instructor-card {
+        border-top: 4px solid #10b981;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .instructor-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
+    }
+</style>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-0">
+    <!-- Hero Section -->
+    <div class="hero-section">
+        <div class="hero-title">Welcome to Pulse</div>
+        <div class="hero-subtitle">Interactive Quiz Platform for Teachers and Students</div>
+    </div>
+
+    <!-- Role Selection Cards -->
+    <div class="role-cards">
+        <!-- Student Card -->
+        <MudCard Class="student-card">
+            <MudCardContent>
+                <div class="role-icon">👨‍🎓</div>
+                <div class="role-title">Student</div>
+                <div class="role-description">
+                    Join a quiz session and test your knowledge
+                </div>
+                <ul class="role-features">
+                    <li>Join sessions with a code</li>
+                    <li>Take interactive quizzes</li>
+                    <li>Multiple question types</li>
+                    <li>Instant feedback</li>
+                </ul>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Filled" Color="Color.Info" FullWidth="true" Size="Size.Large"
+                           Style="text-transform: uppercase; font-weight: 600;"
+                           OnClick="@(() => NavManager.NavigateTo("/student-join"))">
+                    Join Session
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+
+        <!-- Instructor Card -->
+        <MudCard Class="instructor-card">
+            <MudCardContent>
+                <div class="role-icon">👨‍🏫</div>
+                <div class="role-title">Instructor</div>
+                <div class="role-description">
+                    Create and manage quiz sessions for your students
+                </div>
+                <ul class="role-features">
+                    <li>Create quiz sessions</li>
+                    <li>Manage questions</li>
+                    <li>Generate QR codes</li>
+                    <li>Monitor responses</li>
+                </ul>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Filled" Color="Color.Success" FullWidth="true" Size="Size.Large"
+                           Style="text-transform: uppercase; font-weight: 600;"
+                           OnClick="@(() => NavManager.NavigateTo("/instructor"))">
+                    Dashboard
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </div>
+</MudContainer>
+
+@code {
+}
 

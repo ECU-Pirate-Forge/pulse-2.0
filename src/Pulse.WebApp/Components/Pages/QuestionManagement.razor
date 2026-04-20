@@ -1,0 +1,468 @@
+@page "/instructor/questions/{SessionId}"
+@using MudBlazor
+@using Microsoft.AspNetCore.Components
+@using System.Net.Http.Json
+@using Pulse.Shared.Models
+@using Pulse.Domain.Entities
+@inject NavigationManager NavManager
+@inject HttpClient Http
+
+<PageTitle>Manage Questions - Pulse</PageTitle>
+
+<style>
+    .questions-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 24px;
+        border-radius: 12px;
+        margin-bottom: 24px;
+    }
+
+    .form-section {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        margin-bottom: 24px;
+    }
+
+    .form-title {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #1f2937;
+        margin-bottom: 20px;
+    }
+
+    .options-grid {
+        background: #f9fafb;
+        padding: 16px;
+        border-radius: 8px;
+        margin-bottom: 16px;
+    }
+
+    .option-row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 12px;
+        margin-bottom: 12px;
+        align-items: center;
+    }
+
+    .option-row:last-child {
+        margin-bottom: 0;
+    }
+
+    .questions-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 16px;
+    }
+
+    .question-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        border-left: 4px solid #667eea;
+        transition: all 0.2s;
+    }
+
+    .question-card:hover {
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+    }
+
+    .question-type {
+        display: inline-block;
+        background: #e0e7ff;
+        color: #4f46e5;
+        padding: 4px 12px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        margin-bottom: 12px;
+    }
+
+    .question-text {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #1f2937;
+        margin-bottom: 12px;
+        line-height: 1.5;
+    }
+
+    .question-options {
+        background: #f9fafb;
+        padding: 12px;
+        border-radius: 6px;
+        margin: 12px 0;
+        font-size: 0.9rem;
+        color: #6b7280;
+    }
+
+    .question-actions {
+        display: flex;
+        gap: 8px;
+        padding-top: 12px;
+        border-top: 1px solid #e5e7eb;
+        margin-top: 12px;
+    }
+
+    .action-button {
+        flex: 1;
+        font-weight: 600;
+        font-size: 0.85rem;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 48px 24px;
+        background: white;
+        border-radius: 12px;
+    }
+
+    .empty-icon {
+        font-size: 3rem;
+        margin-bottom: 12px;
+    }
+
+    .button-row {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+        margin-top: 16px;
+    }
+</style>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    <!-- Header -->
+    <div class="questions-header">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+            <div>
+                <MudButton Variant="Variant.Text" Color="Color.Inherit" 
+                          StartIcon="@Icons.Material.Filled.ArrowBack"
+                          OnClick="GoBack" />
+                <MudText Typo="Typo.h4" Style="font-weight: 700; display: inline-block; margin-left: 8px;">
+                    Manage Questions
+                </MudText>
+            </div>
+        </MudStack>
+    </div>
+
+    <!-- Add Question Form -->
+    <div class="form-section">
+        <div class="form-title">Create New Question</div>
+        
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="NewQuestion.Text"
+                          Label="Question Text"
+                          Placeholder="Enter your question here"
+                          Variant="Variant.Outlined"
+                          Lines="3" />
+
+            <MudSelect @bind-Value="NewQuestion.Type"
+                       Label="Question Type"
+                       T="int"
+                       Variant="Variant.Outlined">
+                <MudSelectItem T="int" Value="0">Multiple Choice</MudSelectItem>
+                <MudSelectItem T="int" Value="1">Likert Scale (1-5)</MudSelectItem>
+                <MudSelectItem T="int" Value="2">Open Ended</MudSelectItem>
+            </MudSelect>
+
+            @if (NewQuestion.Type == 0)
+            {
+                <div class="options-grid">
+                    <MudText Typo="Typo.subtitle2" Style="font-weight: 600; margin-bottom: 12px;">Options</MudText>
+                    @for (int i = 0; i < NewQuestion.Options.Count; i++)
+                    {
+                        var index = i;
+                        <div class="option-row">
+                            <MudTextField @bind-Value="NewQuestion.Options[index]"
+                                          Label="@($"Option {index + 1}")"
+                                          Placeholder="Enter option"
+                                          Variant="Variant.Outlined"
+                                          Style="flex: 1;" />
+                            @if (NewQuestion.Options.Count > 2)
+                            {
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                              Color="Color.Error"
+                                              Size="Size.Small"
+                                              OnClick="@(() => RemoveOption(index))" />
+                            }
+                        </div>
+                    }
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Primary"
+                               Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.Add"
+                               OnClick="AddOption">
+                        Add Option
+                    </MudButton>
+                </div>
+            }
+
+            <div class="button-row">
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Size="Size.Large"
+                           Disabled="string.IsNullOrWhiteSpace(NewQuestion.Text) || !HasMinimumRequiredOptions(NewQuestion)"
+                           OnClick="SaveQuestion"
+                           Style="font-weight: 600;">
+                    Add Question
+                </MudButton>
+            </div>
+        </MudStack>
+    </div>
+
+    <!-- Questions List -->
+    <MudText Typo="Typo.h5" Style="font-weight: 700; margin-bottom: 16px;">
+        Questions (@Questions.Count)
+    </MudText>
+
+    @if (Questions.Count == 0)
+    {
+        <div class="empty-state">
+            <div class="empty-icon">❓</div>
+            <div class="form-title">No Questions Yet</div>
+            <p style="color: #6b7280; margin-bottom: 20px;">Create your first question using the form above</p>
+        </div>
+    }
+    else
+    {
+        <div class="questions-grid">
+            @foreach (var q in Questions)
+            {
+                <div class="question-card">
+                    <div class="question-type">@GetTypeName(q.Type)</div>
+                    <div class="question-text">@q.Text</div>
+
+                    @if (q.Type == 0 && q.Options?.Count > 0)
+                    {
+                        <div class="question-options">
+                            <strong>Options:</strong><br />
+                            @foreach (var opt in q.Options)
+                            {
+                                <div>• @opt</div>
+                            }
+                        </div>
+                    }
+
+                    <div class="question-actions">
+                        <MudButton Variant="Variant.Outlined"
+                                   Size="Size.Small"
+                                   Color="Color.Error"
+                                   Class="action-button"
+                                   @onclick="@(() => DeleteQuestion(q.Id))">
+                            Delete
+                        </MudButton>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    <!-- Question Bank Section -->
+    <MudDivider Class="my-6" />
+    <MudText Typo="Typo.h5" Style="font-weight: 700; margin-bottom: 16px;">📚 Question Bank</MudText>
+
+    @if (IsBankLoading)
+    {
+        <MudProgressLinear Indeterminate="true" Class="mb-4" />
+    }
+    else if (!string.IsNullOrEmpty(BankError))
+    {
+        <MudAlert Severity="Severity.Warning">@BankError</MudAlert>
+    }
+    else
+    {
+        <MudTextField @bind-Value="BankSearch"
+                      Label="Search question bank"
+                      Variant="Variant.Outlined"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Class="mb-4" />
+        @if (!FilteredBankItems.Any())
+        {
+            <div class="empty-state">
+                <div class="empty-icon">📚</div>
+                <div class="form-title">No Questions in Bank</div>
+                <p style="color: #6b7280;">The question bank is empty.</p>
+            </div>
+        }
+        else
+        {
+            <div class="questions-grid">
+                @foreach (var item in FilteredBankItems)
+                {
+                    <div class="question-card">
+                        <div class="question-type">@GetTypeName((int)item.Type)</div>
+                        <div class="question-text">@item.Text</div>
+                        @if (item.Type == QuestionType.MultipleChoice && item.Options?.Count > 0)
+                        {
+                            <div class="question-options">
+                                <strong>Options:</strong><br />
+                                @foreach (var opt in item.Options)
+                                {
+                                    <div>• @opt</div>
+                                }
+                            </div>
+                        }
+                        <div class="question-actions">
+                            <MudButton Variant="Variant.Filled"
+                                       Size="Size.Small"
+                                       Color="Color.Primary"
+                                       Class="action-button"
+                                       @onclick="@(() => ImportFromBank(item))">
+                                Import
+                            </MudButton>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    }
+</MudContainer>
+
+@code {
+    [Parameter]
+    public string SessionId { get; set; } = string.Empty;
+
+    private List<QuestionModel> Questions = new();
+    private QuestionModel NewQuestion = new() { Options = new List<string> { "", "" } };
+
+    private List<QuestionBankItem> BankItems = new();
+    private string BankSearch = string.Empty;
+    private bool IsBankLoading = false;
+    private string? BankError = null;
+
+    private IEnumerable<QuestionBankItem> FilteredBankItems =>
+        string.IsNullOrWhiteSpace(BankSearch)
+            ? BankItems
+            : BankItems.Where(i => i.Text.Contains(BankSearch, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        Questions = new List<QuestionModel>
+        {
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Text = "What is the capital of France?",
+                Type = 0,
+                Options = new List<string> { "London", "Berlin", "Paris", "Madrid" }
+            },
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Text = "How confident are you with this material?",
+                Type = 1,
+                Options = new List<string>()
+            }
+        };
+
+        await LoadQuestionBankAsync();
+    }
+
+    private async Task LoadQuestionBankAsync()
+    {
+        IsBankLoading = true;
+        BankError = null;
+        try
+        {
+            var response = await Http.GetAsync("/api/questionbank");
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<QuestionBankResponse>();
+                BankItems = result?.Items ?? [];
+            }
+            else
+            {
+                BankError = "Unable to load question bank.";
+            }
+        }
+        catch
+        {
+            BankError = "Unable to connect to the server.";
+        }
+        finally
+        {
+            IsBankLoading = false;
+        }
+    }
+
+    private void ImportFromBank(QuestionBankItem item)
+    {
+        Questions.Add(new QuestionModel
+        {
+            Id = Guid.NewGuid(),
+            Text = item.Text,
+            Type = (int)item.Type,
+            Options = new List<string>(item.Options ?? [])
+        });
+    }
+
+    private bool HasMinimumRequiredOptions(QuestionModel question)
+    {
+        if (question.Type != 0)
+            return true;
+
+        return question.Options.Count(o => !string.IsNullOrWhiteSpace(o)) >= 2;
+    }
+
+    private void SaveQuestion()
+    {
+        var nonEmptyOptions = NewQuestion.Options
+            .Where(o => !string.IsNullOrWhiteSpace(o))
+            .ToList();
+
+        if (string.IsNullOrWhiteSpace(NewQuestion.Text) || !HasMinimumRequiredOptions(NewQuestion))
+        {
+            return;
+        }
+
+        Questions.Add(new QuestionModel
+        {
+            Id = Guid.NewGuid(),
+            Text = NewQuestion.Text,
+            Type = NewQuestion.Type,
+            Options = nonEmptyOptions
+        });
+
+        NewQuestion = new() { Options = new List<string> { "", "" }, Type = 0 };
+    }
+
+    private void DeleteQuestion(Guid id)
+    {
+        Questions.RemoveAll(q => q.Id == id);
+    }
+
+    private void AddOption() => NewQuestion.Options.Add("");
+
+    private void RemoveOption(int index)
+    {
+        if (NewQuestion.Options.Count > 2)
+            NewQuestion.Options.RemoveAt(index);
+    }
+
+    private string GetTypeName(int type) => type switch
+    {
+        0 => "Multiple Choice",
+        1 => "Likert Scale",
+        2 => "Open Ended",
+        _ => "Unknown"
+    };
+
+    private void GoBack() => NavManager.NavigateTo("/instructor");
+
+    public class QuestionModel
+    {
+        public Guid Id { get; set; }
+        public string Text { get; set; } = string.Empty;
+        public int Type { get; set; }
+        public List<string> Options { get; set; } = new();
+    }
+
+    private class QuestionBankResponse
+    {
+        public List<QuestionBankItem> Items { get; set; } = new();
+        public int TotalCount { get; set; }
+    }
+}

@@ -1,0 +1,140 @@
+@page "/student-join"
+@using MudBlazor
+@using Microsoft.AspNetCore.Components
+@inject NavigationManager NavManager
+
+<PageTitle>Join Session - Pulse</PageTitle>
+
+<style>
+    .join-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: calc(100vh - 70px);
+        padding: 20px;
+    }
+
+    .join-card {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
+        padding: 48px;
+        max-width: 450px;
+        width: 100%;
+    }
+
+    .join-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 24px;
+        margin: -48px -48px 24px -48px;
+        border-radius: 16px 16px 0 0;
+        text-align: center;
+    }
+
+    .join-icon {
+        font-size: 3rem;
+        margin-bottom: 12px;
+    }
+
+    .join-title {
+        font-size: 1.75rem;
+        font-weight: 700;
+        margin-bottom: 4px;
+    }
+
+    .join-subtitle {
+        opacity: 0.9;
+        font-size: 0.95rem;
+    }
+
+    .code-input {
+        font-size: 1.5rem !important;
+        letter-spacing: 4px;
+        text-align: center;
+        font-family: monospace;
+        font-weight: 600;
+    }
+
+    .join-button {
+        margin-top: 24px;
+        height: 48px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .back-button {
+        margin-top: 16px;
+    }
+
+    .demo-code {
+        background: #f3f4f6;
+        padding: 12px;
+        border-radius: 8px;
+        text-align: center;
+        margin-top: 20px;
+        font-size: 0.9rem;
+        color: #6b7280;
+    }
+</style>
+
+<div class="join-container">
+    <div class="join-card">
+        <div class="join-header">
+            <div class="join-icon">🎯</div>
+            <div class="join-title">Join Quiz</div>
+            <div class="join-subtitle">Enter the session code</div>
+        </div>
+
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="JoinCode"
+                          Label="Session Code"
+                          Placeholder="ABC123"
+                          Variant="Variant.Outlined"
+                          Class="code-input"
+                          MaxLength="6"
+                          HelperText="6-character code from your instructor" />
+
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       FullWidth="true"
+                       Size="Size.Large"
+                       Class="join-button"
+                       Disabled="JoinCode.Length < 6"
+                       @onclick="JoinSession">
+                Join Now
+            </MudButton>
+
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Default"
+                       FullWidth="true"
+                       Class="back-button"
+                       @onclick="GoBack">
+                Back to Home
+            </MudButton>
+
+            <div class="demo-code">
+                <MudText Typo="Typo.caption">Try demo code: ABC123</MudText>
+            </div>
+        </MudStack>
+    </div>
+</div>
+
+@code {
+    private string JoinCode = string.Empty;
+
+    private void JoinSession()
+    {
+        if (JoinCode.Length == 6)
+        {
+            // For demo, navigate to quiz page
+            NavManager.NavigateTo($"/quiz/{JoinCode}");
+        }
+    }
+
+    private void GoBack()
+    {
+        NavManager.NavigateTo("/");
+    }
+}
