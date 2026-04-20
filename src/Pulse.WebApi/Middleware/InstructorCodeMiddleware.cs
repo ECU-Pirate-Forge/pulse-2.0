@@ -106,7 +106,8 @@ public static class InstructorOnlyEndpointMatcher
         }
 
         if ((HttpMethods.IsPost(method) || HttpMethods.IsGet(method))
-            && (path.Equals("/sessions", StringComparison.OrdinalIgnoreCase) || path.Equals("/api/sessions", StringComparison.OrdinalIgnoreCase)))        {
+            && (path.Equals("/sessions", StringComparison.OrdinalIgnoreCase) || path.Equals("/api/sessions", StringComparison.OrdinalIgnoreCase)))
+        {
             return true;
         }
 
