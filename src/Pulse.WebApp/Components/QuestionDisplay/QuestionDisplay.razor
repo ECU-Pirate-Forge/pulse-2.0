@@ -114,6 +114,9 @@
     [Inject]
     public HttpClient Http { get; set; } = null!;
 
+    [Inject]
+    public IJSRuntime JS { get; set; } = null!;
+
     private string SelectedResponse { get; set; } = string.Empty;
     private string ValidationError { get; set; } = string.Empty;
     private string SuccessMessage { get; set; } = string.Empty;
@@ -211,9 +214,14 @@
 
     private async Task<string> GetDeviceId()
     {
-        // Try to get deviceId from localStorage using JavaScript interop
-        // For now, generate a placeholder - this should be implemented with JS interop
-        return Guid.NewGuid().ToString();
+        const string storageKey = "pulse_device_id";
+        var deviceId = await JS.InvokeAsync<string?>("localStorage.getItem", storageKey);
+        if (string.IsNullOrEmpty(deviceId))
+        {
+            deviceId = Guid.NewGuid().ToString();
+            await JS.InvokeVoidAsync("localStorage.setItem", storageKey, deviceId);
+        }
+        return deviceId;
     }
 
     private string GetLikertLabel(int scale)
