@@ -22,6 +22,12 @@ public class SessionEndpointTests
             return session;
         }
 
+        public bool Update(Session session)
+        {
+            _store[session.Id] = session;
+            return true;
+        }
+
         public Task<Session> InsertAsync(Session session, CancellationToken ct = default)
         {
             if (session.Id == Guid.Empty)

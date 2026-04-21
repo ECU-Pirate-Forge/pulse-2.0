@@ -39,4 +39,5 @@ public interface ISessionRepository
     /// Persists a new session to the database.
     /// </summary>
     Task<Session> InsertAsync(Session session, CancellationToken ct = default);
+    bool Update(Session session);
 }
