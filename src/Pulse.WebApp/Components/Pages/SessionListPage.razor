@@ -1,0 +1,240 @@
+@page "/sessions"
+@page "/sessions/{InstructorCode}"
+@using System.Net
+@using System.Net.Http.Json
+@using Pulse.Shared.Models
+@inject HttpClient Http
+
+<PageTitle>Session List - Pulse</PageTitle>
+
+<h1>Session List</h1>
+
+<div class="mb-3">
+    <label for="instructor-code" class="form-label">Instructor Code</label>
+    <input id="instructor-code"
+           class="form-control"
+           @bind="InstructorCodeInput"
+           @bind:event="oninput"
+           placeholder="Enter your instructor code" />
+    <button class="btn btn-primary mt-2"
+            @onclick="LoadSessionsAsync"
+            disabled="@IsBusy"
+            data-testid="load-sessions-button">
+        Load Sessions
+    </button>
+</div>
+
+@if (IsLoading)
+{
+    <p>Loading sessions...</p>
+}
+else if (!string.IsNullOrWhiteSpace(ErrorMessage))
+{
+    <div class="alert alert-danger" role="alert">@ErrorMessage</div>
+}
+
+@if (!IsLoading && Sessions.Count > 0)
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var session in Sessions)
+            {
+                <tr>
+                    <td>@session.Title</td>
+                    <td>@session.Status</td>
+                    <td>
+                        @if (CanOpen(session.Status))
+                        {
+                            <button class="btn btn-outline-primary btn-sm me-1"
+                                    @onclick="() => OpenSessionAsync(session.Id)"
+                                    disabled="@IsBusy"
+                                    data-testid="@($"open-{session.Id}")">
+                                Open
+                            </button>
+                        }
+                        @if (CanActivate(session.Status))
+                        {
+                            <button class="btn btn-outline-success btn-sm me-1"
+                                    @onclick="() => ActivateSessionAsync(session.Id)"
+                                    disabled="@IsBusy"
+                                    data-testid="@($"activate-{session.Id}")">
+                                Activate
+                            </button>
+                        }
+                        @if (CanClose(session.Status))
+                        {
+                            <button class="btn btn-outline-warning btn-sm me-1"
+                                    @onclick="() => CloseSessionAsync(session.Id)"
+                                    disabled="@IsBusy"
+                                    data-testid="@($"close-{session.Id}")">
+                                Close
+                            </button>
+                        }
+                        <button class="btn btn-outline-danger btn-sm"
+                                @onclick="() => DeleteSessionAsync(session.Id)"
+                                disabled="@IsBusy"
+                                data-testid="@($"delete-{session.Id}")">
+                            Delete
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    [Parameter] public string? InstructorCode { get; set; }
+
+    private readonly List<Session> Sessions = [];
+    private string InstructorCodeInput = string.Empty;
+    private string? ErrorMessage;
+    private bool IsLoading;
+    private bool IsActionInProgress;
+
+    private bool IsBusy => IsLoading || IsActionInProgress;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(InstructorCode))
+        {
+            InstructorCodeInput = InstructorCode;
+        }
+
+        await LoadSessionsAsync();
+    }
+
+    private async Task LoadSessionsAsync()
+    {
+        IsLoading = true;
+        ErrorMessage = null;
+
+        try
+        {
+            using var response = await SendGetSessionsRequestAsync("/api/sessions");
+
+            if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.MethodNotAllowed)
+            {
+                using var fallbackResponse = await SendGetSessionsRequestAsync("/sessions");
+                await HandleListResponseAsync(fallbackResponse);
+            }
+            else
+            {
+                await HandleListResponseAsync(response);
+            }
+        }
+        catch
+        {
+            Sessions.Clear();
+            ErrorMessage = "We could not load sessions right now. Please try again.";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private Task OpenSessionAsync(Guid sessionId) =>
+        InvokeActionAsync(HttpMethod.Post, $"/api/sessions/{sessionId}/open", "open");
+
+    private Task ActivateSessionAsync(Guid sessionId) =>
+        InvokeActionAsync(HttpMethod.Post, $"/api/sessions/{sessionId}/activate", "activate");
+
+    private Task CloseSessionAsync(Guid sessionId) =>
+        InvokeActionAsync(HttpMethod.Post, $"/api/sessions/{sessionId}/close", "close");
+
+    private Task DeleteSessionAsync(Guid sessionId) =>
+        InvokeActionAsync(HttpMethod.Delete, $"/api/sessions/{sessionId}", "delete");
+
+    private async Task InvokeActionAsync(HttpMethod method, string url, string actionName)
+    {
+        IsActionInProgress = true;
+        ErrorMessage = null;
+
+        try
+        {
+            using var request = new HttpRequestMessage(method, url);
+            AddInstructorCodeHeader(request);
+            using var response = await Http.SendAsync(request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                await LoadSessionsAsync();
+            }
+            else
+            {
+                ErrorMessage = $"We could not {actionName} this session. Please try again.";
+            }
+        }
+        catch
+        {
+            ErrorMessage = $"We could not {actionName} this session. Please try again.";
+        }
+        finally
+        {
+            IsActionInProgress = false;
+        }
+    }
+
+    private async Task HandleListResponseAsync(HttpResponseMessage response)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            var sessions = await response.Content.ReadFromJsonAsync<List<Session>>() ?? [];
+            Sessions.Clear();
+            Sessions.AddRange(sessions);
+            return;
+        }
+
+        Sessions.Clear();
+        ErrorMessage = GetListErrorMessage(response.StatusCode);
+    }
+
+    private async Task<HttpResponseMessage> SendGetSessionsRequestAsync(string path)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, path);
+        AddInstructorCodeHeader(request);
+        return await Http.SendAsync(request);
+    }
+
+    private void AddInstructorCodeHeader(HttpRequestMessage request)
+    {
+        if (!string.IsNullOrWhiteSpace(InstructorCodeInput))
+        {
+            request.Headers.TryAddWithoutValidation("InstructorCode", InstructorCodeInput.Trim());
+        }
+    }
+
+    private static string GetListErrorMessage(HttpStatusCode statusCode)
+    {
+        return statusCode switch
+        {
+            HttpStatusCode.Unauthorized => "Please enter your instructor code to view sessions.",
+            HttpStatusCode.Forbidden => "Your instructor code is invalid. Please try again.",
+            _ => "We could not load sessions right now. Please try again."
+        };
+    }
+
+    private static bool CanOpen(string? status) =>
+        NormalizeStatus(status) == "draft";
+
+    private static bool CanActivate(string? status) =>
+        NormalizeStatus(status) == "open";
+
+    private static bool CanClose(string? status)
+    {
+        var normalized = NormalizeStatus(status);
+        return normalized is "open" or "active";
+    }
+
+    private static string NormalizeStatus(string? status) =>
+        status?.Trim().ToLowerInvariant() ?? string.Empty;
+}
+
