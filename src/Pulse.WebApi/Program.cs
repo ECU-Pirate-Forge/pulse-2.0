@@ -70,6 +70,8 @@ app.MapGet("/api/sessions/join/{joinCode}", SessionEndpointHandlers.JoinSessionB
 app.MapGet("/sessions/{id:guid}/qr", SessionEndpointHandlers.GetSessionQr);
 
 app.MapPost("/api/sessions/{sessionId:guid}/questions/{questionId:guid}/respond", ResponseEndpointHandlers.Respond);
+app.MapGet("/api/sessions/{id:guid}/results", SessionResultsEndpointHandlers.GetSessionResults);
+app.MapPut("/api/sessions/{id:guid}/unblind", SessionEndpointHandlers.UnblindSession);
 app.MapDefaultEndpoints();
 
 app.Run();

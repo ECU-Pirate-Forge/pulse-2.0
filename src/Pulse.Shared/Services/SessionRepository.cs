@@ -112,11 +112,18 @@ public class SessionRepository : ISessionRepository
 
     public Task<Session> InsertAsync(Session session, CancellationToken ct = default)
     {
-        var collection = _db.GetCollection<Session>(SessionCollectionName);
-        collection.Insert(session);
+        _sessions.Insert(session);
+        _cache[session.Id] = session;
         return Task.FromResult(session);
     }
 
+    public bool Update(Session session)
+    {
+        var updated = _sessions.Update(session);
+        if (updated)
+            _cache[session.Id] = session;
+        return updated;
+    }
     public Task<bool> JoinCodeExistsAsync(string joinCode, CancellationToken ct = default)
     {
         var exists = _sessions.Exists(s => s.JoinCode == joinCode);
