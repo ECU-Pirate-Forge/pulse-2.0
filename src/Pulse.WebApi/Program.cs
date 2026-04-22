@@ -111,6 +111,7 @@ app.MapGet("/sessions/{id:guid}/qr", SessionEndpointHandlers.GetSessionQr);
 
 app.MapGet("/api/sessions/{id:guid}/results", SessionResultsEndpointHandlers.GetSessionResults);
 app.MapPut("/api/sessions/{id:guid}/unblind", SessionEndpointHandlers.UnblindSession);
+app.MapGet("/api/admin/export-db", AdminEndpointHandlers.ExportDb);
 app.MapDefaultEndpoints();
 
 app.Run();
