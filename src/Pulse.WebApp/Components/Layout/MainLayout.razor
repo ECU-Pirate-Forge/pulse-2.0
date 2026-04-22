@@ -1,7 +1,7 @@
 ﻿@using MudBlazor
 @inherits LayoutComponentBase
 
-<MudThemeProvider Theme="GetTheme()" />
+<MudThemeProvider Theme="_theme" />
 <MudDialogProvider />
 <MudSnackbarProvider />
 <MudPopoverProvider />
@@ -20,7 +20,17 @@
 
     <!-- Main Content -->
     <div class="pulse-content" style="padding-top: 70px;">
-        @Body
+        <ErrorBoundary>
+            <ChildContent>
+                @Body
+            </ChildContent>
+            <ErrorContent>
+                <MudAlert Severity="Severity.Error" Class="ma-4">
+                    An unhandled error has occurred.
+                    <MudButton Variant="Variant.Text" Href="/">Reload</MudButton>
+                </MudAlert>
+            </ErrorContent>
+        </ErrorBoundary>
     </div>
 </div>
 
@@ -44,5 +54,5 @@
 </style>
 
 @code {
-    private MudTheme GetTheme() => new();
+    private readonly MudTheme _theme = new();
 }

@@ -180,8 +180,12 @@
                         {
                             var option = opt;
                             var isSelected = SelectedAnswers.ContainsKey(CurrentQuestion - 1) && SelectedAnswers[CurrentQuestion - 1] == option;
-                            <div class="mc-button @(isSelected ? "selected" : "")" 
-                                 @onclick="@(() => SelectAnswer(option))">
+                            <div class="mc-button @(isSelected ? "selected" : "")"
+                                 role="button"
+                                 tabindex="0"
+                                 @onclick="@(() => SelectAnswer(option))"
+                                 @onkeydown="@((e) => { if (e.Key == "Enter" || e.Key == " ") SelectAnswer(option); })"
+                                 @onkeydown:preventDefault>
                                 @option
                             </div>
                         }
@@ -197,7 +201,11 @@
                                 var scale = i;
                                 var isSelected = SelectedAnswers.ContainsKey(CurrentQuestion - 1) && SelectedAnswers[CurrentQuestion - 1] == scale.ToString();
                                 <div class="likert-option @(isSelected ? "selected" : "")"
-                                     @onclick="@(() => SelectAnswer(scale.ToString()))">
+                                     role="button"
+                                     tabindex="0"
+                                     @onclick="@(() => SelectAnswer(scale.ToString()))"
+                                     @onkeydown="@((e) => { if (e.Key == "Enter" || e.Key == " ") SelectAnswer(scale.ToString()); })"
+                                     @onkeydown:preventDefault>
                                     @scale
                                 </div>
                             }
@@ -278,7 +286,7 @@
     public string SessionId { get; set; } = string.Empty;
 
     private int CurrentQuestion = 1;
-    private int TotalQuestions = 3;
+    private int TotalQuestions => Questions.Count;
     private bool Completed = false;
     private string CurrentOpenAnswer = string.Empty;
     private Dictionary<int, string> SelectedAnswers = new();
@@ -316,18 +324,18 @@
     private void SelectAnswer(string answer)
     {
         SelectedAnswers[CurrentQuestion - 1] = answer;
-        if (CurrentQuestion > 1 && CurrentOpenAnswer == string.Empty)
-        {
-            CurrentOpenAnswer = string.Empty;
-        }
     }
 
     private void NextQuestion()
     {
         if (CurrentQuestion < TotalQuestions)
         {
-            CurrentOpenAnswer = SelectedAnswers.ContainsKey(CurrentQuestion) ? SelectedAnswers[CurrentQuestion] : string.Empty;
+            if (CurrentOpenAnswer != string.Empty && CurrentQ.Type == 2)
+            {
+                SelectedAnswers[CurrentQuestion - 1] = CurrentOpenAnswer;
+            }
             CurrentQuestion++;
+            CurrentOpenAnswer = SelectedAnswers.ContainsKey(CurrentQuestion - 1) ? SelectedAnswers[CurrentQuestion - 1] : string.Empty;
         }
     }
 
