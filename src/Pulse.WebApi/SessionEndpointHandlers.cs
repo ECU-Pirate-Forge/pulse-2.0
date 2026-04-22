@@ -113,7 +113,9 @@ public static class SessionEndpointHandlers
 
         session.IsUnblinded = true;
         session.UpdatedAt = DateTime.UtcNow;
-        repo.Update(session);
+        var updated = repo.Update(session);
+        if (!updated)
+            return Results.Problem("Failed to persist session update.", statusCode: StatusCodes.Status500InternalServerError);
 
         // TODO: Emit ResultsUnblinded SignalR event when hub is implemented
 

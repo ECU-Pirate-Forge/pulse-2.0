@@ -119,8 +119,10 @@ public class SessionRepository : ISessionRepository
 
     public bool Update(Session session)
     {
-        var collection = _db.GetCollection<Session>(SessionCollectionName);
-        return collection.Update(session);
+        var updated = _sessions.Update(session);
+        if (updated)
+            _cache[session.Id] = session;
+        return updated;
     }
     public Task<bool> JoinCodeExistsAsync(string joinCode, CancellationToken ct = default)
     {
