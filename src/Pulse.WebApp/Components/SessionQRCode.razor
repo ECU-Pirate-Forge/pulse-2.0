@@ -143,6 +143,20 @@
         await LoadQRCode();
     }
 
+    /// <summary>
+    /// Public method that can be called by parent component when session is activated.
+    /// This triggers a refresh of the QR code to reflect the new session state.
+    /// 
+    /// NOTE: This is a workaround until SignalR integration is implemented.
+    /// Once SignalR is available, this component should listen to SessionActivated
+    /// messages broadcast from the server and automatically refresh.
+    /// </summary>
+    public async Task OnSessionActivatedAsync()
+    {
+        // Refresh QR code when session becomes active
+        await RefreshQRCode();
+    }
+
     private async Task LoadQRCode()
     {
         IsLoading = true;
