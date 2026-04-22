@@ -1,5 +1,6 @@
 using MudBlazor.Services;
 using Pulse.WebApp.Components;
+using Microsoft.AspNetCore.Components;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,6 +11,21 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 builder.Services.AddMudServices();
+
+// Configure HttpClient with BaseAddress for API calls
+builder.Services.AddScoped<HttpClient>(sp => 
+{
+    var navigationManager = sp.GetRequiredService<NavigationManager>();
+    
+    // For development: construct API URL based on current host
+    // Replace port 5243 (WebApp) with 5062 (WebApi)
+    var apiBaseUrl = navigationManager.BaseUri.Replace(":5243", ":5062");
+    
+    return new HttpClient 
+    { 
+        BaseAddress = new Uri(apiBaseUrl)
+    };
+});
 
 
 var app = builder.Build();

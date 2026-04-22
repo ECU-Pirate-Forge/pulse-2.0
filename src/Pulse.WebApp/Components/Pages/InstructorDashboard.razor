@@ -173,7 +173,7 @@
                 <div class="stat-label">Questions Created</div>
             </div>
             <div class="stat-card">
-                <div class="stat-number">142</div>
+                <div class="stat-number">@TotalResponses</div>
                 <div class="stat-label">Student Responses</div>
             </div>
         </div>
@@ -269,17 +269,29 @@
 @code {
     private string NewSessionTitle = string.Empty;
     private List<SessionModel> Sessions = new();
-    private int TotalQuestions = 8;
+
+    private int TotalQuestions => CalculateTotalQuestions();
+    private int TotalResponses => CalculateTotalResponses();
 
     protected override void OnInitialized()
     {
-        // Demo sessions
+        // Demo sessions with accurate question counts
         Sessions = new List<SessionModel>
         {
-            new() { Id = Guid.NewGuid(), Title = "Biology Quiz - Chapter 5", JoinCode = "BIO123", QuestionCount = 10, ResponseCount = 24 },
-            new() { Id = Guid.NewGuid(), Title = "Math Concepts Test", JoinCode = "MATH45", QuestionCount = 15, ResponseCount = 18 },
-            new() { Id = Guid.NewGuid(), Title = "History Final Exam", JoinCode = "HIST99", QuestionCount = 20, ResponseCount = 32 }
+            new() { Id = Guid.NewGuid(), Title = "Biology Quiz - Chapter 5", JoinCode = "BIO123", QuestionCount = 3, ResponseCount = 0 },
+            new() { Id = Guid.NewGuid(), Title = "Math Concepts Test", JoinCode = "MATH45", QuestionCount = 3, ResponseCount = 0 },
+            new() { Id = Guid.NewGuid(), Title = "History Final Exam", JoinCode = "HIST99", QuestionCount = 4, ResponseCount = 0 }
         };
+    }
+
+    private int CalculateTotalQuestions()
+    {
+        return Sessions.Sum(s => s.QuestionCount);
+    }
+
+    private int CalculateTotalResponses()
+    {
+        return Sessions.Sum(s => s.ResponseCount);
     }
 
     private void CreateSession()
@@ -306,7 +318,11 @@
 
     private void ShowQR(Guid sessionId)
     {
-        NavManager.NavigateTo($"/instructor/qr/{sessionId}");
+        var session = Sessions.FirstOrDefault(s => s.Id == sessionId);
+        if (session != null)
+        {
+            NavManager.NavigateTo($"/instructor/qr/{sessionId}?joinCode={session.JoinCode}");
+        }
     }
 
     private void DeleteSession(Guid sessionId)
