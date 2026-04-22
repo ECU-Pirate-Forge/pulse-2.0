@@ -6,170 +6,135 @@
 <PageTitle>QR Code - Pulse</PageTitle>
 
 <style>
-    .qr-container {
-        display: flex;
-        align-items: center;
-        justify-content: center;
+    .qr-page-container {
         min-height: calc(100vh - 70px);
-        padding: 20px;
+        padding: 32px 16px;
         background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
     }
 
-    .qr-card {
+    .qr-page-card {
+        max-width: 900px;
+        margin: 0 auto;
         background: white;
-        border-radius: 16px;
+        border-radius: 12px;
         box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
-        padding: 48px;
-        max-width: 500px;
-        width: 100%;
-        text-align: center;
+        overflow: hidden;
     }
 
-    .qr-header {
+    .qr-page-header {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
-        padding: 24px;
-        margin: -48px -48px 24px -48px;
-        border-radius: 16px 16px 0 0;
-    }
-
-    .qr-title {
-        font-size: 1.75rem;
-        font-weight: 700;
-        margin-bottom: 8px;
-    }
-
-    .qr-subtitle {
-        opacity: 0.9;
-        font-size: 0.95rem;
-    }
-
-    .qr-display {
-        background: #f9fafb;
-        padding: 24px;
-        border-radius: 12px;
-        margin: 24px 0;
+        padding: 32px;
         display: flex;
         align-items: center;
-        justify-content: center;
-        min-height: 300px;
+        justify-content: space-between;
     }
 
-    .qr-placeholder {
-        text-align: center;
-        color: #9ca3af;
-    }
-
-    .qr-placeholder-icon {
-        font-size: 4rem;
-        margin-bottom: 12px;
-    }
-
-    .join-code-section {
-        background: #f3f4f6;
-        padding: 16px;
-        border-radius: 8px;
-        margin-bottom: 24px;
-    }
-
-    .join-code-label {
-        font-size: 0.85rem;
-        color: #6b7280;
-        font-weight: 500;
-        margin-bottom: 8px;
-    }
-
-    .join-code {
+    .qr-page-title {
         font-size: 1.75rem;
-        font-family: monospace;
         font-weight: 700;
-        color: #667eea;
-        letter-spacing: 4px;
     }
 
-    .instructions {
+    .qr-page-subtitle {
+        opacity: 0.9;
+        margin-top: 4px;
+    }
+
+    .qr-page-content {
+        padding: 32px;
+    }
+
+    .qr-page-instructions {
         background: #eff6ff;
         border-left: 4px solid #3b82f6;
         padding: 16px;
         border-radius: 4px;
-        margin-bottom: 24px;
-        text-align: left;
+        margin-bottom: 32px;
     }
 
-    .instructions-title {
+    .qr-page-instructions-title {
         font-weight: 600;
         color: #1e40af;
         margin-bottom: 8px;
     }
 
-    .instructions-text {
+    .qr-page-instructions-text {
         color: #0c4a6e;
         font-size: 0.95rem;
         line-height: 1.6;
     }
 
-    .action-buttons {
+    .qr-page-buttons {
         display: flex;
         gap: 12px;
-        margin-top: 24px;
+        margin-top: 32px;
     }
 
-    .action-button {
-        flex: 1;
-        height: 44px;
+    .qr-page-button {
         font-weight: 600;
-        text-transform: uppercase;
+    }
+
+    @@media (max-width: 768px) {
+        .qr-page-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .qr-page-buttons {
+            flex-direction: column;
+        }
+
+        .qr-page-button {
+            width: 100%;
+        }
     }
 </style>
 
-<div class="qr-container">
-    <div class="qr-card">
-        <div class="qr-header">
-            <div class="qr-title">📱 Share Session</div>
-            <div class="qr-subtitle">Students can scan this to join</div>
-        </div>
-
-        <!-- QR Code Display -->
-        <div class="qr-display">
-            <div class="qr-placeholder">
-                <div class="qr-placeholder-icon">□</div>
-                <div style="color: #6b7280; font-size: 0.9rem;">QR Code Preview</div>
-                <div style="color: #9ca3af; font-size: 0.85rem; margin-top: 8px;">Scan with phone camera</div>
+<div class="qr-page-container">
+    <div class="qr-page-card">
+        <!-- Header -->
+        <div class="qr-page-header">
+            <div>
+                <div class="qr-page-title">📱 Share Session</div>
+                <div class="qr-page-subtitle">Students can scan or enter the code to join</div>
             </div>
+            <MudIcon Icon="@Icons.Material.Filled.QrCode" Style="font-size: 3rem; opacity: 0.8;" />
         </div>
 
-        <!-- Join Code -->
-        <div class="join-code-section">
-            <div class="join-code-label">Or enter this code manually:</div>
-            <div class="join-code">@(string.IsNullOrEmpty(JoinCode) ? "N/A" : JoinCode)</div>
-        </div>
-
-        <!-- Instructions -->
-        <div class="instructions">
-            <div class="instructions-title">✓ Instructions for Students:</div>
-            <div class="instructions-text">
-                <ol style="margin: 0; padding-left: 20px;">
-                    <li>Scan the QR code with their mobile device, or</li>
-                    <li>Visit Pulse Quiz and enter the code: <strong>@(string.IsNullOrEmpty(JoinCode) ? "N/A" : JoinCode)</strong></li>
-                    <li>They will be able to access the quiz immediately</li>
-                </ol>
+        <!-- Content -->
+        <div class="qr-page-content">
+            <!-- Instructions -->
+            <div class="qr-page-instructions">
+                <div class="qr-page-instructions-title">✓ How to Share:</div>
+                <div class="qr-page-instructions-text">
+                    <ol style="margin: 0; padding-left: 20px;">
+                        <li>Share the QR code or session code with your students</li>
+                        <li>Students can scan the QR code with their mobile device</li>
+                        <li>Or they can visit Pulse and enter the session code manually</li>
+                        <li>They'll be able to access and start the quiz immediately</li>
+                    </ol>
+                </div>
             </div>
-        </div>
 
-        <!-- Action Buttons -->
-        <div class="action-buttons">
-            <MudButton Variant="Variant.Filled"
-                       Color="Color.Primary"
-                       Class="action-button"
-                       StartIcon="@Icons.Material.Filled.Print">
-                Print
-            </MudButton>
-            <MudButton Variant="Variant.Outlined"
-                       Color="Color.Default"
-                       Class="action-button"
-                       @onclick="GoBack">
-                Back
-            </MudButton>
+            <!-- QR Component -->
+            <SessionQRCode SessionId="@SessionId" JoinCode="@JoinCode" />
+
+            <!-- Action Buttons -->
+            <div class="qr-page-buttons">
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Class="qr-page-button"
+                           StartIcon="@Icons.Material.Filled.Print">
+                    Print
+                </MudButton>
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Default"
+                           Class="qr-page-button"
+                           @onclick="GoBack">
+                    Back to Dashboard
+                </MudButton>
+            </div>
         </div>
     </div>
 </div>
