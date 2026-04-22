@@ -93,4 +93,32 @@ public static class SessionEndpointHandlers
             created.JoinCode,
             created.InstructorCode));
     }
+
+    public static async Task<IResult> UnblindSession(
+        Guid id,
+        HttpContext context,
+        ISessionRepository repo)
+    {
+        var instructorCode = context.Items[InstructorCodeMiddleware.HeaderName]?.ToString();
+
+        if (string.IsNullOrWhiteSpace(instructorCode))
+            return Results.Unauthorized();
+
+        var session = await repo.GetByIdAsync(id);
+        if (session is null)
+            return Results.NotFound();
+
+        if (!string.Equals(session.InstructorCode, instructorCode, StringComparison.Ordinal))
+            return Results.StatusCode(403);
+
+        session.IsUnblinded = true;
+        session.UpdatedAt = DateTime.UtcNow;
+        var updated = repo.Update(session);
+        if (!updated)
+            return Results.Problem("Failed to persist session update.", statusCode: StatusCodes.Status500InternalServerError);
+
+        // TODO: Emit ResultsUnblinded SignalR event when hub is implemented
+
+        return Results.Ok(session);
+    }
 }
