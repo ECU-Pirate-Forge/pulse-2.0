@@ -17,4 +17,5 @@ public class QuestionRepository
     public Question? GetById(Guid id) => _col.FindById(id);
     public bool Update(Question q) => _col.Update(q);
     public bool Delete(Guid id) => _col.Delete(id);
+    public IEnumerable<Question> GetBySessionId(Guid sessionId) => _col.Find(q => q.SessionId == sessionId);
 }
