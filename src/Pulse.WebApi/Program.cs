@@ -69,6 +69,7 @@ app.MapPost("/api/sessions", SessionEndpointHandlers.CreateSession);
 app.MapGet("/api/sessions/join/{joinCode}", SessionEndpointHandlers.JoinSessionByCode);
 app.MapGet("/sessions/{id:guid}/qr", SessionEndpointHandlers.GetSessionQr);
 
+app.MapPost("/api/sessions/{sessionId:guid}/questions/{questionId:guid}/respond", ResponseEndpointHandlers.Respond);
 app.MapDefaultEndpoints();
 
 app.Run();
