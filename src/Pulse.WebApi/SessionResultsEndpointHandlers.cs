@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Http.HttpResults;
 using Pulse.Application.Services;
 using Pulse.Common.Services;
 using Pulse.WebApi.Middleware;

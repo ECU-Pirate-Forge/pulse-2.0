@@ -50,7 +50,7 @@ public class SessionResultsEndpointTests
             new Response { QuestionId = questionId, DeviceId = "d3", Value = "B" }
         ]);
 
-        var db = new LiteDB.LiteDatabase("Filename=:memory:");
+        using var db = new LiteDB.LiteDatabase("Filename=:memory:");
         var questionRepo = new QuestionRepository(db);
         questionRepo.Insert(new Question { Id = questionId, SessionId = sessionId, Text = "Q1", Type = QuestionType.MultipleChoice, Options = ["A", "B"] });
 
@@ -62,6 +62,10 @@ public class SessionResultsEndpointTests
         var okResult = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.Ok<SessionResultsResponse>>(result);
         Assert.Equal(200, okResult.StatusCode);
         Assert.Equal(3, okResult.Value!.TotalResponses);
+        Assert.Single(okResult.Value.Questions);
+        var questionTally = okResult.Value.Questions[0];
+        Assert.Equal(2, questionTally.Tallies.First(t => t.Option == "A").Count);
+        Assert.Equal(1, questionTally.Tallies.First(t => t.Option == "B").Count);
     }
 
     [Fact]
@@ -69,7 +73,7 @@ public class SessionResultsEndpointTests
     {
         var sessionRepo = BuildSessionRepo();
         var responseRepo = BuildResponseRepo();
-        var db = new LiteDB.LiteDatabase("Filename=:memory:");
+        using var db = new LiteDB.LiteDatabase("Filename=:memory:");
         var questionRepo = new QuestionRepository(db);
         var context = BuildContext(null);
 
@@ -84,7 +88,7 @@ public class SessionResultsEndpointTests
     {
         var sessionRepo = BuildSessionRepo(null);
         var responseRepo = BuildResponseRepo();
-        var db = new LiteDB.LiteDatabase("Filename=:memory:");
+        using var db = new LiteDB.LiteDatabase("Filename=:memory:");
         var questionRepo = new QuestionRepository(db);
         var context = BuildContext("INST001");
 
@@ -101,7 +105,7 @@ public class SessionResultsEndpointTests
         var session = new Session { Id = sessionId, Title = "Test", InstructorCode = "RIGHTCODE" };
         var sessionRepo = BuildSessionRepo(session);
         var responseRepo = BuildResponseRepo();
-        var db = new LiteDB.LiteDatabase("Filename=:memory:");
+        using var db = new LiteDB.LiteDatabase("Filename=:memory:");
         var questionRepo = new QuestionRepository(db);
         var context = BuildContext("WRONGCODE");
 

@@ -16,7 +16,6 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<QuestionService>();
         services.AddSingleton<IQuestionBankRepository, QuestionBankRepository>();
         services.AddSingleton<IResponseRepository, ResponseRepository>();
-        services.AddSingleton<ResponseAggregationService>();
 
         return services;
     }
