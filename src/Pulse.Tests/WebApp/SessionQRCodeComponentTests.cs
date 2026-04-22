@@ -134,7 +134,7 @@ public class SessionQRCodeComponentTests : Bunit.TestContext
         if (method != null && component != null)
         {
             var task = (Task)method.Invoke(component, null)!;
-            
+
             // Assert - Method should be invocable and return a Task that completes
             await cut.InvokeAsync(async () => await task);
             task.IsCompleted.Should().BeTrue(
