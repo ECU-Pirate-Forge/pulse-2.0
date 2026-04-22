@@ -83,7 +83,7 @@ High-level repository layout:
 ### 1. Clone
 
 ```bash
-git clone <your-repository-url>
+git clone https://github.com/ECU-Pirate-Forge/pulse-2.0.git
 cd pulse-2.0
 ```
 
@@ -102,7 +102,7 @@ dotnet build Pulse.slnx -c Debug
 ### 4. Run Tests
 
 ```bash
-dotnet test src/Pulse.Tests/Pulse.Tests.csproj -c Debug --no-build
+dotnet test .\Pulse.slnx
 ```
 
 ### 5. Run the Full Local Stack (Recommended)
@@ -125,8 +125,8 @@ Instruction validation was performed by a non-author reviewer (GitHub Copilot ag
 
 - `dotnet --version` -> 10.0.201
 - `dotnet restore Pulse.slnx` -> success
-- `dotnet build Pulse.slnx -c Debug` -> success
-- `dotnet test src/Pulse.Tests/Pulse.Tests.csproj -c Debug --no-build` -> 124 passed, 0 failed
+- `dotnet build .\Pulse.slnx -c Debug` -> success
+- `dotnet test .\Pulse.slnx` -> 124 passed, 0 failed
 
 ## Documentation
 
