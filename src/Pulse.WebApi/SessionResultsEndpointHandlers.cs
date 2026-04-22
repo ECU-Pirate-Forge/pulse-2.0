@@ -16,6 +16,7 @@ public static class SessionResultsEndpointHandlers
     {
         var instructorCode = context.Items[InstructorCodeMiddleware.HeaderName]?.ToString();
 
+        // Guard for unit test isolation — middleware always populates this in production
         if (string.IsNullOrWhiteSpace(instructorCode))
             return Results.Unauthorized();
 
