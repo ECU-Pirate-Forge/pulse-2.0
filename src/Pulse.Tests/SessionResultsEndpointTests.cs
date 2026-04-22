@@ -80,7 +80,8 @@ public class SessionResultsEndpointTests
         var result = await SessionResultsEndpointHandlers.GetSessionResults(
             Guid.NewGuid(), context, sessionRepo.Object, questionRepo, responseRepo.Object);
 
-        Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.UnauthorizedHttpResult>(result);
+        var statusResult = Assert.IsAssignableFrom<Microsoft.AspNetCore.Http.IStatusCodeHttpResult>(result);
+        Assert.Equal(401, statusResult.StatusCode);
     }
 
     [Fact]
