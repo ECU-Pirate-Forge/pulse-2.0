@@ -205,6 +205,28 @@ public class QuestionBankImportEndpointTests
     }
 
     [Fact]
+    public async Task ImportQuestions_ExistingQuestions_SortOrderStartsAfterExisting()
+    {
+        var session = new Session { Id = _sessionId, InstructorCode = "INST001" };
+        var bankItem = new QuestionBankItem { Id = _bankItemId, Text = "Q1", Type = QuestionType.MultipleChoice, Options = ["A", "B"] };
+
+        var questionRepo = BuildQuestionRepo();
+        questionRepo.Insert(new Question { Id = Guid.NewGuid(), SessionId = _sessionId, Text = "Existing", Type = QuestionType.MultipleChoice, Options = ["A", "B"], SortOrder = 0 });
+        questionRepo.Insert(new Question { Id = Guid.NewGuid(), SessionId = _sessionId, Text = "Existing 2", Type = QuestionType.MultipleChoice, Options = ["A", "B"], SortOrder = 1 });
+
+        var result = await QuestionBankImportEndpointHandlers.ImportQuestions(
+            _sessionId,
+            new ImportQuestionsRequest { QuestionBankItemIds = [_bankItemId] },
+            BuildContext("INST001"),
+            BuildSessionRepo(session).Object,
+            BuildBankRepo(bankItem).Object,
+            questionRepo);
+
+        var ok = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.Ok<List<Question>>>(result);
+        Assert.Equal(2, ok.Value![0].SortOrder);
+    }
+
+    [Fact]
     public async Task ImportQuestions_DuplicateIds_DeduplicatesImport()
     {
         var session = new Session { Id = _sessionId, InstructorCode = "INST001" };

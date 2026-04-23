@@ -17,8 +17,10 @@ public static class QuestionBankImportEndpointHandlers
     {
         var instructorCode = context.Items[InstructorCodeMiddleware.HeaderName]?.ToString();
 
+        // Middleware owns the 401 response in production.
+        // This guard exists only for unit test isolation where middleware is bypassed.
         if (string.IsNullOrWhiteSpace(instructorCode))
-            return Results.Json(new { error = "InstructorCode is required." }, statusCode: StatusCodes.Status401Unauthorized);
+            return Results.Unauthorized();
 
         if (request.QuestionBankItemIds is null || request.QuestionBankItemIds.Count == 0)
             return Results.BadRequest("Question bank item ID list is required and must not be empty.");
@@ -40,6 +42,11 @@ public static class QuestionBankImportEndpointHandlers
             bankItems.Add(item);
         }
 
+        var existingMaxSortOrder = questionRepo.GetBySessionId(sessionId)
+            .Select(q => q.SortOrder)
+            .DefaultIfEmpty(-1)
+            .Max();
+
         var createdQuestions = new List<Question>();
         for (int i = 0; i < bankItems.Count; i++)
         {
@@ -51,7 +58,7 @@ public static class QuestionBankImportEndpointHandlers
                 Text = item.Text,
                 Type = item.Type,
                 Options = item.Options.ToList(),
-                SortOrder = i,
+                SortOrder = existingMaxSortOrder + 1 + i,
                 CreatedAt = DateTime.UtcNow
             };
             questionRepo.Insert(question);
