@@ -112,6 +112,7 @@ app.MapGet("/sessions/{id:guid}/qr", SessionEndpointHandlers.GetSessionQr);
 app.MapGet("/api/sessions/{id:guid}/results", SessionResultsEndpointHandlers.GetSessionResults);
 app.MapPut("/api/sessions/{id:guid}/unblind", SessionEndpointHandlers.UnblindSession);
 app.MapGet("/api/admin/export-db", AdminEndpointHandlers.ExportDb);
+app.MapPost("/api/questionbank/import/preview", CsvPreviewEndpointHandlers.PreviewImport).DisableAntiforgery();
 app.MapDefaultEndpoints();
 
 app.Run();
