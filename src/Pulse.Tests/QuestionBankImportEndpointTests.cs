@@ -111,7 +111,8 @@ public class QuestionBankImportEndpointTests
             BuildBankRepo().Object,
             BuildQuestionRepo());
 
-        Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.UnauthorizedHttpResult>(result);
+        var statusResult = Assert.IsAssignableFrom<Microsoft.AspNetCore.Http.IStatusCodeHttpResult>(result);
+        Assert.Equal(401, statusResult.StatusCode);
     }
 
     [Fact]
@@ -168,9 +169,56 @@ public class QuestionBankImportEndpointTests
             BuildQuestionRepo());
 
         var ok = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.Ok<List<Question>>>(result);
-        // Verify the question has a new ID, not the bank item ID
         Assert.NotEqual(_bankItemId, ok.Value![0].Id);
-        // Verify options are a copy, not a reference
-        Assert.Equal(bankItem.Options, ok.Value[0].Options);
+        Assert.Equal(2, ok.Value[0].Options.Count);
+        // Mutate the bank item and verify the imported question is unaffected
+        bankItem.Options.Add("C");
+        Assert.Equal(2, ok.Value[0].Options.Count);
+    }
+
+    [Fact]
+    public async Task ImportQuestions_MultipleItems_SetsUniqueSortOrders()
+    {
+        var session = new Session { Id = _sessionId, InstructorCode = "INST001" };
+        var id1 = Guid.NewGuid();
+        var id2 = Guid.NewGuid();
+        var item1 = new QuestionBankItem { Id = id1, Text = "Q1", Type = QuestionType.MultipleChoice, Options = ["A", "B"] };
+        var item2 = new QuestionBankItem { Id = id2, Text = "Q2", Type = QuestionType.LikertScale, Options = [] };
+
+        var repo = new Mock<IQuestionBankRepository>();
+        repo.Setup(r => r.GetById(id1)).Returns(item1);
+        repo.Setup(r => r.GetById(id2)).Returns(item2);
+
+        var result = await QuestionBankImportEndpointHandlers.ImportQuestions(
+            _sessionId,
+            new ImportQuestionsRequest { QuestionBankItemIds = [id1, id2] },
+            BuildContext("INST001"),
+            BuildSessionRepo(session).Object,
+            repo.Object,
+            BuildQuestionRepo());
+
+        var ok = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.Ok<List<Question>>>(result);
+        Assert.Equal(2, ok.Value!.Count);
+        Assert.NotEqual(ok.Value[0].Id, ok.Value[1].Id);
+        Assert.Equal(0, ok.Value[0].SortOrder);
+        Assert.Equal(1, ok.Value[1].SortOrder);
+    }
+
+    [Fact]
+    public async Task ImportQuestions_DuplicateIds_DeduplicatesImport()
+    {
+        var session = new Session { Id = _sessionId, InstructorCode = "INST001" };
+        var bankItem = new QuestionBankItem { Id = _bankItemId, Text = "Q1", Type = QuestionType.MultipleChoice, Options = ["A", "B"] };
+
+        var result = await QuestionBankImportEndpointHandlers.ImportQuestions(
+            _sessionId,
+            new ImportQuestionsRequest { QuestionBankItemIds = [_bankItemId, _bankItemId] },
+            BuildContext("INST001"),
+            BuildSessionRepo(session).Object,
+            BuildBankRepo(bankItem).Object,
+            BuildQuestionRepo());
+
+        var ok = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.Ok<List<Question>>>(result);
+        Assert.Single(ok.Value!);
     }
 }

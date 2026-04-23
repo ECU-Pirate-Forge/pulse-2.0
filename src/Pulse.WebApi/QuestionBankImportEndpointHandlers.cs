@@ -18,7 +18,7 @@ public static class QuestionBankImportEndpointHandlers
         var instructorCode = context.Items[InstructorCodeMiddleware.HeaderName]?.ToString();
 
         if (string.IsNullOrWhiteSpace(instructorCode))
-            return Results.Unauthorized();
+            return Results.Json(new { error = "InstructorCode is required." }, statusCode: StatusCodes.Status401Unauthorized);
 
         if (request.QuestionBankItemIds is null || request.QuestionBankItemIds.Count == 0)
             return Results.BadRequest("Question bank item ID list is required and must not be empty.");
@@ -30,8 +30,9 @@ public static class QuestionBankImportEndpointHandlers
         if (!string.Equals(session.InstructorCode, instructorCode, StringComparison.Ordinal))
             return Results.StatusCode(403);
 
+        var distinctIds = request.QuestionBankItemIds.Distinct().ToList();
         var bankItems = new List<QuestionBankItem>();
-        foreach (var id in request.QuestionBankItemIds)
+        foreach (var id in distinctIds)
         {
             var item = bankRepo.GetById(id);
             if (item is null)
@@ -40,8 +41,9 @@ public static class QuestionBankImportEndpointHandlers
         }
 
         var createdQuestions = new List<Question>();
-        foreach (var item in bankItems)
+        for (int i = 0; i < bankItems.Count; i++)
         {
+            var item = bankItems[i];
             var question = new Question
             {
                 Id = Guid.NewGuid(),
@@ -49,6 +51,7 @@ public static class QuestionBankImportEndpointHandlers
                 Text = item.Text,
                 Type = item.Type,
                 Options = item.Options.ToList(),
+                SortOrder = i,
                 CreatedAt = DateTime.UtcNow
             };
             questionRepo.Insert(question);
