@@ -208,22 +208,31 @@ public class QuestionBankImportEndpointTests
     public async Task ImportQuestions_ExistingQuestions_SortOrderStartsAfterExisting()
     {
         var session = new Session { Id = _sessionId, InstructorCode = "INST001" };
-        var bankItem = new QuestionBankItem { Id = _bankItemId, Text = "Q1", Type = QuestionType.MultipleChoice, Options = ["A", "B"] };
+        var id1 = Guid.NewGuid();
+        var id2 = Guid.NewGuid();
+        var bankItem1 = new QuestionBankItem { Id = id1, Text = "Q1", Type = QuestionType.MultipleChoice, Options = ["A", "B"] };
+        var bankItem2 = new QuestionBankItem { Id = id2, Text = "Q2", Type = QuestionType.LikertScale, Options = [] };
 
         var questionRepo = BuildQuestionRepo();
         questionRepo.Insert(new Question { Id = Guid.NewGuid(), SessionId = _sessionId, Text = "Existing", Type = QuestionType.MultipleChoice, Options = ["A", "B"], SortOrder = 0 });
         questionRepo.Insert(new Question { Id = Guid.NewGuid(), SessionId = _sessionId, Text = "Existing 2", Type = QuestionType.MultipleChoice, Options = ["A", "B"], SortOrder = 1 });
 
+        var bankRepo = new Mock<IQuestionBankRepository>();
+        bankRepo.Setup(r => r.GetById(id1)).Returns(bankItem1);
+        bankRepo.Setup(r => r.GetById(id2)).Returns(bankItem2);
+
         var result = await QuestionBankImportEndpointHandlers.ImportQuestions(
             _sessionId,
-            new ImportQuestionsRequest { QuestionBankItemIds = [_bankItemId] },
+            new ImportQuestionsRequest { QuestionBankItemIds = [id1, id2] },
             BuildContext("INST001"),
             BuildSessionRepo(session).Object,
-            BuildBankRepo(bankItem).Object,
+            bankRepo.Object,
             questionRepo);
 
         var ok = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.Ok<List<Question>>>(result);
-        Assert.Equal(2, ok.Value![0].SortOrder);
+        Assert.Equal(2, ok.Value!.Count);
+        Assert.Equal(2, ok.Value[0].SortOrder);
+        Assert.Equal(3, ok.Value[1].SortOrder);
     }
 
     [Fact]

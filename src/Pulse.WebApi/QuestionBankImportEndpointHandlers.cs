@@ -19,8 +19,9 @@ public static class QuestionBankImportEndpointHandlers
 
         // Middleware owns the 401 response in production.
         // This guard exists only for unit test isolation where middleware is bypassed.
+        // Mirror the middleware response shape for consistency.
         if (string.IsNullOrWhiteSpace(instructorCode))
-            return Results.Unauthorized();
+            return Results.Json(new { error = "InstructorCode is required." }, statusCode: StatusCodes.Status401Unauthorized);
 
         if (request.QuestionBankItemIds is null || request.QuestionBankItemIds.Count == 0)
             return Results.BadRequest("Question bank item ID list is required and must not be empty.");
