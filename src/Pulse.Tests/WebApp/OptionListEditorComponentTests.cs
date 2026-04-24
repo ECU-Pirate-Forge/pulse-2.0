@@ -109,6 +109,34 @@ public class OptionListEditorComponentTests : BunitContext
     }
 
     [Fact]
+    public void RemoveOption_Disabled_When_At_MinimumOptions_For_MultipleChoice()
+    {
+        // Arrange - MC usage: MinimumOptions=2, exactly 2 options present
+        var options = new List<string> { "Option 1", "Option 2" };
+        var component = Render<OptionListEditor>(parameters => parameters
+            .Add(p => p.Options, options)
+            .Add(p => p.MinimumOptions, 2));
+
+        // Act & Assert - both remove buttons should be disabled
+        var removeButtons = component.FindAll("button").Where(b => b.TextContent.Contains("Remove")).ToList();
+        Assert.All(removeButtons, btn => Assert.NotNull(btn.GetAttribute("disabled")));
+    }
+
+    [Fact]
+    public void RemoveOption_Enabled_When_Above_MinimumOptions_For_MultipleChoice()
+    {
+        // Arrange - MC usage: MinimumOptions=2, 3 options present
+        var options = new List<string> { "Option 1", "Option 2", "Option 3" };
+        var component = Render<OptionListEditor>(parameters => parameters
+            .Add(p => p.Options, options)
+            .Add(p => p.MinimumOptions, 2));
+
+        // Act & Assert - remove buttons should be enabled
+        var removeButtons = component.FindAll("button").Where(b => b.TextContent.Contains("Remove")).ToList();
+        Assert.All(removeButtons, btn => Assert.Null(btn.GetAttribute("disabled")));
+    }
+
+    [Fact]
     public async Task EditOption_Updates_Option_Value()
     {
         // Arrange
