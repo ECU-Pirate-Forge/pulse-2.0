@@ -203,7 +203,8 @@ public class OptionListEditorComponentTests : BunitContext
         // Arrange
         var options = new List<string> { "Option 1" };
         var component = Render<OptionListEditor>(parameters => parameters
-            .Add(p => p.Options, options));
+            .Add(p => p.Options, options)
+            .Add(p => p.MinimumOptions, 2));
 
         // Act
         var isValid = component.Instance.ValidateOptions();
@@ -218,7 +219,8 @@ public class OptionListEditorComponentTests : BunitContext
         // Arrange
         var options = new List<string> { "  ", "  " };
         var component = Render<OptionListEditor>(parameters => parameters
-            .Add(p => p.Options, options));
+            .Add(p => p.Options, options)
+            .Add(p => p.MinimumOptions, 2));
 
         // Act
         var isValid = component.Instance.ValidateOptions();
@@ -233,7 +235,8 @@ public class OptionListEditorComponentTests : BunitContext
         // Arrange
         var options = new List<string> { "Option 1", "Option 2" };
         var component = Render<OptionListEditor>(parameters => parameters
-            .Add(p => p.Options, options));
+            .Add(p => p.Options, options)
+            .Add(p => p.MinimumOptions, 2));
 
         // Act
         var isValid = component.Instance.ValidateOptions();
@@ -248,7 +251,8 @@ public class OptionListEditorComponentTests : BunitContext
         // Arrange
         var options = new List<string> { "Option 1", "Option 2", "Option 3", "Option 4" };
         var component = Render<OptionListEditor>(parameters => parameters
-            .Add(p => p.Options, options));
+            .Add(p => p.Options, options)
+            .Add(p => p.MinimumOptions, 2));
 
         // Act
         var isValid = component.Instance.ValidateOptions();
