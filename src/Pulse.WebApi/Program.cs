@@ -20,12 +20,24 @@ builder.Services.AddOpenApi();
 var app = builder.Build();
 
 // Define seeding method
-async Task SeedDemoSessions(IServiceProvider services, IConfiguration configuration)
+async Task SeedDemoSessions(IServiceProvider services)
 {
     using var scope = services.CreateScope();
     var repo = scope.ServiceProvider.GetRequiredService<ISessionRepository>();
 
-    var instructorCode = configuration["Security:InstructorCode"] ?? "TEST-INSTRUCTOR-CODE";
+    var hardcodedCodes = new[] { "BIO123", "MATH45", "HIST99" };
+
+    // Get all sessions for this instructor code
+    var allSessions = await repo.GetByInstructorCodeAsync("TEST-INSTRUCTOR-CODE");
+
+    // Delete sessions that aren't hardcoded
+    foreach (var session in allSessions)
+    {
+        if (!hardcodedCodes.Contains(session.JoinCode))
+        {
+            await repo.DeleteAsync(session.Id);
+        }
+    }
 
     var demoSessions = new[]
     {
@@ -44,7 +56,7 @@ async Task SeedDemoSessions(IServiceProvider services, IConfiguration configurat
                 Id = Guid.NewGuid(),
                 Title = demo.Title,
                 JoinCode = demo.Code,
-                InstructorCode = instructorCode,
+                InstructorCode = "TEST-INSTRUCTOR-CODE",
                 Status = "Active",
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
@@ -57,7 +69,7 @@ async Task SeedDemoSessions(IServiceProvider services, IConfiguration configurat
 // Seed demo sessions in development
 if (app.Environment.IsDevelopment())
 {
-    await SeedDemoSessions(app.Services, app.Configuration);
+    await SeedDemoSessions(app.Services);
 }
 
 app.UseMiddleware<GlobalExceptionMiddleware>();

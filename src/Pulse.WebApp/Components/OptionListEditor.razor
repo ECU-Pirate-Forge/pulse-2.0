@@ -4,10 +4,7 @@
 <div class="option-list-editor">
     <div class="editor-header">
         <h5>Options</h5>
-        @if (MinimumOptions > 1)
-        {
-            <small class="text-muted">(Minimum @MinimumOptions options required)</small>
-        }
+        <small class="text-muted">(Minimum 2 options required for Multiple Choice)</small>
     </div>
 
     @if (!string.IsNullOrEmpty(ValidationMessage))
@@ -21,7 +18,7 @@
         @for (int i = 0; i < LocalOptions.Count; i++)
         {
             int index = i; // Capture for closure
-            <div class="option-row" @key="index">
+            <div class="option-row" key="@index">
                 <MudTextField 
                     Value="LocalOptions[index]"
                     Label="@($"Option {index + 1}")"
@@ -33,7 +30,7 @@
                     Variant="Variant.Outlined"
                     Color="Color.Error"
                     OnClick="@(() => RemoveOption(index))"
-                    Disabled="@(LocalOptions.Count <= MinimumOptions)"
+                    Disabled="@(LocalOptions.Count <= 1)"
                     Class="ms-2">
                     Remove
                 </MudButton>
@@ -107,37 +104,16 @@
     [Parameter]
     public EventCallback<List<string>> OptionsChanged { get; set; }
 
-    [Parameter]
-    public int MinimumOptions { get; set; } = 1;
-
     private List<string> LocalOptions = new();
     private string ValidationMessage = string.Empty;
-    private List<string>? _lastOptions;
-    private int _lastMinimumOptions = -1;
 
-    protected override void OnParametersSet()
+    protected override void OnInitialized()
     {
-        var minimumChanged = MinimumOptions != _lastMinimumOptions;
-
-        // Resync local copy when the parent replaces the Options reference
-        if (!ReferenceEquals(Options, _lastOptions))
+        // Initialize local copy of options
+        LocalOptions = new List<string>(Options ?? new List<string>());
+        if (LocalOptions.Count == 0)
         {
-            _lastOptions = Options;
-            _lastMinimumOptions = MinimumOptions;
-            LocalOptions = new List<string>(Options ?? new List<string>());
-            if (LocalOptions.Count == 0)
-            {
-                var count = Math.Max(MinimumOptions, 1);
-                for (int i = 0; i < count; i++)
-                    LocalOptions.Add(string.Empty);
-            }
-        }
-        else if (minimumChanged)
-        {
-            _lastMinimumOptions = MinimumOptions;
-            // Pad with empty entries if LocalOptions doesn't meet the new minimum
-            while (LocalOptions.Count < MinimumOptions)
-                LocalOptions.Add(string.Empty);
+            LocalOptions.Add(string.Empty);
         }
     }
 
@@ -150,9 +126,9 @@
 
     private async Task RemoveOption(int index)
     {
-        if (LocalOptions.Count <= MinimumOptions)
+        if (LocalOptions.Count <= 1)
         {
-            ValidationMessage = $"At least {MinimumOptions} option(s) must remain.";
+            ValidationMessage = "At least one option must remain. (Minimum 2 required for Multiple Choice questions)";
             return;
         }
 
@@ -178,10 +154,10 @@
     public bool ValidateOptions()
     {
         var nonEmptyOptions = LocalOptions.Where(o => !string.IsNullOrWhiteSpace(o)).ToList();
-
-        if (nonEmptyOptions.Count < MinimumOptions)
+        
+        if (nonEmptyOptions.Count < 2)
         {
-            ValidationMessage = $"At least {MinimumOptions} option(s) are required.";
+            ValidationMessage = "Multiple Choice questions require at least 2 options.";
             return false;
         }
 
