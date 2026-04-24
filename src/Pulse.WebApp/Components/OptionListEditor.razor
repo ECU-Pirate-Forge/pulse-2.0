@@ -21,7 +21,7 @@
         @for (int i = 0; i < LocalOptions.Count; i++)
         {
             int index = i; // Capture for closure
-            <div class="option-row" @key="index">
+            <div class="option-row" @key="_optionKeys[index]">
                 <MudTextField 
                     Value="LocalOptions[index]"
                     Label="@($"Option {index + 1}")"
@@ -111,6 +111,9 @@
     public int MinimumOptions { get; set; } = 1;
 
     private List<string> LocalOptions = new();
+    // Stable per-item keys prevent Blazor from reusing the wrong element when items are
+    // removed or reordered. NEVER use the loop index as @key.
+    private List<Guid> _optionKeys = new();
     private string ValidationMessage = string.Empty;
     private List<string>? _lastOptions;
     private int _lastMinimumOptions = -1;
@@ -119,17 +122,29 @@
     {
         var minimumChanged = MinimumOptions != _lastMinimumOptions;
 
-        // Resync local copy when the parent replaces the Options reference
+        // Resync local copy when the parent replaces the Options reference.
+        // NOTE: The parent must replace the list reference (not mutate it in-place)
+        // when it wants to push new values into this component; passing a new List<T>
+        // instance is sufficient and is already enforced by NotifyParent's defensive copy.
         if (!ReferenceEquals(Options, _lastOptions))
         {
             _lastOptions = Options;
             _lastMinimumOptions = MinimumOptions;
-            LocalOptions = new List<string>(Options ?? new List<string>());
-            if (LocalOptions.Count == 0)
+            var incoming = Options ?? new List<string>();
+            // Only rebuild keys when content actually changed to avoid unnecessary remounts.
+            if (!incoming.SequenceEqual(LocalOptions) || LocalOptions.Count == 0)
             {
-                var count = Math.Max(MinimumOptions, 1);
-                for (int i = 0; i < count; i++)
-                    LocalOptions.Add(string.Empty);
+                LocalOptions = new List<string>(incoming);
+                _optionKeys = LocalOptions.Select(_ => Guid.NewGuid()).ToList();
+                if (LocalOptions.Count == 0)
+                {
+                    var count = Math.Max(MinimumOptions, 1);
+                    for (int i = 0; i < count; i++)
+                    {
+                        LocalOptions.Add(string.Empty);
+                        _optionKeys.Add(Guid.NewGuid());
+                    }
+                }
             }
         }
         else if (minimumChanged)
@@ -137,13 +152,17 @@
             _lastMinimumOptions = MinimumOptions;
             // Pad with empty entries if LocalOptions doesn't meet the new minimum
             while (LocalOptions.Count < MinimumOptions)
+            {
                 LocalOptions.Add(string.Empty);
+                _optionKeys.Add(Guid.NewGuid());
+            }
         }
     }
 
     private async Task AddOption()
     {
         LocalOptions.Add(string.Empty);
+        _optionKeys.Add(Guid.NewGuid());
         ValidationMessage = string.Empty;
         await NotifyParent();
     }
@@ -157,6 +176,7 @@
         }
 
         LocalOptions.RemoveAt(index);
+        _optionKeys.RemoveAt(index);
         ValidationMessage = string.Empty;
         await NotifyParent();
     }
@@ -170,7 +190,7 @@
 
     private async Task NotifyParent()
     {
-        await OptionsChanged.InvokeAsync(LocalOptions);
+        await OptionsChanged.InvokeAsync(new List<string>(LocalOptions));
     }
 
     public List<string> GetOptions() => LocalOptions;
