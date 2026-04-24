@@ -19,6 +19,45 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
+// Define seeding method
+async Task SeedDemoSessions(IServiceProvider services)
+{
+    using var scope = services.CreateScope();
+    var repo = scope.ServiceProvider.GetRequiredService<ISessionRepository>();
+
+    var demoSessions = new[]
+    {
+        new { Code = "BIO123", Title = "Biology Quiz - Chapter 5" },
+        new { Code = "MATH45", Title = "Math Concepts Test" },
+        new { Code = "HIST99", Title = "History Final Exam" }
+    };
+
+    foreach (var demo in demoSessions)
+    {
+        var existingSession = await repo.GetByJoinCodeAsync(demo.Code);
+        if (existingSession == null)
+        {
+            var session = new Session
+            {
+                Id = Guid.NewGuid(),
+                Title = demo.Title,
+                JoinCode = demo.Code,
+                InstructorCode = "INSTRUCTOR001",
+                Status = "Active",
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            await repo.InsertAsync(session);
+        }
+    }
+}
+
+// Seed demo sessions in development
+if (app.Environment.IsDevelopment())
+{
+    await SeedDemoSessions(app.Services);
+}
+
 app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseMiddleware<InstructorCodeMiddleware>();
 app.UseHttpsRedirection();
@@ -67,11 +106,13 @@ app.MapGet("/api/questionbank", QuestionBankEndpointHandlers.GetQuestionBankItem
 app.MapGet("/sessions", SessionEndpointHandlers.GetSessions);
 app.MapPost("/api/sessions", SessionEndpointHandlers.CreateSession);
 app.MapGet("/api/sessions/join/{joinCode}", SessionEndpointHandlers.JoinSessionByCode);
+app.MapGet("/api/sessions/qr/{joinCode}", SessionEndpointHandlers.GetSessionQrByCode);
 app.MapGet("/sessions/{id:guid}/qr", SessionEndpointHandlers.GetSessionQr);
-
 app.MapPost("/api/sessions/{sessionId:guid}/questions/{questionId:guid}/respond", ResponseEndpointHandlers.Respond);
 app.MapGet("/api/sessions/{id:guid}/results", SessionResultsEndpointHandlers.GetSessionResults);
+
 app.MapPut("/api/sessions/{id:guid}/unblind", SessionEndpointHandlers.UnblindSession);
+app.MapGet("/api/admin/export-db", AdminEndpointHandlers.ExportDb);
 app.MapDefaultEndpoints();
 
 app.Run();

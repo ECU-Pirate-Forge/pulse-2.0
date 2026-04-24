@@ -1,0 +1,206 @@
+@using MudBlazor
+@using System.Net.Http
+@inject HttpClient HttpClient
+@inject NavigationManager NavManager
+
+<div class="session-qr-container">
+    @if (IsLoading)
+    {
+        <div class="qr-loading">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+            <MudText Typo="Typo.body2" Style="margin-top: 12px;">Loading QR Code...</MudText>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <div class="qr-error">
+            <MudAlert Severity="Severity.Error" Style="margin-bottom: 16px;">
+                @ErrorMessage
+            </MudAlert>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" @onclick="RefreshQRCode">
+                Retry
+            </MudButton>
+        </div>
+    }
+    else if (QRImageData != null)
+    {
+        <MudStack Row="true" Spacing="4" AlignItems="AlignItems.Center">
+            <!-- QR Code Image -->
+            <div class="qr-image-wrapper">
+                <img src="@QRImageData" alt="Session QR Code" class="qr-image" />
+                <div style="text-align: center; margin-top: 12px;">
+                    <MudText Typo="Typo.caption" Style="color: #9ca3af;">Scan to join</MudText>
+                </div>
+            </div>
+
+            <!-- Join URL and Code -->
+            <div class="qr-info-wrapper">
+                <MudStack Spacing="2">
+                    <div>
+                        <MudText Typo="Typo.subtitle2" Style="font-weight: 600; margin-bottom: 8px;">Join URL:</MudText>
+                        <div class="join-url-box">
+                            <MudText Typo="Typo.body2" Style="word-break: break-all; flex: 1;">@JoinUrl</MudText>
+                        </div>
+                    </div>
+
+                    <div>
+                        <MudText Typo="Typo.subtitle2" Style="font-weight: 600; margin-bottom: 8px;">Session Code:</MudText>
+                        <div class="session-code-box">
+                            <MudText Typo="Typo.h6" Style="font-family: monospace; letter-spacing: 2px;">@JoinCode</MudText>
+                        </div>
+                    </div>
+
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true" StartIcon="@Icons.Material.Filled.Refresh" @onclick="RefreshQRCode">
+                        Refresh
+                    </MudButton>
+                </MudStack>
+            </div>
+        </MudStack>
+    }
+</div>
+
+<style>
+    .session-qr-container {
+        padding: 24px;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+
+    .qr-loading {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 48px 24px;
+    }
+
+    .qr-error {
+        padding: 16px;
+    }
+
+    .qr-image-wrapper {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-width: 250px;
+    }
+
+    .qr-image {
+        width: 200px;
+        height: 200px;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 8px;
+        background: white;
+    }
+
+    .qr-info-wrapper {
+        flex: 1;
+        min-width: 250px;
+    }
+
+    .join-url-box {
+        background: #f9fafb;
+        padding: 12px;
+        border-radius: 8px;
+        border: 1px solid #e5e7eb;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .session-code-box {
+        background: #f0f3ff;
+        padding: 12px;
+        border-radius: 8px;
+        border: 1px solid #dbeafe;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public string SessionId { get; set; } = string.Empty;
+
+    [Parameter]
+    public string JoinCode { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback<bool> OnSessionActivated { get; set; }
+
+    private string? QRImageData { get; set; }
+    private string JoinUrl { get; set; } = string.Empty;
+    private bool IsLoading { get; set; } = true;
+    private string? ErrorMessage { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadQRCode();
+    }
+
+    /// <summary>
+    /// Public method that can be called by parent component when session is activated.
+    /// This triggers a refresh of the QR code to reflect the new session state.
+    /// 
+    /// NOTE: This is a workaround until SignalR integration is implemented.
+    /// Once SignalR is available, this component should listen to SessionActivated
+    /// messages broadcast from the server and automatically refresh.
+    /// </summary>
+    public async Task OnSessionActivatedAsync()
+    {
+        // Refresh QR code when session becomes active
+        await RefreshQRCode();
+    }
+
+    private async Task LoadQRCode()
+    {
+        IsLoading = true;
+        ErrorMessage = null;
+
+        try
+        {
+            // Construct the join URL from the application base URI so it works on any route
+            var baseUri = NavManager.BaseUri.TrimEnd('/');
+            JoinUrl = $"{baseUri}/join/{JoinCode}";
+
+            // Call the QR image endpoint
+            var response = await HttpClient.GetAsync($"/api/sessions/qr/{JoinCode}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var imageBytes = await response.Content.ReadAsByteArrayAsync();
+                QRImageData = $"data:image/png;base64,{Convert.ToBase64String(imageBytes)}";
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                ErrorMessage = "Session not found. Please verify the join code.";
+            }
+            else
+            {
+                ErrorMessage = $"Failed to load QR code. Status: {response.StatusCode}";
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            ErrorMessage = $"Error communicating with server: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"An unexpected error occurred: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task RefreshQRCode()
+    {
+        await LoadQRCode();
+    }
+}

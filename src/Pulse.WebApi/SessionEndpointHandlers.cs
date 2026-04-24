@@ -44,6 +44,25 @@ public static class SessionEndpointHandlers
         return Results.File(pngBytes, "image/png");
     }
 
+    public static async Task<IResult> GetSessionQrByCode(string joinCode, HttpRequest request, ISessionRepository repo, IConfiguration configuration)
+    {
+        if (string.IsNullOrWhiteSpace(joinCode))
+            return Results.BadRequest(new { error = "Join code is required." });
+
+        var session = await repo.GetByJoinCodeAsync(joinCode);
+        if (session is null)
+            return Results.NotFound(new { error = "Session not found." });
+
+        var joinUrl = BuildJoinUrl(configuration["App:JoinBaseUrl"], request, session.JoinCode);
+
+        using var generator = new QRCodeGenerator();
+        using var qrData = generator.CreateQrCode(joinUrl, QRCodeGenerator.ECCLevel.Q);
+        var qrCode = new PngByteQRCode(qrData);
+        var pngBytes = qrCode.GetGraphic(20);
+
+        return Results.File(pngBytes, "image/png");
+    }
+
     public static async Task<IResult> JoinSessionByCode(string joinCode, ISessionRepository repo)
     {
         if (string.IsNullOrWhiteSpace(joinCode))
