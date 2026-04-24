@@ -79,8 +79,10 @@ public static class SessionEndpointHandlers
         HttpContext context,
         CreateSessionRequest request,
         ISessionRepository repo,
-        IJoinCodeGenerator joinCodeGenerator)
+        IJoinCodeGenerator joinCodeGenerator,
+        ILoggerFactory loggerFactory)
     {
+        var logger = loggerFactory.CreateLogger("SessionEndpointHandlers");
         if (string.IsNullOrWhiteSpace(request.Title))
             return Results.BadRequest("Title is required.");
 
@@ -106,6 +108,9 @@ public static class SessionEndpointHandlers
         };
 
         var created = await repo.InsertAsync(session);
+
+        logger.LogInformation("Session created SessionId={SessionId} Title={Title} CorrelationId={CorrelationId}",
+            created.Id, request.Title, context.TraceIdentifier);
 
         return Results.Created($"/api/sessions/{created.Id}", new CreateSessionResponse(
             created.Id,
