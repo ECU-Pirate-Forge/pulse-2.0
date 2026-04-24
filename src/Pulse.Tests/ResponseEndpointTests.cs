@@ -3,6 +3,8 @@ using Pulse.Application.Services;
 using Pulse.Common.Services;
 using Pulse.Domain.Entities;
 using Pulse.Shared.Models;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 using Pulse.WebApi;
 using LiteDB;
 
@@ -11,6 +13,8 @@ namespace Pulse.Tests.Tests;
 public class ResponseEndpointTests
 {
     private readonly DeviceIdValidationService _deviceIdService = new();
+    private static ILoggerFactory NullLogger() => LoggerFactory.Create(_ => { });
+    private static HttpContext EmptyContext() => new DefaultHttpContext();
     private readonly Guid _sessionId = Guid.NewGuid();
     private readonly Guid _questionId = Guid.NewGuid();
     private readonly string _validDeviceId = Guid.NewGuid().ToString();
@@ -51,7 +55,9 @@ public class ResponseEndpointTests
             BuildSessionRepo(session).Object,
             BuildQuestionRepo(),
             BuildResponseRepo().Object,
-            _deviceIdService);
+            _deviceIdService,
+            NullLogger(),
+            EmptyContext());
 
         var ok = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.Ok<RespondResult>>(result);
         Assert.NotEqual(default, ok.Value!.SubmittedAt);
@@ -67,7 +73,9 @@ public class ResponseEndpointTests
             BuildSessionRepo().Object,
             BuildQuestionRepo(),
             BuildResponseRepo().Object,
-            _deviceIdService);
+            _deviceIdService,
+            NullLogger(),
+            EmptyContext());
 
         Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.BadRequest<string>>(result);
     }
@@ -82,7 +90,9 @@ public class ResponseEndpointTests
             BuildSessionRepo().Object,
             BuildQuestionRepo(),
             BuildResponseRepo().Object,
-            _deviceIdService);
+            _deviceIdService,
+            NullLogger(),
+            EmptyContext());
 
         Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.BadRequest<string>>(result);
     }
@@ -97,7 +107,9 @@ public class ResponseEndpointTests
             BuildSessionRepo().Object,
             BuildQuestionRepo(),
             BuildResponseRepo().Object,
-            _deviceIdService);
+            _deviceIdService,
+            NullLogger(),
+            EmptyContext());
 
         Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.BadRequest<string>>(result);
     }
@@ -113,7 +125,9 @@ public class ResponseEndpointTests
             BuildSessionRepo(session).Object,
             BuildQuestionRepo(),
             BuildResponseRepo().Object,
-            _deviceIdService);
+            _deviceIdService,
+            NullLogger(),
+            EmptyContext());
 
         Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.Conflict<string>>(result);
     }
@@ -128,7 +142,9 @@ public class ResponseEndpointTests
             BuildSessionRepo(null).Object,
             BuildQuestionRepo(),
             BuildResponseRepo().Object,
-            _deviceIdService);
+            _deviceIdService,
+            NullLogger(),
+            EmptyContext());
 
         Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.NotFound<string>>(result);
     }
@@ -144,7 +160,9 @@ public class ResponseEndpointTests
             BuildSessionRepo(session).Object,
             BuildQuestionRepo(withQuestion: false),
             BuildResponseRepo().Object,
-            _deviceIdService);
+            _deviceIdService,
+            NullLogger(),
+            EmptyContext());
 
         Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.NotFound<string>>(result);
     }

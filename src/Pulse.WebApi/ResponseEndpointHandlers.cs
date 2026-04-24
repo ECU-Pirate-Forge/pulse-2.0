@@ -13,8 +13,11 @@ public static class ResponseEndpointHandlers
         ISessionRepository sessionRepo,
         QuestionRepository questionRepo,
         IResponseRepository responseRepo,
-        DeviceIdValidationService deviceIdService)
+        DeviceIdValidationService deviceIdService,
+        ILoggerFactory loggerFactory,
+        HttpContext context)
     {
+        var logger = loggerFactory.CreateLogger("ResponseEndpointHandlers");
         var deviceValidation = deviceIdService.ValidateDeviceId(request.DeviceId);
         if (!deviceValidation.IsValid)
             return Results.BadRequest(deviceValidation.ErrorMessage);
@@ -27,7 +30,10 @@ public static class ResponseEndpointHandlers
             return Results.NotFound("Session not found.");
 
         if (!string.Equals(session.Status, "Active", StringComparison.OrdinalIgnoreCase))
+        {
+            logger.LogWarning("Response rejected — session not active SessionId={SessionId} CorrelationId={CorrelationId}", sessionId, context.TraceIdentifier);
             return Results.Conflict("Session is not active.");
+        }
 
         var question = questionRepo.GetById(questionId);
         if (question is null)
@@ -43,6 +49,9 @@ public static class ResponseEndpointHandlers
         };
 
         responseRepo.Upsert(response);
+
+        logger.LogInformation("Response submitted SessionId={SessionId} QuestionId={QuestionId} DeviceId={DeviceId} CorrelationId={CorrelationId}",
+            sessionId, questionId, request.DeviceId, context.TraceIdentifier);
 
         return Results.Ok(new RespondResult(response.SubmittedAt));
     }
