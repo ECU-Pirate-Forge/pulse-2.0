@@ -25,6 +25,20 @@ async Task SeedDemoSessions(IServiceProvider services)
     using var scope = services.CreateScope();
     var repo = scope.ServiceProvider.GetRequiredService<ISessionRepository>();
 
+    var hardcodedCodes = new[] { "BIO123", "MATH45", "HIST99" };
+
+    // Get all sessions for this instructor code
+    var allSessions = await repo.GetByInstructorCodeAsync("TEST-INSTRUCTOR-CODE");
+    
+    // Delete sessions that aren't hardcoded
+    foreach (var session in allSessions)
+    {
+        if (!hardcodedCodes.Contains(session.JoinCode))
+        {
+            await repo.DeleteAsync(session.Id);
+        }
+    }
+
     var demoSessions = new[]
     {
         new { Code = "BIO123", Title = "Biology Quiz - Chapter 5" },
@@ -42,7 +56,7 @@ async Task SeedDemoSessions(IServiceProvider services)
                 Id = Guid.NewGuid(),
                 Title = demo.Title,
                 JoinCode = demo.Code,
-                InstructorCode = "INSTRUCTOR001",
+                InstructorCode = "TEST-INSTRUCTOR-CODE",
                 Status = "Active",
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow

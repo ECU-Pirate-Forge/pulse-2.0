@@ -80,6 +80,12 @@ public class SessionEndpointTests
                 .ToList();
             return Task.FromResult<IEnumerable<Session>>(sessions);
         }
+
+        public Task DeleteAsync(Guid id)
+        {
+            _store.Remove(id);
+            return Task.CompletedTask;
+        }
     }
 
     private HttpClient CreateClient(ISessionRepository? repo = null)

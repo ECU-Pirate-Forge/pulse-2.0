@@ -40,4 +40,10 @@ public interface ISessionRepository
     /// </summary>
     Task<Session> InsertAsync(Session session, CancellationToken ct = default);
     bool Update(Session session);
+
+    /// <summary>
+    /// Deletes a session by its id.
+    /// </summary>
+    /// <param name="id">The session id to delete</param>
+    Task DeleteAsync(Guid id);
 }

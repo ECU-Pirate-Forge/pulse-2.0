@@ -6,6 +6,7 @@
 @using Pulse.Domain.Entities
 @inject NavigationManager NavManager
 @inject HttpClient Http
+@inject IJSRuntime JS
 
 <PageTitle>Manage Questions - Pulse</PageTitle>
 
@@ -140,7 +141,7 @@
             <div>
                 <MudButton Variant="Variant.Text" Color="Color.Inherit" 
                           StartIcon="@Icons.Material.Filled.ArrowBack"
-                          OnClick="GoBack" />
+                          OnClick="async () => await GoBack()" />
                 <MudText Typo="Typo.h4" Style="font-weight: 700; display: inline-block; margin-left: 8px;">
                     Manage Questions
                 </MudText>
@@ -170,33 +171,11 @@
 
             @if (NewQuestion.Type == 0)
             {
-                <div class="options-grid">
+                <div class="form-section" style="margin-bottom: 16px;">
                     <MudText Typo="Typo.subtitle2" Style="font-weight: 600; margin-bottom: 12px;">Options</MudText>
-                    @for (int i = 0; i < NewQuestion.Options.Count; i++)
-                    {
-                        var index = i;
-                        <div class="option-row">
-                            <MudTextField @bind-Value="NewQuestion.Options[index]"
-                                          Label="@($"Option {index + 1}")"
-                                          Placeholder="Enter option"
-                                          Variant="Variant.Outlined"
-                                          Style="flex: 1;" />
-                            @if (NewQuestion.Options.Count > 2)
-                            {
-                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                              Color="Color.Error"
-                                              Size="Size.Small"
-                                              OnClick="@(() => RemoveOption(index))" />
-                            }
-                        </div>
-                    }
-                    <MudButton Variant="Variant.Outlined"
-                               Color="Color.Primary"
-                               Size="Size.Small"
-                               StartIcon="@Icons.Material.Filled.Add"
-                               OnClick="AddOption">
-                        Add Option
-                    </MudButton>
+                    <OptionListEditor 
+                        Options="NewQuestion.Options"
+                        OptionsChanged="OnOptionsChanged" />
                 </div>
             }
 
@@ -327,6 +306,7 @@
 
     private List<QuestionModel> Questions = new();
     private QuestionModel NewQuestion = new() { Options = new List<string> { "", "" } };
+    private OptionListEditor? OptionEditorRef;
 
     private List<QuestionBankItem> BankItems = new();
     private string BankSearch = string.Empty;
@@ -407,6 +387,11 @@
         return question.Options.Count(o => !string.IsNullOrWhiteSpace(o)) >= 2;
     }
 
+    private void OnOptionsChanged(List<string> updatedOptions)
+    {
+        NewQuestion.Options = updatedOptions;
+    }
+
     private void SaveQuestion()
     {
         var nonEmptyOptions = NewQuestion.Options
@@ -434,14 +419,6 @@
         Questions.RemoveAll(q => q.Id == id);
     }
 
-    private void AddOption() => NewQuestion.Options.Add("");
-
-    private void RemoveOption(int index)
-    {
-        if (NewQuestion.Options.Count > 2)
-            NewQuestion.Options.RemoveAt(index);
-    }
-
     private string GetTypeName(int type) => type switch
     {
         0 => "Multiple Choice",
@@ -450,7 +427,7 @@
         _ => "Unknown"
     };
 
-    private void GoBack() => NavManager.NavigateTo("/instructor");
+    private async Task GoBack() => await JS.InvokeVoidAsync("history.back");
 
     public class QuestionModel
     {
