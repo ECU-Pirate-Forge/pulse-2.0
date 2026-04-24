@@ -12,7 +12,7 @@ public class OptionListEditorComponentTests : BunitContext
     public OptionListEditorComponentTests()
     {
         Services.AddMudServices();
-        
+
         // Configure JSInterop to allow all MudBlazor JS calls
         JSInterop.SetupVoid("mudElementRef.addOnBlurEvent", _ => true);
         JSInterop.SetupVoid("mudElementRef.addOnFocusEvent", _ => true);
@@ -137,7 +137,7 @@ public class OptionListEditorComponentTests : BunitContext
         // Arrange
         var options = new List<string> { "Option 1" };
         var changedOptions = new List<string>();
-        
+
         var component = Render<OptionListEditor>(parameters => parameters
             .Add(p => p.Options, options)
             .Add(p => p.OptionsChanged, EventCallback.Factory.Create<List<string>>(
@@ -159,7 +159,7 @@ public class OptionListEditorComponentTests : BunitContext
         // Arrange
         var options = new List<string> { "Option 1", "Option 2" };
         var changedOptions = new List<string>();
-        
+
         var component = Render<OptionListEditor>(parameters => parameters
             .Add(p => p.Options, options)
             .Add(p => p.OptionsChanged, EventCallback.Factory.Create<List<string>>(
@@ -181,7 +181,7 @@ public class OptionListEditorComponentTests : BunitContext
         // Arrange
         var options = new List<string> { "Option 1", "Option 2" };
         var changedOptions = new List<string>();
-        
+
         var component = Render<OptionListEditor>(parameters => parameters
             .Add(p => p.Options, options)
             .Add(p => p.OptionsChanged, EventCallback.Factory.Create<List<string>>(

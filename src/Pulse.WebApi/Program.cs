@@ -29,7 +29,7 @@ async Task SeedDemoSessions(IServiceProvider services)
 
     // Get all sessions for this instructor code
     var allSessions = await repo.GetByInstructorCodeAsync("TEST-INSTRUCTOR-CODE");
-    
+
     // Delete sessions that aren't hardcoded
     foreach (var session in allSessions)
     {
