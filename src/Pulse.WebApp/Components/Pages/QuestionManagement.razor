@@ -6,7 +6,6 @@
 @using Pulse.Domain.Entities
 @inject NavigationManager NavManager
 @inject HttpClient Http
-@inject IJSRuntime JS
 
 <PageTitle>Manage Questions - Pulse</PageTitle>
 
@@ -141,7 +140,7 @@
             <div>
                 <MudButton Variant="Variant.Text" Color="Color.Inherit" 
                           StartIcon="@Icons.Material.Filled.ArrowBack"
-                          OnClick="async () => await GoBack()" />
+                          OnClick="GoBack" />
                 <MudText Typo="Typo.h4" Style="font-weight: 700; display: inline-block; margin-left: 8px;">
                     Manage Questions
                 </MudText>
@@ -172,7 +171,6 @@
             @if (NewQuestion.Type == 0)
             {
                 <div class="form-section" style="margin-bottom: 16px;">
-                    <MudText Typo="Typo.subtitle2" Style="font-weight: 600; margin-bottom: 12px;">Options</MudText>
                     <OptionListEditor 
                         Options="NewQuestion.Options"
                         OptionsChanged="OnOptionsChanged"
@@ -427,7 +425,10 @@
         _ => "Unknown"
     };
 
-    private async Task GoBack() => await JS.InvokeVoidAsync("history.back");
+    private void GoBack()
+    {
+        NavManager.NavigateTo("/instructor");
+    }
 
     public class QuestionModel
     {

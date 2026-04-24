@@ -1,11 +1,12 @@
 @page "/instructor"
 @using MudBlazor
 @using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
 @using System.Net.Http.Json
 @using Pulse.Shared.Models
 @inject NavigationManager NavManager
 @inject HttpClient Http
-@inject IJSRuntime JS
+@inject ProtectedSessionStorage ProtectedStorage
 
 <PageTitle>Instructor Dashboard - Pulse</PageTitle>
 
@@ -325,11 +326,11 @@
         {
             try
             {
-                // Try to restore instructor code from session storage
-                var savedCode = await JS.InvokeAsync<string>("sessionStorage.getItem", "instructorCode");
-                if (!string.IsNullOrEmpty(savedCode))
+                // Try to restore instructor code from protected session storage
+                var result = await ProtectedStorage.GetAsync<string>("instructorCode");
+                if (result.Success && !string.IsNullOrEmpty(result.Value))
                 {
-                    _instructorCode = savedCode;
+                    _instructorCode = result.Value;
                     await LoadSessionsAsync();
                     StateHasChanged();
                 }
@@ -342,6 +343,10 @@
             {
                 // JS interop is not available during prerendering; skip until interactive render
             }
+            catch (System.Security.Cryptography.CryptographicException)
+            {
+                // Stored value could not be decrypted (e.g., keys rotated); ignore and re-authenticate
+            }
         }
     }
 
@@ -353,8 +358,8 @@
         _instructorCode = InstructorCodeInput.Trim();
         AuthError = string.Empty;
         
-        // Save to session storage
-        await JS.InvokeVoidAsync("sessionStorage.setItem", "instructorCode", _instructorCode);
+        // Save to protected session storage (encrypted, not accessible to scripts)
+        await ProtectedStorage.SetAsync("instructorCode", _instructorCode);
         
         await LoadSessionsAsync();
 
@@ -362,7 +367,7 @@
         {
             AuthError = LoadError;
             _instructorCode = string.Empty;
-            await JS.InvokeVoidAsync("sessionStorage.removeItem", "instructorCode");
+            await ProtectedStorage.DeleteAsync("instructorCode");
             LoadError = null;
         }
     }
