@@ -129,4 +129,11 @@ public class SessionRepository : ISessionRepository
         var exists = _sessions.Exists(s => s.JoinCode == joinCode);
         return Task.FromResult(exists);
     }
+
+    public Task DeleteAsync(Guid id)
+    {
+        _sessions.Delete(id);
+        _cache.TryRemove(id, out _);
+        return Task.CompletedTask;
+    }
 }

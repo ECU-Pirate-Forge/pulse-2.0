@@ -12,7 +12,7 @@ builder.Services.AddRazorComponents()
 builder.Services.AddMudServices();
 
 builder.Services.AddHttpClient("webapi", client =>
-    client.BaseAddress = new Uri("https+http://webapi"));
+    client.BaseAddress = new Uri("http://localhost:5062"));
 builder.Services.AddScoped(sp =>
     sp.GetRequiredService<IHttpClientFactory>().CreateClient("webapi"));
 
