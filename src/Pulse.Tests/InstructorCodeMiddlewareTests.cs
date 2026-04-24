@@ -124,6 +124,16 @@ public class InstructorCodeMiddlewareTests
         var isProtected = InstructorOnlyEndpointMatcher.IsInstructorOnly(context.Request);
 
         Assert.True(isProtected);
+
+    }
+    [Fact]
+    public void IsInstructorOnlyReturnsTrueForApiPrefixedResultsRoute()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Method = HttpMethods.Get;
+        context.Request.Path = "/api/sessions/abc123/results";
+        var isProtected = InstructorOnlyEndpointMatcher.IsInstructorOnly(context.Request);
+        Assert.True(isProtected);
     }
 
     [Fact]
