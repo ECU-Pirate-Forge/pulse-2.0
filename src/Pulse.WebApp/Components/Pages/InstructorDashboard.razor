@@ -5,6 +5,7 @@
 @using Pulse.Shared.Models
 @inject NavigationManager NavManager
 @inject HttpClient Http
+@inject IJSRuntime JS
 
 <PageTitle>Instructor Dashboard - Pulse</PageTitle>
 
@@ -318,6 +319,32 @@
 
     private bool IsAuthenticated => !string.IsNullOrEmpty(_instructorCode);
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                // Try to restore instructor code from session storage
+                var savedCode = await JS.InvokeAsync<string>("sessionStorage.getItem", "instructorCode");
+                if (!string.IsNullOrEmpty(savedCode))
+                {
+                    _instructorCode = savedCode;
+                    await LoadSessionsAsync();
+                    StateHasChanged();
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                // JS interop is not available during prerendering; skip until interactive render
+            }
+            catch (JSException)
+            {
+                // JS interop is not available during prerendering; skip until interactive render
+            }
+        }
+    }
+
     private async Task AuthenticateAsync()
     {
         if (string.IsNullOrWhiteSpace(InstructorCodeInput))
@@ -325,12 +352,17 @@
 
         _instructorCode = InstructorCodeInput.Trim();
         AuthError = string.Empty;
+        
+        // Save to session storage
+        await JS.InvokeVoidAsync("sessionStorage.setItem", "instructorCode", _instructorCode);
+        
         await LoadSessionsAsync();
 
         if (!string.IsNullOrEmpty(LoadError))
         {
             AuthError = LoadError;
             _instructorCode = string.Empty;
+            await JS.InvokeVoidAsync("sessionStorage.removeItem", "instructorCode");
             LoadError = null;
         }
     }

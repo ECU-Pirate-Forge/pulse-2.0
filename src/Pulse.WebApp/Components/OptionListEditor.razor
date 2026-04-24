@@ -1,0 +1,191 @@
+@using MudBlazor
+@using System.Collections.Generic
+
+<div class="option-list-editor">
+    <div class="editor-header">
+        <h5>Options</h5>
+        @if (MinimumOptions > 1)
+        {
+            <small class="text-muted">(Minimum @MinimumOptions options required)</small>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(ValidationMessage))
+    {
+        <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
+            @ValidationMessage
+        </MudAlert>
+    }
+
+    <div class="options-list">
+        @for (int i = 0; i < LocalOptions.Count; i++)
+        {
+            int index = i; // Capture for closure
+            <div class="option-row" @key="index">
+                <MudTextField 
+                    Value="LocalOptions[index]"
+                    Label="@($"Option {index + 1}")"
+                    Variant="Variant.Outlined"
+                    Class="flex-grow-1"
+                    ValueChanged="@((string? newValue) => OnOptionChanged(index, newValue ?? string.Empty))" />
+                
+                <MudButton 
+                    Variant="Variant.Outlined"
+                    Color="Color.Error"
+                    OnClick="@(() => RemoveOption(index))"
+                    Disabled="@(LocalOptions.Count <= MinimumOptions)"
+                    Class="ms-2">
+                    Remove
+                </MudButton>
+            </div>
+        }
+    </div>
+
+    <MudButton 
+        Variant="Variant.Outlined"
+        Color="Color.Primary"
+        Size="Size.Small"
+        StartIcon="@Icons.Material.Filled.Add"
+        OnClick="AddOption"
+        Class="mt-3">
+        Add Option
+    </MudButton>
+</div>
+
+<style>
+    .option-list-editor {
+        padding: 16px;
+        background: white;
+        border-radius: 8px;
+        border: 1px solid #e0e0e0;
+    }
+
+    .editor-header {
+        margin-bottom: 16px;
+    }
+
+    .editor-header h5 {
+        margin: 0 0 4px 0;
+        font-weight: 600;
+        color: #1f2937;
+    }
+
+    .options-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .option-row {
+        display: flex;
+        gap: 8px;
+        align-items: flex-end;
+    }
+
+    .option-row .flex-grow-1 {
+        flex: 1;
+    }
+
+    .ms-2 {
+        margin-left: 8px;
+    }
+
+    .mt-3 {
+        margin-top: 16px;
+    }
+
+    .mb-3 {
+        margin-bottom: 16px;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public List<string> Options { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<List<string>> OptionsChanged { get; set; }
+
+    [Parameter]
+    public int MinimumOptions { get; set; } = 1;
+
+    private List<string> LocalOptions = new();
+    private string ValidationMessage = string.Empty;
+    private List<string>? _lastOptions;
+    private int _lastMinimumOptions = -1;
+
+    protected override void OnParametersSet()
+    {
+        var minimumChanged = MinimumOptions != _lastMinimumOptions;
+
+        // Resync local copy when the parent replaces the Options reference
+        if (!ReferenceEquals(Options, _lastOptions))
+        {
+            _lastOptions = Options;
+            _lastMinimumOptions = MinimumOptions;
+            LocalOptions = new List<string>(Options ?? new List<string>());
+            if (LocalOptions.Count == 0)
+            {
+                var count = Math.Max(MinimumOptions, 1);
+                for (int i = 0; i < count; i++)
+                    LocalOptions.Add(string.Empty);
+            }
+        }
+        else if (minimumChanged)
+        {
+            _lastMinimumOptions = MinimumOptions;
+            // Pad with empty entries if LocalOptions doesn't meet the new minimum
+            while (LocalOptions.Count < MinimumOptions)
+                LocalOptions.Add(string.Empty);
+        }
+    }
+
+    private async Task AddOption()
+    {
+        LocalOptions.Add(string.Empty);
+        ValidationMessage = string.Empty;
+        await NotifyParent();
+    }
+
+    private async Task RemoveOption(int index)
+    {
+        if (LocalOptions.Count <= MinimumOptions)
+        {
+            ValidationMessage = $"At least {MinimumOptions} option(s) must remain.";
+            return;
+        }
+
+        LocalOptions.RemoveAt(index);
+        ValidationMessage = string.Empty;
+        await NotifyParent();
+    }
+
+    private async Task OnOptionChanged(int index, string newValue)
+    {
+        LocalOptions[index] = newValue;
+        ValidationMessage = string.Empty;
+        await NotifyParent();
+    }
+
+    private async Task NotifyParent()
+    {
+        await OptionsChanged.InvokeAsync(LocalOptions);
+    }
+
+    public List<string> GetOptions() => LocalOptions;
+
+    public bool ValidateOptions()
+    {
+        var nonEmptyOptions = LocalOptions.Where(o => !string.IsNullOrWhiteSpace(o)).ToList();
+
+        if (nonEmptyOptions.Count < MinimumOptions)
+        {
+            ValidationMessage = $"At least {MinimumOptions} option(s) are required.";
+            return false;
+        }
+
+        ValidationMessage = string.Empty;
+        return true;
+    }
+}

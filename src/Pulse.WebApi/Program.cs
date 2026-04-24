@@ -20,10 +20,12 @@ builder.Services.AddOpenApi();
 var app = builder.Build();
 
 // Define seeding method
-async Task SeedDemoSessions(IServiceProvider services)
+async Task SeedDemoSessions(IServiceProvider services, IConfiguration configuration)
 {
     using var scope = services.CreateScope();
     var repo = scope.ServiceProvider.GetRequiredService<ISessionRepository>();
+
+    var instructorCode = configuration["Security:InstructorCode"] ?? "TEST-INSTRUCTOR-CODE";
 
     var demoSessions = new[]
     {
@@ -42,7 +44,7 @@ async Task SeedDemoSessions(IServiceProvider services)
                 Id = Guid.NewGuid(),
                 Title = demo.Title,
                 JoinCode = demo.Code,
-                InstructorCode = "INSTRUCTOR001",
+                InstructorCode = instructorCode,
                 Status = "Active",
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
@@ -55,7 +57,7 @@ async Task SeedDemoSessions(IServiceProvider services)
 // Seed demo sessions in development
 if (app.Environment.IsDevelopment())
 {
-    await SeedDemoSessions(app.Services);
+    await SeedDemoSessions(app.Services, app.Configuration);
 }
 
 app.UseMiddleware<GlobalExceptionMiddleware>();

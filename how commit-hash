@@ -1,0 +1,76 @@
+[33m7f7f57b[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mFeature/Options_list_subcomponent[m[33m, [m[1;31morigin/dev[m[33m)[m Merge pull request #99 from ECU-Pirate-Forge/README-Update-1
+[33m48f7532[m[33m ([m[1;31morigin/README-Update-1[m[33m)[m docs: update README with correct clone URL and test commands
+[33m54f146e[m Merge pull request #98 from ECU-Pirate-Forge/LiteDB-export-endpoint-48
+[33m17591dd[m docs: update README, API reference, and troubleshooting guide with detailed information and examples
+[33m459cca4[m[33m ([m[1;31morigin/LiteDB-export-endpoint-48[m[33m)[m Add temporary zip artifacts to .gitignore
+[33m4bea57d[m Remove unused database export proof file
+[33m4fe5cb9[m Merge pull request #97 from ECU-Pirate-Forge/Instructor-session-list-page-component
+[33m8f45cbc[m Merge pull request #96 from ECU-Pirate-Forge/Feature/QR_Code_Instructor
+[33mae01155[m[33m ([m[1;31morigin/Feature/QR_Code_Instructor[m[33m)[m Update src/Pulse.WebApp/Components/SessionQRCode.razor
+[33m045f663[m Update src/Pulse.WebApp/Components/SessionQRCode.razor
+[33m7458000[m[33m ([m[1;32mFeature/QR_Code_Instructor[m[33m)[m fix: whitespace formatting in SessionQRCodeComponentTests
+[33m411e7f3[m Merge branch 'Feature/QR_Code_Instructor' of https://github.com/ECU-Pirate-Forge/pulse-2.0 into Feature/QR_Code_Instructor
+[33mcb8b9a2[m add unit tests and OnSessionActivated fixed
+[33m59bebb3[m Merge pull request #91 from ECU-Pirate-Forge/40-csv-parser-function-per-row-validation
+[33m2a2ea1c[m Add admin database export endpoint and tests
+[33m8bec77a[m[33m ([m[1;31morigin/Instructor-session-list-page-component[m[33m)[m Add Sessions navigation link and implement Session List page with CRUD functionality
+[33mf2ae830[m Merge pull request #94 from ECU-Pirate-Forge/Feature/#47-PUT-sessions-unblind
+[33mb451852[m Fix @media CSS escaping in QrCodeDisplay.razor
+[33m12400fa[m Merge origin/dev into Feature/QR_Code_Instructor: resolve conflicts
+[33m5b4759c[m Display QR component on instructor session page
+[33m54fb504[m[33m ([m[1;31morigin/Feature/#47-PUT-sessions-unblind[m[33m)[m Fix Update cache consistency and error handling in UnblindSession
+[33m4a8e7ef[m Implemented PUT /api/sessions/{id}/unblind endpoint (#47)
+[33md0732b7[m[33m ([m[1;32mdev[m[33m)[m Merge pull request #92 from ECU-Pirate-Forge/Feature/Complete_UI
+[33m4f68842[m Merge pull request #85 from ECU-Pirate-Forge/feature/50-ci-workflow
+[33m14aa86c[m[33m ([m[1;31morigin/Feature/Complete_UI[m[33m)[m feat: add real API calls for DoD items #30, #45, and #88 device tracking
+[33m1f32ea6[m[33m ([m[1;31morigin/Feature/50-ci-workflow[m[33m)[m Run dotnet format to fix linting issues
+[33me7c6c01[m Merge pull request #89 from ECU-Pirate-Forge/Feature/#33-aggregation-function
+[33m881462e[m fix: apply code review feedback on UI components
+[33m0697c14[m[33m ([m[1;32mFeature/Complete_UI[m[33m)[m Merge dev: resolve database conflict
+[33mf6a525c[m[33m ([m[1;31morigin/40-csv-parser-function-per-row-validation[m[33m)[m Fix whitespace formatting in InstructorCodeMiddleware.cs to pass linting
+[33m7940a0e[m fix(CsvParser): address reviewer feedback on row numbering, cancellation, null row, and unbalanced quotes
+[33m379f7d4[m Add CSV parser service, tests and PBI doc
+[33m6f08e19[m demo ui
+[33m703cb5c[m Merge pull request #88 from ECU-Pirate-Forge/Feature/Student_response_UI_component
+[33m20bf1de[m Merge branch 'dev' into feature/50-ci-workflow
+[33mc755f74[m[33m ([m[1;31morigin/Feature/#33-aggregation-function[m[33m)[m Implemented ResponseAggregationService with GetResponseCounts (#33)
+[33mebc9425[m Fix CI workflow - replace Node.js with .NET commands, combine lint into single ci.yml
+[33m03a3461[m Merge pull request #83 from ECU-Pirate-Forge/Feature/#45-GET-questionbank
+[33mf1fa4ed[m Merge pull request #86 from ECU-Pirate-Forge/Feature/#19-validate-deviceid
+[33me0071d7[m Merge pull request #87 from ECU-Pirate-Forge/Feature/#17-response-repository-upsert
+[33m33345d5[m[33m ([m[1;31morigin/Feature/Student_response_UI_component[m[33m, [m[1;32mFeature/Student_response_UI_component[m[33m)[m demo to show what it should look like from the students pov later
+[33mc09d925[m files and unit test for questiondisplay
+[33mfea39c0[m[33m ([m[1;31morigin/Feature/#17-response-repository-upsert[m[33m)[m Implemented ResponseRepository with upsert and compound index (#17)
+[33mfd55b0e[m Merge pull request #84 from ECU-Pirate-Forge/Feature/#16-response-model
+[33m1065892[m[33m ([m[1;31morigin/Feature/#19-validate-deviceid[m[33m)[m Implemented DeviceId UUID validation service (#19)
+[33m8947d2d[m Update CI and lint workflows to run on push and pull request
+[33m8b64a58[m Merge pull request #78 from ECU-Pirate-Forge/thai/31-student-join-page
+[33m299ae93[m[33m ([m[1;31morigin/Feature/#16-response-model[m[33m)[m Completed Response model with all required fields (#16)
+[33m28145f7[m[33m ([m[1;31morigin/Feature/#45-GET-questionbank[m[33m)[m Implemented GET /api/questionbank with filters and pagination (#45)
+[33ma68afb1[m Merge pull request #82 from ECU-Pirate-Forge/#15/validate-MC-Question-has-2-or-more-options
+[33m1feda4f[m[33m ([m[1;31morigin/#15/validate-MC-Question-has-2-or-more-options[m[33m)[m fix: extract POST /questions to handler, normalize options before save, add tests
+[33m8912cb4[m Merge branch 'dev' into #15/validate-MC-Question-has-2-or-more-options
+[33m6b7c743[m feat: implement question validation service and update related endpoints
+[33m36cd3fd[m Merge pull request #81 from ECU-Pirate-Forge/Feature/#44-POST-questionbank
+[33mac49340[m[33m ([m[1;31morigin/Feature/#44-POST-questionbank[m[33m)[m "Implemented POST /api/questionbank endpoint (#44)"
+[33mcbaed25[m Merge pull request #80 from ECU-Pirate-Forge/Feature/#43-questionbank-model-and-repo
+[33mda3a0ba[m[33m ([m[1;31morigin/Feature/#43-questionbank-model-and-repo[m[33m)[m Added Unit test #43
+[33m07088a7[m "Implemented QuestionBankItem model and QuestionBankRepository (#43)"
+[33mc43529c[m Merge pull request #79 from ECU-Pirate-Forge/Feature/#24-PUT-questions-reorder
+[33me1d794d[m[33m ([m[1;31morigin/Feature/#24-PUT-questions-reorder[m[33m)[m Implemented PUT /api/questions/reorder endpoint
+[33m86fbf9e[m[33m ([m[1;31morigin/Feature/23/Delete-api-questions[m[33m)[m Merge pull request #74 from ECU-Pirate-Forge/Feature/#10-POST-/api/sessions-—-create-session
+[33m81c6135[m[33m ([m[1;31morigin/Feature/#10-POST-/api/sessions-—-create-session[m[33m)[m Fixed conflicts and Merged dev into Feature #10
+[33m5c050e6[m Merge dev into Feature/#10-POST-/api/sessions
+[33m396668c[m[33m ([m[1;31morigin/thai/31-student-join-page[m[33m)[m Implement student join page logic
+[33md0ad37d[m Add student join page route for task #31
+[33m263740e[m Merge pull request #77 from ECU-Pirate-Forge/mermaid-dependency-4-8-26
+[33m29a3bc2[m[33m ([m[1;31morigin/mermaid-dependency-4-8-26[m[33m)[m feat: add mermaid dependency graph for project overview
+[33m0c14a31[m Merge pull request #75 from ECU-Pirate-Forge/Feature/21_Minimal_Join_Page
+[33m898c47e[m[33m ([m[1;31morigin/Feature/21_Minimal_Join_Page[m[33m, [m[1;32mFeature/21_Minimal_Join_Page[m[33m)[m Resolve merge conflict: use /api/sessions/join path and keep QR endpoint
+[33m7c88acc[m Resolve merge conflicts: combine endpoints and add JoinSessionByCode handler
+[33m73f7a13[m Merge pull request #76 from ECU-Pirate-Forge/37-get-apisessionssessionidqr-qr-image-endpoint
+[33m52740d0[m fix: correct join endpoint route to /api/sessions/join and remove duplicate handler in tests
+[33m5833677[m[33m ([m[1;31morigin/37-get-apisessionssessionidqr-qr-image-endpoint[m[33m)[m Merge dev into branch: integrate Insert/GetById, session endpoint tests, fix all conflicts
+[33mee8e4ac[m Merge pull request #71 from ECU-Pirate-Forge/39-apply-instructorcode-middleware-to-questionsession-management-endpoints
+[33md0c1acd[m Resolve merge conflict in solution file - keep Pulse.Common
+[33m3932d20[m files for GET jo
