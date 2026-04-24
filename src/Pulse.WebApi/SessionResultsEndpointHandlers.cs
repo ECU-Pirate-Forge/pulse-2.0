@@ -15,8 +15,12 @@ public static class SessionResultsEndpointHandlers
     {
         var instructorCode = context.Items[InstructorCodeMiddleware.HeaderName]?.ToString();
 
+        // Guard for unit test isolation — middleware always populates this in production.
+        // Mirrors the middleware response shape if middleware is ever bypassed.
         if (string.IsNullOrWhiteSpace(instructorCode))
-            return Results.Unauthorized();
+            return Results.Json(
+                new { error = "InstructorCode is required." },
+                statusCode: StatusCodes.Status401Unauthorized);
 
         var session = await sessionRepo.GetByIdAsync(id);
         if (session is null)

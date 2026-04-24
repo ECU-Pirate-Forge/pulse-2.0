@@ -71,7 +71,7 @@ public sealed class InstructorCodeMiddleware
 public static class InstructorOnlyEndpointMatcher
 {
     private static readonly Regex SessionIdRouteRegex = new("^/sessions/[^/]+$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-    private static readonly Regex SessionResultsRouteRegex = new("^/sessions/[^/]+/results$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex SessionResultsRouteRegex = new("^(/api)?/sessions/[^/]+/results$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex SessionQrRouteRegex = new("^/sessions/[^/]+/(qr|qr-code)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex PublicStudentSessionRouteRegex = new("^/sessions/[^/]+/(join|responses)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
@@ -121,6 +121,10 @@ public static class InstructorOnlyEndpointMatcher
             return true;
         }
 
+        if (HttpMethods.IsPost(method) && path.StartsWith("/api/sessions/", StringComparison.OrdinalIgnoreCase) && path.EndsWith("/questions/import", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
         if (HttpMethods.IsGet(method) && (SessionResultsRouteRegex.IsMatch(path) || SessionQrRouteRegex.IsMatch(path)))
         {
             return true;

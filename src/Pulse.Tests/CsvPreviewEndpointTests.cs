@@ -68,7 +68,6 @@ public class CsvPreviewEndpointTests
     public async Task PreviewImport_NoFile_Returns400()
     {
         var result = await CsvPreviewEndpointHandlers.PreviewImport(MakeRequest(null));
-
         Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.BadRequest<string>>(result);
     }
 
@@ -76,7 +75,6 @@ public class CsvPreviewEndpointTests
     public async Task PreviewImport_WrongFileType_Returns400()
     {
         var result = await CsvPreviewEndpointHandlers.PreviewImport(MakeRequest("some content", "test.txt"));
-
         Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.BadRequest<string>>(result);
     }
 
@@ -84,7 +82,20 @@ public class CsvPreviewEndpointTests
     public async Task PreviewImport_EmptyFile_Returns400()
     {
         var result = await CsvPreviewEndpointHandlers.PreviewImport(MakeRequest(string.Empty));
-
         Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.BadRequest<string>>(result);
+    }
+
+    [Fact]
+    public async Task PreviewImport_InvalidType_OnlyShowsTypeError_NotMcError()
+    {
+        var csv = "text,type,options\nSome question,invalid_type,only one";
+        var result = await CsvPreviewEndpointHandlers.PreviewImport(MakeRequest(csv));
+
+        var ok = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.Ok<CsvPreviewResponse>>(result);
+        Assert.False(ok.Value!.AllRowsValid);
+        var row = ok.Value.Rows[0];
+        Assert.Single(row.ValidationErrors);
+        Assert.Contains("not a valid question type", row.ValidationErrors[0]);
+        Assert.DoesNotContain("2 options", row.ValidationErrors[0]);
     }
 }

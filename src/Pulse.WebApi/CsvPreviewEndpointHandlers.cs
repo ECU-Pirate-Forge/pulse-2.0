@@ -42,14 +42,15 @@ public static class CsvPreviewEndpointHandlers
             if (string.IsNullOrWhiteSpace(text))
                 errors.Add("Text is required.");
 
-            if (!int.TryParse(typeRaw, out var typeInt) || !Enum.IsDefined(typeof(QuestionType), typeInt))
+            var typeIsValid = int.TryParse(typeRaw, out var typeInt) && Enum.IsDefined(typeof(QuestionType), typeInt);
+            if (!typeIsValid)
                 errors.Add($"Type '{typeRaw}' is not a valid question type (0=MultipleChoice, 1=LikertScale, 2=OpenEnded).");
 
             var options = string.IsNullOrWhiteSpace(optionsRaw)
                 ? new List<string>()
                 : optionsRaw.Split('|').Select(o => o.Trim()).Where(o => !string.IsNullOrWhiteSpace(o)).ToList();
 
-            if (Enum.IsDefined(typeof(QuestionType), typeInt) && (QuestionType)typeInt == QuestionType.MultipleChoice && options.Count < 2)
+            if (typeIsValid && (QuestionType)typeInt == QuestionType.MultipleChoice && options.Count < 2)
                 errors.Add("Multiple choice questions require at least 2 options.");
 
             if (errors.Count > 0)
