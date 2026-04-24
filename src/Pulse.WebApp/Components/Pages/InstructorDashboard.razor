@@ -323,13 +323,24 @@
     {
         if (firstRender)
         {
-            // Try to restore instructor code from session storage
-            var savedCode = await JS.InvokeAsync<string>("sessionStorage.getItem", "instructorCode");
-            if (!string.IsNullOrEmpty(savedCode))
+            try
             {
-                _instructorCode = savedCode;
-                await LoadSessionsAsync();
-                StateHasChanged();
+                // Try to restore instructor code from session storage
+                var savedCode = await JS.InvokeAsync<string>("sessionStorage.getItem", "instructorCode");
+                if (!string.IsNullOrEmpty(savedCode))
+                {
+                    _instructorCode = savedCode;
+                    await LoadSessionsAsync();
+                    StateHasChanged();
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                // JS interop is not available during prerendering; skip until interactive render
+            }
+            catch (JSException)
+            {
+                // JS interop is not available during prerendering; skip until interactive render
             }
         }
     }
