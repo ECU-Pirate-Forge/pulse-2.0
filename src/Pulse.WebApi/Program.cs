@@ -69,28 +69,28 @@ app.MapGet("/api/sessions/{sessionId:guid}/questions", (Guid sessionId, Question
     return Results.Ok(questions);
 });
 
-app.MapPost("/api/sessions/{sessionId:guid}/questions", 
+app.MapPost("/api/sessions/{sessionId:guid}/questions",
     (Guid sessionId, Question question, QuestionRepository questionRepo, QuestionService questionService) =>
-{
-    question.SessionId = sessionId;
-    
-    var normalizedOptions = question.Options
-        .Where(option => !string.IsNullOrWhiteSpace(option))
-        .Select(option => option.Trim())
-        .ToList();
-
-    var validation = questionService.ValidateQuestion(new QuestionDTO
     {
-        Type = question.Type,
-        Options = normalizedOptions
-    });
+        question.SessionId = sessionId;
 
-    if (!validation.IsValid)
-        return Results.BadRequest(validation.ErrorMessage);
+        var normalizedOptions = question.Options
+            .Where(option => !string.IsNullOrWhiteSpace(option))
+            .Select(option => option.Trim())
+            .ToList();
 
-    question.Options = normalizedOptions;
-    var created = questionRepo.Insert(question);
-    return Results.Created($"/api/sessions/{sessionId}/questions/{created.Id}", created);
+        var validation = questionService.ValidateQuestion(new QuestionDTO
+        {
+            Type = question.Type,
+            Options = normalizedOptions
+        });
+
+        if (!validation.IsValid)
+            return Results.BadRequest(validation.ErrorMessage);
+
+        question.Options = normalizedOptions;
+        var created = questionRepo.Insert(question);
+        return Results.Created($"/api/sessions/{sessionId}/questions/{created.Id}", created);
 });
 
 app.MapPost("/api/questionbank", QuestionBankEndpointHandlers.CreateQuestionBankItem);

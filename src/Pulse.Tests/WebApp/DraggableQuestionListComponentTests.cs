@@ -86,13 +86,13 @@ public class DraggableQuestionListComponentTests : BunitContext
         var options = new List<string> { "Option A", "Option B", "Option C" };
         var questions = new List<Question>
         {
-            new() 
-            { 
-                Id = Guid.NewGuid(), 
-                Text = "Choose one", 
-                Type = QuestionType.MultipleChoice, 
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Text = "Choose one",
+                Type = QuestionType.MultipleChoice,
                 Options = options,
-                SortOrder = 0 
+                SortOrder = 0
             }
         };
 
@@ -112,13 +112,13 @@ public class DraggableQuestionListComponentTests : BunitContext
         // Arrange
         var questions = new List<Question>
         {
-            new() 
-            { 
-                Id = Guid.NewGuid(), 
-                Text = "What do you think?", 
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Text = "What do you think?",
                 Type = QuestionType.OpenEnded,
                 Options = new List<string>(),
-                SortOrder = 0 
+                SortOrder = 0
             }
         };
 

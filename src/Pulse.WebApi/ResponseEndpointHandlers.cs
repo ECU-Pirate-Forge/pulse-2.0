@@ -29,6 +29,13 @@ public static class ResponseEndpointHandlers
         if (session is null)
             return Results.NotFound("Session not found.");
 
+        if (!string.Equals(session.Status, "Active", StringComparison.OrdinalIgnoreCase))
+        {
+            logger.LogWarning("Response submitted to session not active SessionId={SessionId} Status={Status} CorrelationId={CorrelationId}",
+                sessionId, session.Status, context.TraceIdentifier);
+            return Results.Conflict("Session is not active.");
+        }
+
         var question = questionRepo.GetById(questionId);
         if (question is null)
             return Results.NotFound("Question not found.");

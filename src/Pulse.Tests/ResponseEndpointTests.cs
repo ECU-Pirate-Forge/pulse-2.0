@@ -47,7 +47,7 @@ public class ResponseEndpointTests
     [Fact]
     public async Task Respond_ValidRequest_Returns200WithSubmittedAt()
     {
-        var session = new Session { Id = _sessionId, InstructorCode = "INST" };
+        var session = new Session { Id = _sessionId, InstructorCode = "INST", Status = "Active" };
         var request = new RespondRequest { DeviceId = _validDeviceId, Value = "A" };
 
         var result = await ResponseEndpointHandlers.Respond(
@@ -134,7 +134,7 @@ public class ResponseEndpointTests
     [Fact]
     public async Task Respond_UnknownQuestion_Returns404()
     {
-        var session = new Session { Id = _sessionId, InstructorCode = "INST" };
+        var session = new Session { Id = _sessionId, InstructorCode = "INST", Status = "Active" };
         var request = new RespondRequest { DeviceId = _validDeviceId, Value = "A" };
 
         var result = await ResponseEndpointHandlers.Respond(
