@@ -180,14 +180,20 @@
     private void OnDragStart(DragEventArgs e, int index)
     {
         _draggedIndex = index;
-        e.DataTransfer.EffectAllowed = "move";
-        e.DataTransfer.DropEffect = "move";
+        if (e.DataTransfer != null)
+        {
+            e.DataTransfer.EffectAllowed = "move";
+            e.DataTransfer.DropEffect = "move";
+        }
     }
 
     private void OnDragOver(DragEventArgs e)
     {
-        e.DataTransfer.EffectAllowed = "move";
-        e.DataTransfer.DropEffect = "move";
+        if (e.DataTransfer != null)
+        {
+            e.DataTransfer.EffectAllowed = "move";
+            e.DataTransfer.DropEffect = "move";
+        }
     }
 
     private async Task OnDrop(DragEventArgs e, int targetIndex)

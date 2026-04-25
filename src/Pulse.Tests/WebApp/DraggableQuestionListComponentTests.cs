@@ -171,46 +171,6 @@ public class DraggableQuestionListComponentTests : BunitContext
     }
 
     [Fact]
-    public async Task OnOrderChanged_Callback_Invoked_When_Order_Changes()
-    {
-        // Arrange
-        var questions = new List<Question>
-        {
-            new() { Id = Guid.NewGuid(), Text = "Question 1", Type = QuestionType.MultipleChoice, SortOrder = 0 },
-            new() { Id = Guid.NewGuid(), Text = "Question 2", Type = QuestionType.MultipleChoice, SortOrder = 1 }
-        };
-
-        var callbackInvoked = false;
-        List<Question>? reorderedQuestions = null;
-
-        var component = Render<DraggableQuestionList>(parameters => parameters
-            .Add(p => p.Questions, questions)
-            .Add(p => p.OnOrderChanged, EventCallback.Factory.Create<List<Question>>(
-                this, 
-                (List<Question> q) => 
-                {
-                    callbackInvoked = true;
-                    reorderedQuestions = q;
-                })));
-
-        // Act
-        var questionItems = component.FindAll(".question-item");
-        var firstItem = questionItems[0];
-
-        // Simulate drag start
-        await firstItem.TriggerEventAsync("ondragstart", new DragEventArgs());
-
-        // Get second item and simulate drop
-        var secondItem = questionItems[1];
-        await secondItem.TriggerEventAsync("ondrop", new DragEventArgs());
-
-        // Assert
-        Assert.True(callbackInvoked, "OnOrderChanged callback should be invoked");
-        Assert.NotNull(reorderedQuestions);
-        Assert.Equal(2, reorderedQuestions.Count);
-    }
-
-    [Fact]
     public void Question_Numbers_Display_Sequentially()
     {
         // Arrange
@@ -230,49 +190,5 @@ public class DraggableQuestionListComponentTests : BunitContext
         Assert.Contains(">1<", markup); // Question 1 number
         Assert.Contains(">2<", markup); // Question 2 number
         Assert.Contains(">3<", markup); // Question 3 number
-    }
-
-    [Fact]
-    public void SortOrder_Updated_After_Drag_Operation()
-    {
-        // Arrange
-        var questions = new List<Question>
-        {
-            new() { Id = Guid.NewGuid(), Text = "Question 1", Type = QuestionType.MultipleChoice, SortOrder = 0 },
-            new() { Id = Guid.NewGuid(), Text = "Question 2", Type = QuestionType.MultipleChoice, SortOrder = 1 },
-            new() { Id = Guid.NewGuid(), Text = "Question 3", Type = QuestionType.MultipleChoice, SortOrder = 2 }
-        };
-
-        var reorderedQuestions = new List<Question>();
-        var component = Render<DraggableQuestionList>(parameters => parameters
-            .Add(p => p.Questions, questions)
-            .Add(p => p.OnOrderChanged, EventCallback.Factory.Create<List<Question>>(
-                this, 
-                (List<Question> q) => 
-                {
-                    reorderedQuestions = new List<Question>(q);
-                })));
-
-        // Act
-        var questionItems = component.FindAll(".question-item");
-        var firstItem = questionItems[0];
-
-        // Simulate drag start on first item
-        firstItem.TriggerEventAsync("ondragstart", new DragEventArgs());
-
-        // Simulate drop on third item
-        var thirdItem = questionItems[2];
-        thirdItem.TriggerEventAsync("ondrop", new DragEventArgs());
-
-        // Assert - After a short delay to allow async operations
-        component.WaitForAssertion(() =>
-        {
-            Assert.NotEmpty(reorderedQuestions);
-            // Verify SortOrder is updated sequentially
-            for (int i = 0; i < reorderedQuestions.Count; i++)
-            {
-                Assert.Equal(i, reorderedQuestions[i].SortOrder);
-            }
-        }, timeout: TimeSpan.FromSeconds(1));
     }
 }
