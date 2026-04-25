@@ -115,6 +115,7 @@ app.MapGet("/api/sessions/{id:guid}/results", SessionResultsEndpointHandlers.Get
 
 app.MapPut("/api/sessions/{id:guid}/unblind", SessionEndpointHandlers.UnblindSession);
 app.MapGet("/api/admin/export-db", AdminEndpointHandlers.ExportDb);
+app.MapPost("/api/questionbank/import/preview", CsvPreviewEndpointHandlers.PreviewImport).DisableAntiforgery();
 app.MapPost("/api/sessions/{sessionId:guid}/questions/import", QuestionBankImportEndpointHandlers.ImportQuestions);
 app.MapDefaultEndpoints();
 
