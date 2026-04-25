@@ -225,7 +225,7 @@ public class DraggableQuestionListComponentTests : BunitContext
         // OnDrop: drag from index 0 to index 2, with adjustment for removal → inserts at index 1
         // Original: [First(0), Second(1), Third(2)]
         // After RemoveAt(0): [Second(0), Third(1)]
-        // targetIndex adjusts from 2→1 (because dragged from below target)
+        // targetIndex adjusts from 2→1 because removing item at lower index shifts remaining indices down
         // After Insert(1): [Second, First, Third]
         Assert.NotNull(receivedOrder);
         Assert.Equal(3, receivedOrder!.Count);

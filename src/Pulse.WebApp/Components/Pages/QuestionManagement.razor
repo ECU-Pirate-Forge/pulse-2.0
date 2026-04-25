@@ -398,7 +398,7 @@
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Error loading questions for session {SessionId}", SessionId);
+            Logger.LogError(ex, "Error loading questions");
             SaveError = "An error occurred while loading questions. Please try again.";
         }
         finally
@@ -517,7 +517,7 @@
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Error saving question for session {SessionId}", SessionId);
+            Logger.LogError(ex, "Error saving question");
             SaveError = "An error occurred while saving the question. Please try again.";
         }
         finally
@@ -565,7 +565,7 @@
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Error updating question order for session {SessionId}", SessionId);
+            Logger.LogError(ex, "Error updating question order");
             ReorderError = "An error occurred while updating question order. Please try again.";
         }
     }

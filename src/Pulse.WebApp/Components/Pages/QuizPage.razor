@@ -383,7 +383,7 @@
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Error loading session for join code {JoinCode}", JoinCode);
+            Logger.LogError(ex, "Error loading session");
             ErrorMessage = "An error occurred while loading the session. Please try again.";
             IsLoading = false;
         }
