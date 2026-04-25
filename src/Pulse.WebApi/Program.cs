@@ -91,7 +91,7 @@ app.MapPost("/api/sessions/{sessionId:guid}/questions",
         question.Options = normalizedOptions;
         var created = questionRepo.Insert(question);
         return Results.Created($"/api/sessions/{sessionId}/questions/{created.Id}", created);
-});
+    });
 
 app.MapPost("/api/questionbank", QuestionBankEndpointHandlers.CreateQuestionBankItem);
 app.MapGet("/api/questionbank", QuestionBankEndpointHandlers.GetQuestionBankItems);
