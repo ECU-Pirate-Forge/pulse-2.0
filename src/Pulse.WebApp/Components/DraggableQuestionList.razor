@@ -16,7 +16,9 @@
                 <div class="question-item"
                      draggable="true"
                      @ondragstart="@((DragEventArgs e) => OnDragStart(e, index))"
+                     @ondragover:preventDefault
                      @ondragover="@((DragEventArgs e) => OnDragOver(e))"
+                     @ondrop:preventDefault
                      @ondrop="@((DragEventArgs e) => OnDrop(e, index))"
                      @ondragend="@((DragEventArgs e) => OnDragEnd(e))"
                      @key="question.Id">

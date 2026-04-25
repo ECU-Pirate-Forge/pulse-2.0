@@ -125,6 +125,10 @@ public static class InstructorOnlyEndpointMatcher
         {
             return true;
         }
+        if (HttpMethods.IsPost(method) && path.StartsWith("/api/sessions/", StringComparison.OrdinalIgnoreCase) && path.EndsWith("/questions", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
         if (HttpMethods.IsGet(method) && (SessionResultsRouteRegex.IsMatch(path) || SessionQrRouteRegex.IsMatch(path)))
         {
             return true;

@@ -74,7 +74,7 @@ app.MapPost("/api/sessions/{sessionId:guid}/questions",
     {
         question.SessionId = sessionId;
 
-        var normalizedOptions = question.Options
+        var normalizedOptions = (question.Options ?? Enumerable.Empty<string>())
             .Where(option => !string.IsNullOrWhiteSpace(option))
             .Select(option => option.Trim())
             .ToList();

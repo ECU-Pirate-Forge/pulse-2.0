@@ -6,6 +6,7 @@
 @rendermode InteractiveServer
 @inject NavigationManager NavManager
 @inject HttpClient HttpClient
+@inject ILogger<QuizPage> Logger
 
 <PageTitle>Quiz - Pulse</PageTitle>
 
@@ -338,7 +339,8 @@
             }
 
             // Fetch session by join code
-            var response = await HttpClient.GetAsync($"/api/sessions/join/{JoinCode}");
+            var encodedJoinCode = Uri.EscapeDataString(JoinCode);
+            var response = await HttpClient.GetAsync($"/api/sessions/join/{encodedJoinCode}");
             if (!response.IsSuccessStatusCode)
             {
                 ErrorMessage = "Invalid session code. Please check and try again.";
@@ -360,13 +362,17 @@
 
             // Fetch questions for this session
             var questionsResponse = await HttpClient.GetAsync($"/api/sessions/{SessionId}/questions");
-            if (questionsResponse.IsSuccessStatusCode)
+            if (!questionsResponse.IsSuccessStatusCode)
             {
-                var questionsJson = await questionsResponse.Content.ReadAsStringAsync();
-                var qOptions = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                Questions = System.Text.Json.JsonSerializer.Deserialize<List<Question>>(questionsJson, qOptions) ?? new List<Question>();
-                Questions = Questions.OrderBy(q => q.SortOrder).ToList();
+                ErrorMessage = "Failed to load questions for this session.";
+                IsLoading = false;
+                return;
             }
+
+            var questionsJson = await questionsResponse.Content.ReadAsStringAsync();
+            var qOptions = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            Questions = System.Text.Json.JsonSerializer.Deserialize<List<Question>>(questionsJson, qOptions) ?? new List<Question>();
+            Questions = Questions.OrderBy(q => q.SortOrder).ToList();
 
             if (Questions.Count == 0)
             {
@@ -377,7 +383,8 @@
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"Error loading session: {ex.Message}";
+            Logger.LogError(ex, "Error loading session for join code {JoinCode}", JoinCode);
+            ErrorMessage = "An error occurred while loading the session. Please try again.";
             IsLoading = false;
         }
     }

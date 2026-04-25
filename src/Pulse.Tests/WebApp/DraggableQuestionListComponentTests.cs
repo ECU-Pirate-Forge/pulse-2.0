@@ -191,4 +191,50 @@ public class DraggableQuestionListComponentTests : BunitContext
         Assert.Contains(">2<", markup); // Question 2 number
         Assert.Contains(">3<", markup); // Question 3 number
     }
+
+    [Fact]
+    public async Task Drop_Reorders_Questions_And_Emits_OnOrderChanged()
+    {
+        // Arrange
+        var q1Id = Guid.NewGuid();
+        var q2Id = Guid.NewGuid();
+        var q3Id = Guid.NewGuid();
+        var questions = new List<Question>
+        {
+            new() { Id = q1Id, Text = "First", Type = QuestionType.MultipleChoice, SortOrder = 0 },
+            new() { Id = q2Id, Text = "Second", Type = QuestionType.LikertScale, SortOrder = 1 },
+            new() { Id = q3Id, Text = "Third", Type = QuestionType.OpenEnded, SortOrder = 2 }
+        };
+
+        List<Question>? receivedOrder = null;
+
+        var component = Render<DraggableQuestionList>(parameters => parameters
+            .Add(p => p.Questions, questions)
+            .Add(p => p.OnOrderChanged, EventCallback.Factory.Create<List<Question>>(
+                this, order => receivedOrder = order)));
+
+        var items = component.FindAll(".question-item");
+
+        // Act: drag item at index 0 (First) and drop onto index 2 (Third)
+        await items[0].TriggerEventAsync("ondragstart", new DragEventArgs());
+        // Re-find items after dragstart triggers a re-render
+        items = component.FindAll(".question-item");
+        await items[2].TriggerEventAsync("ondrop", new DragEventArgs());
+
+        // Assert: callback was invoked and new order has "First" moved after "Second"
+        // OnDrop: drag from index 0 to index 2, with adjustment for removal → inserts at index 1
+        // Original: [First(0), Second(1), Third(2)]
+        // After RemoveAt(0): [Second(0), Third(1)]
+        // targetIndex adjusts from 2→1 (because dragged from below target)
+        // After Insert(1): [Second, First, Third]
+        Assert.NotNull(receivedOrder);
+        Assert.Equal(3, receivedOrder!.Count);
+        Assert.Equal(q2Id, receivedOrder[0].Id);
+        Assert.Equal(q1Id, receivedOrder[1].Id);
+        Assert.Equal(q3Id, receivedOrder[2].Id);
+        // SortOrder values are updated sequentially
+        Assert.Equal(0, receivedOrder[0].SortOrder);
+        Assert.Equal(1, receivedOrder[1].SortOrder);
+        Assert.Equal(2, receivedOrder[2].SortOrder);
+    }
 }
