@@ -15,6 +15,17 @@
     <ImportMap />
     <link rel="icon" type="image/png" href="favicon.png" />
     <HeadOutlet @rendermode="InteractiveServer" />
+    
+    <script>
+        // Enable drag-and-drop by preventing default on dragover
+        document.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        });
+        document.addEventListener('drop', (e) => {
+            e.preventDefault();
+        });
+    </script>
 </head>
 
 <body>

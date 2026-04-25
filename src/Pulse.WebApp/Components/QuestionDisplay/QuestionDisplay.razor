@@ -32,17 +32,17 @@
                 @if (Question.Type == QuestionType.MultipleChoice)
                 {
                     <div class="multiple-choice-options">
-                        @foreach (var option in Question.Options)
+                        @foreach (var (option, index) in Question.Options.Select((o, i) => (o, i)))
                         {
                             <div class="form-check">
                                 <input 
                                     type="radio" 
                                     class="form-check-input" 
-                                    id="option_@option.GetHashCode()" 
+                                    id="option_@index" 
                                     name="response" 
                                     value="@option" 
                                     @onchange="@((ChangeEventArgs e) => SelectedResponse = e.Value?.ToString() ?? string.Empty)" />
-                                <label class="form-check-label" for="option_@option.GetHashCode()">
+                                <label class="form-check-label" for="option_@index">
                                     @option
                                 </label>
                             </div>

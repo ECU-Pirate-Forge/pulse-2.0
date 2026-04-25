@@ -22,7 +22,6 @@ public class GetSessionsByInstructorCodeEndpointTests
             Title = "Session A",
             InstructorCode = "INST001",
             JoinCode = "ABC123",
-            Status = "Active",
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         });
@@ -32,7 +31,6 @@ public class GetSessionsByInstructorCodeEndpointTests
             Title = "Session B",
             InstructorCode = "OTHER",
             JoinCode = "ZZZ999",
-            Status = "Active",
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         });
@@ -66,7 +64,6 @@ public class GetSessionsByInstructorCodeEndpointTests
             Title = "Session A",
             InstructorCode = "OTHER",
             JoinCode = "ABC123",
-            Status = "Active",
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         });

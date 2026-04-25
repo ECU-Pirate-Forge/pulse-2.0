@@ -72,7 +72,7 @@ public static class SessionEndpointHandlers
         if (session == null)
             return Results.NotFound(new { error = "Session not found. Please check your code." });
 
-        return Results.Ok(new { title = session.Title });
+        return Results.Ok(new { id = session.Id, title = session.Title, joinCode = session.JoinCode });
     }
 
     public static async Task<IResult> CreateSession(
@@ -102,7 +102,6 @@ public static class SessionEndpointHandlers
             Title = request.Title,
             JoinCode = joinCode,
             InstructorCode = instructorCode,
-            Status = "Draft",
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };

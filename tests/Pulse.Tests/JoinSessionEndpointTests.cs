@@ -18,7 +18,6 @@ public class JoinSessionEndpointTests
             Title = expectedTitle,
             JoinCode = joinCode,
             InstructorCode = "INST001",
-            Status = "active",
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };

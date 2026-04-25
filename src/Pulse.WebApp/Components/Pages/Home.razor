@@ -1,7 +1,10 @@
 ﻿@page "/"
 @using MudBlazor
 @using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@rendermode InteractiveServer
 @inject NavigationManager NavManager
+@inject ProtectedSessionStorage ProtectedStorage
 
 <PageTitle>Pulse Quiz - Home</PageTitle>
 
@@ -164,5 +167,13 @@
 </MudContainer>
 
 @code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Clear instructor code when returning home so they need to re-authenticate
+        if (firstRender)
+        {
+            await ProtectedStorage.DeleteAsync("instructorCode");
+        }
+    }
 }
 

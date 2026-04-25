@@ -26,7 +26,6 @@ public class SessionRepositoryTests
             Title = "Test",
             JoinCode = "ABC123",
             InstructorCode = "INST001",
-            Status = "Active",
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -96,7 +95,6 @@ public class SessionRepositoryTests
             Title = "Test",
             JoinCode = "DUPLICATE",
             InstructorCode = "INST001",
-            Status = "Active",
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };

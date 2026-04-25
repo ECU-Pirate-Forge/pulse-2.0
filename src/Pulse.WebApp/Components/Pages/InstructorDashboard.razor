@@ -4,6 +4,7 @@
 @using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
 @using System.Net.Http.Json
 @using Pulse.Shared.Models
+@rendermode InteractiveServer
 @inject NavigationManager NavManager
 @inject HttpClient Http
 @inject ProtectedSessionStorage ProtectedStorage
@@ -272,8 +273,8 @@
                         <div class="session-body">
                             <div class="session-info">
                                 <div class="session-info-row">
-                                    <span class="session-label">Status:</span>
-                                    <span class="session-value">@session.Status</span>
+                                    <span class="session-label">Questions:</span>
+                                    <span class="session-value">@session.QuestionCount</span>
                                 </div>
                             </div>
                             <div class="session-actions">
@@ -385,13 +386,38 @@
             if (response.IsSuccessStatusCode)
             {
                 var sessions = await response.Content.ReadFromJsonAsync<List<Session>>();
-                Sessions = (sessions ?? []).Select(s => new SessionModel
+                Sessions = [];
+                
+                if (sessions != null)
                 {
-                    Id = s.Id,
-                    Title = s.Title,
-                    JoinCode = s.JoinCode,
-                    Status = s.Status
-                }).ToList();
+                    foreach (var s in sessions)
+                    {
+                        // Fetch question count for this session
+                        int questionCount = 0;
+                        try
+                        {
+                            var questionsResponse = await Http.GetAsync($"/api/sessions/{s.Id}/questions");
+                            if (questionsResponse.IsSuccessStatusCode)
+                            {
+                                var questions = await questionsResponse.Content.ReadFromJsonAsync<List<dynamic>>();
+                                questionCount = questions?.Count ?? 0;
+                            }
+                        }
+                        catch
+                        {
+                            // If we can't fetch questions, just use 0
+                            questionCount = 0;
+                        }
+
+                        Sessions.Add(new SessionModel
+                        {
+                            Id = s.Id,
+                            Title = s.Title,
+                            JoinCode = s.JoinCode,
+                            QuestionCount = questionCount
+                        });
+                    }
+                }
             }
             else if (response.StatusCode is System.Net.HttpStatusCode.Unauthorized
                                           or System.Net.HttpStatusCode.Forbidden)
@@ -438,7 +464,7 @@
                         Id = result.Id,
                         Title = NewSessionTitle.Trim(),
                         JoinCode = result.JoinCode,
-                        Status = "Draft"
+                        QuestionCount = 0
                     });
                     NewSessionTitle = string.Empty;
                 }
@@ -476,6 +502,6 @@
         public Guid Id { get; set; }
         public string Title { get; set; } = string.Empty;
         public string JoinCode { get; set; } = string.Empty;
-        public string Status { get; set; } = string.Empty;
+        public int QuestionCount { get; set; }
     }
 }
