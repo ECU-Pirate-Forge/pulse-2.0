@@ -69,10 +69,20 @@ The extension currently registers:
 
 - LiteDatabase as Singleton
 	- Registration: AddSingleton<LiteDatabase>(_ => new LiteDatabase(connectionString))
+- IJoinCodeGenerator to JoinCodeGenerator as Singleton
+	- Registration: AddSingleton<IJoinCodeGenerator, JoinCodeGenerator>()
 - ISessionRepository to SessionRepository as Singleton
 	- Registration: AddSingleton<ISessionRepository, SessionRepository>()
 - QuestionRepository as Singleton
 	- Registration: AddSingleton<QuestionRepository>()
+- QuestionService as Singleton
+	- Registration: AddSingleton<QuestionService>()
+- IQuestionBankRepository to QuestionBankRepository as Singleton
+	- Registration: AddSingleton<IQuestionBankRepository, QuestionBankRepository>()
+- IResponseRepository to ResponseRepository as Singleton
+	- Registration: AddSingleton<IResponseRepository, ResponseRepository>()
+- DeviceIdValidationService as Singleton
+	- Registration: AddSingleton<DeviceIdValidationService>()
 
 Additional framework registrations in WebApi:
 

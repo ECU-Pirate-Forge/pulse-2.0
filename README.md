@@ -17,18 +17,35 @@ Current architecture highlights:
 - LiteDB repositories for lightweight local data persistence
 - Aspire AppHost for local orchestration and observability
 
+## User Workflow
+
+Typical classroom usage flow:
+
+1. Instructor starts a session in the admin app.
+2. Instructor adds questions (manually, from question bank content, or via CSV import workflows).
+3. Instructor activates the session and shares the join path using a join code or QR code.
+4. Students join from the web app and submit responses from their own devices.
+5. Pulse validates and records responses, then updates live aggregates for the active session.
+6. Instructor monitors real-time results to adjust teaching during class.
+7. Instructor can unblind results when appropriate and close the session when complete.
+
+
 ## Fully Implemented Features
 
 The following are currently implemented in this repository (and covered by project tests):
 
 - Session lifecycle management: create, retrieve, activate, close, and unblind session state
 - Instructor access protection on management endpoints via instructor code middleware
+- Instructor-scoped session listing via `GET /sessions`
 - Question authoring workflow: create, fetch, update, and delete question data
+- Question ordering/reorder endpoint support
 - Question bank APIs and repository support for reusable question content
+- Question bank CSV preview/import workflow with parser validation
 - Student response submission with validation and upsert-by-device behavior
 - Response aggregation service logic for live tally/result views
-- QR endpoint support for session join flows
+- QR endpoint support for session join flows (by join code and by session id)
 - Global exception middleware for consistent API error handling
+- Structured logging behavior coverage
 - Admin DB export endpoint behavior
 
 ## Roadmap
@@ -121,12 +138,12 @@ dotnet run --project src/Pulse.Admin/Pulse.Admin.csproj
 
 ## Getting Started Validation
 
-Instruction validation was performed by a non-author reviewer (GitHub Copilot agent) on 2026-04-22 in a Windows environment:
+Instruction validation was performed by a non-author reviewer (GitHub Copilot agent) on 2026-04-26 in a Windows environment:
 
 - `dotnet --version` -> 10.0.201
 - `dotnet restore Pulse.slnx` -> success
 - `dotnet build .\Pulse.slnx -c Debug` -> success
-- `dotnet test .\Pulse.slnx` -> 124 passed, 0 failed
+- `dotnet test .\Pulse.slnx` -> 181 passed, 0 failed
 
 ## Documentation
 
