@@ -25,11 +25,10 @@ graph TD
             end
 
             subgraph API["ASP.NET Core Minimal API Endpoints"]
-                SessionAPI["Session endpoints\n(POST /api/sessions, PUT activate/close/unblind)"]
-                QuestionAPI["Question endpoints\n(POST/GET/PUT/DELETE /api/sessions/{id}/questions)"]
+                SessionAPI["Session endpoints\n(POST /api/sessions, GET /sessions, GET /api/sessions/{id}, PUT /api/sessions/{id}/unblind)"]
+                QuestionAPI["Question endpoints\n(/questions and /api/sessions/{sessionId}/questions)"]
                 ResponseAPI["Response endpoint\n(POST …/respond, GET …/results)"]
-                QrAPI["QR endpoint\n(GET /api/sessions/{id}/qr)"]
-                AIGenAPI["AI Generate endpoint\n(POST …/questions/generate)"]
+                QrAPI["QR endpoints\n(GET /api/sessions/qr/{joinCode}, GET /sessions/{id}/qr)"]
             end
 
             Hub["🔌 SignalR Hub\n(/hubs/session)\nSessionHub — group management"]
@@ -39,7 +38,6 @@ graph TD
                 QuestionSvc["QuestionService"]
                 ResponseSvc["ResponseService"]
                 QrSvc["QrCodeService"]
-                AiSvc["AiQuestionService"]
             end
 
             subgraph Repos["LiteDB Repositories"]
@@ -71,7 +69,6 @@ graph TD
     QuestionAPI --> QuestionSvc
     ResponseAPI --> ResponseSvc
     QrAPI --> QrSvc
-    AIGenAPI --> AiSvc
 
     %% Services -> Repos
     SessionSvc --> SessionRepo
@@ -88,9 +85,6 @@ graph TD
 
     %% QrCodeService -> QRCoder
     QrSvc --> QRCoder
-
-    %% AiQuestionService -> Foundry Local
-    AiSvc -- "HTTP inference request" --> FoundryLocal
 
     %% Aspire Dashboard monitors Web & Foundry
     Dashboard -. "telemetry / health" .-> Web
@@ -179,7 +173,7 @@ sequenceDiagram
 
 ## Phase 2 — AI Question Generation
 
-This short sequence shows the Phase 2 AI-assisted question generation flow, where an instructor enters a topic and Foundry Local returns suggested questions for review before they are persisted.
+This short sequence shows the planned Phase 2 AI-assisted question generation flow, where an instructor enters a topic and Foundry Local returns suggested questions for review before they are persisted.
 
 ```mermaid
 sequenceDiagram
