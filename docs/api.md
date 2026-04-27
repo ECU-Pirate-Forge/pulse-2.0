@@ -159,6 +159,38 @@ Response 200 shape:
 
 ## Questions
 
+### GET /api/sessions/{sessionId}/questions
+
+Get ordered questions for a specific session.
+
+Protected: No (current implementation)
+
+Response codes:
+
+- 200 OK (array of question objects ordered by sortOrder)
+
+### POST /api/sessions/{sessionId}/questions
+
+Create a question scoped to a specific session.
+
+Protected: No (current implementation)
+
+Request body (example):
+
+```json
+{
+	"text": "What is 2 + 2?",
+	"type": 0,
+	"options": ["3", "4", "5"],
+	"sortOrder": 0
+}
+```
+
+Response codes:
+
+- 201 Created (created question)
+- 400 Bad Request (validation errors)
+
 ### GET /questions
 
 Get all questions.
@@ -296,6 +328,42 @@ Response 200:
 	"totalCount": 1
 }
 ```
+
+### POST /api/questionbank/import/preview
+
+Preview and validate CSV content before import.
+
+Protected: No (current implementation)
+
+Expected request: multipart/form-data with a CSV file.
+
+Response codes:
+
+- 200 OK (rows + row-level validation issues)
+- 400 Bad Request
+
+### POST /api/sessions/{sessionId}/questions/import
+
+Import validated question bank content into a session.
+
+Protected: No (current implementation)
+
+Response codes:
+
+- 200 OK
+- 400 Bad Request
+
+## Admin
+
+### GET /api/admin/export-db
+
+Export the current LiteDB database file.
+
+Protected: Yes (InstructorCode required)
+
+Response 200:
+
+- Database file stream download
 
 ## Notes
 
