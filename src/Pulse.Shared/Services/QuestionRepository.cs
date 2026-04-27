@@ -13,12 +13,12 @@ public class QuestionRepository
     }
 
     public IEnumerable<Question> GetAll() => _col.FindAll();
-    public Question Insert(Question q) 
-    { 
+    public Question Insert(Question q)
+    {
         // Make a defensive copy of Options to avoid serialization issues with LiteDB
         q.Options = new List<string>(q.Options ?? new List<string>());
-        _col.Insert(q); 
-        return q; 
+        _col.Insert(q);
+        return q;
     }
     public Question? GetById(Guid id) => _col.FindById(id);
     public bool Update(Question q) => _col.Update(q);
