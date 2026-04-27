@@ -45,11 +45,6 @@ public class SessionRepository : ISessionRepository
             session.UpdatedAt = session.CreatedAt;
         }
 
-        if (string.IsNullOrWhiteSpace(session.Status))
-        {
-            session.Status = "Draft";
-        }
-
         _sessions.Insert(session);
         _cache[session.Id] = session;
         return session;

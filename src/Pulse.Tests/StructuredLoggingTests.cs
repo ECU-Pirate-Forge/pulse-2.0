@@ -45,7 +45,7 @@ public class StructuredLoggingTests
     [Fact]
     public async Task Respond_ValidRequest_EmitsInformationLog()
     {
-        var session = new Session { Id = _sessionId, Status = "Active", InstructorCode = "INST" };
+        var session = new Session { Id = _sessionId, InstructorCode = "INST", Status = "Active" };
         var request = new RespondRequest { DeviceId = _validDeviceId, Value = "A" };
 
         var loggerMock = new Mock<ILogger>();
@@ -74,7 +74,7 @@ public class StructuredLoggingTests
     [Fact]
     public async Task Respond_InactiveSession_EmitsWarningLog()
     {
-        var session = new Session { Id = _sessionId, Status = "Draft", InstructorCode = "INST" };
+        var session = new Session { Id = _sessionId, InstructorCode = "INST" };
         var request = new RespondRequest { DeviceId = _validDeviceId, Value = "A" };
 
         var loggerMock = new Mock<ILogger>();

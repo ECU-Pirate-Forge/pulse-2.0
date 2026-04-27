@@ -1,7 +1,12 @@
-@page "/quiz/{SessionId}"
+@page "/quiz/{JoinCode}"
 @using MudBlazor
 @using Microsoft.AspNetCore.Components
+@using Pulse.Shared.Models
+@using Pulse.Domain.Entities
+@rendermode InteractiveServer
 @inject NavigationManager NavManager
+@inject HttpClient HttpClient
+@inject ILogger<QuizPage> Logger
 
 <PageTitle>Quiz - Pulse</PageTitle>
 
@@ -151,7 +156,30 @@
 </style>
 
 <MudContainer MaxWidth="MaxWidth.Medium" Class="py-8">
-    @if (!Completed)
+    @if (IsLoading)
+    {
+        <div class="question-container" style="text-align: center; padding: 48px;">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+            <MudText Typo="Typo.h6" Class="mt-4">Loading quiz...</MudText>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@ErrorMessage</MudAlert>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" @onclick="@(() => NavManager.NavigateTo("/student-join"))">
+            Back to Join
+        </MudButton>
+    }
+    else if (Questions.Count == 0)
+    {
+        <div class="question-container">
+            <MudAlert Severity="Severity.Info">No questions available for this session yet. Please wait for the instructor to add questions.</MudAlert>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Class="mt-4" @onclick="@(() => NavManager.NavigateTo("/student-join"))">
+                Back to Join
+            </MudButton>
+        </div>
+    }
+    else if (!Completed)
     {
         <!-- Quiz Header -->
         <div class="quiz-header">
@@ -169,64 +197,67 @@
 
         <!-- Question Container -->
         <div class="question-container">
-            <div class="question-text">@CurrentQ.Text</div>
+            <div class="question-text">@CurrentQ?.Text</div>
 
-            @switch (CurrentQ.Type)
+            @if (CurrentQ != null)
             {
-                <!-- Multiple Choice -->
-                case 0:
-                    <div class="mc-option">
-                        @foreach (var opt in CurrentQ.Options)
-                        {
-                            var option = opt;
-                            var isSelected = SelectedAnswers.ContainsKey(CurrentQuestion - 1) && SelectedAnswers[CurrentQuestion - 1] == option;
-                            <div class="mc-button @(isSelected ? "selected" : "")"
-                                 role="button"
-                                 tabindex="0"
-                                 @onclick="@(() => SelectAnswer(option))"
-                                 @onkeydown="@((e) => { if (e.Key == "Enter" || e.Key == " ") SelectAnswer(option); })"
-                                 @onkeydown:preventDefault>
-                                @option
-                            </div>
-                        }
-                    </div>
-                    break;
-
-                <!-- Likert Scale -->
-                case 1:
-                    <div>
-                        <div class="likert-scale">
-                            @for (int i = 1; i <= 5; i++)
+                @switch (CurrentQ.Type)
+                {
+                    <!-- Multiple Choice -->
+                    case QuestionType.MultipleChoice:
+                        <div class="mc-option">
+                            @foreach (var opt in CurrentQ.Options)
                             {
-                                var scale = i;
-                                var isSelected = SelectedAnswers.ContainsKey(CurrentQuestion - 1) && SelectedAnswers[CurrentQuestion - 1] == scale.ToString();
-                                <div class="likert-option @(isSelected ? "selected" : "")"
+                                var option = opt;
+                                var isSelected = SelectedAnswers.ContainsKey(CurrentQuestion - 1) && SelectedAnswers[CurrentQuestion - 1] == option;
+                                <div class="mc-button @(isSelected ? "selected" : "")"
                                      role="button"
                                      tabindex="0"
-                                     @onclick="@(() => SelectAnswer(scale.ToString()))"
-                                     @onkeydown="@((e) => { if (e.Key == "Enter" || e.Key == " ") SelectAnswer(scale.ToString()); })"
+                                     @onclick="@(() => SelectAnswer(option))"
+                                     @onkeydown="@((e) => { if (e.Key == "Enter" || e.Key == " ") SelectAnswer(option); })"
                                      @onkeydown:preventDefault>
-                                    @scale
+                                    @option
                                 </div>
                             }
                         </div>
-                        <div class="likert-labels">
-                            <span>Strongly Disagree</span>
-                            <span>Neutral</span>
-                            <span>Strongly Agree</span>
-                        </div>
-                    </div>
-                    break;
+                        break;
 
-                <!-- Open Ended -->
-                case 2:
-                    <MudTextField @bind-Value="CurrentOpenAnswer"
-                                  Label="Your Answer"
-                                  Variant="Variant.Outlined"
-                                  Lines="6"
-                                  Class="open-ended-input"
-                                  Placeholder="Type your response here..." />
-                    break;
+                    <!-- Likert Scale -->
+                    case QuestionType.LikertScale:
+                        <div>
+                            <div class="likert-scale">
+                                @for (int i = 1; i <= 5; i++)
+                                {
+                                    var scale = i;
+                                    var isSelected = SelectedAnswers.ContainsKey(CurrentQuestion - 1) && SelectedAnswers[CurrentQuestion - 1] == scale.ToString();
+                                    <div class="likert-option @(isSelected ? "selected" : "")"
+                                         role="button"
+                                         tabindex="0"
+                                         @onclick="@(() => SelectAnswer(scale.ToString()))"
+                                         @onkeydown="@((e) => { if (e.Key == "Enter" || e.Key == " ") SelectAnswer(scale.ToString()); })"
+                                         @onkeydown:preventDefault>
+                                        @scale
+                                    </div>
+                                }
+                            </div>
+                            <div class="likert-labels">
+                                <span>Strongly Disagree</span>
+                                <span>Neutral</span>
+                                <span>Strongly Agree</span>
+                            </div>
+                        </div>
+                        break;
+
+                    <!-- Open Ended -->
+                    case QuestionType.OpenEnded:
+                        <MudTextField @bind-Value="CurrentOpenAnswer"
+                                      Label="Your Answer"
+                                      Variant="Variant.Outlined"
+                                      Lines="6"
+                                      Class="open-ended-input"
+                                      Placeholder="Type your response here..." />
+                        break;
+                }
             }
         </div>
 
@@ -283,43 +314,82 @@
 
 @code {
     [Parameter]
-    public string SessionId { get; set; } = string.Empty;
+    public string JoinCode { get; set; } = string.Empty;
 
     private int CurrentQuestion = 1;
     private int TotalQuestions => Questions.Count;
     private bool Completed = false;
+    private bool IsLoading = true;
+    private string ErrorMessage = string.Empty;
     private string CurrentOpenAnswer = string.Empty;
     private Dictionary<int, string> SelectedAnswers = new();
 
     private List<Question> Questions = new();
+    private Guid SessionId = Guid.Empty;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        // Demo questions
-        Questions = new List<Question>
+        try
         {
-            new() { 
-                Id = 1, 
-                Text = "What is 2 + 2?", 
-                Type = 0, 
-                Options = new List<string> { "3", "4", "5", "6" } 
-            },
-            new() { 
-                Id = 2, 
-                Text = "How satisfied are you with this course?", 
-                Type = 1,
-                Options = new List<string>()
-            },
-            new() { 
-                Id = 3, 
-                Text = "What was the most important concept you learned?", 
-                Type = 2,
-                Options = new List<string>()
+            if (string.IsNullOrEmpty(JoinCode))
+            {
+                ErrorMessage = "No session code provided";
+                IsLoading = false;
+                return;
             }
-        };
+
+            // Fetch session by join code
+            var encodedJoinCode = Uri.EscapeDataString(JoinCode);
+            var response = await HttpClient.GetAsync($"/api/sessions/join/{encodedJoinCode}");
+            if (!response.IsSuccessStatusCode)
+            {
+                ErrorMessage = "Invalid session code. Please check and try again.";
+                IsLoading = false;
+                return;
+            }
+
+            var json = await response.Content.ReadAsStringAsync();
+            var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var sessionData = System.Text.Json.JsonSerializer.Deserialize<SessionResponse>(json, options);
+            if (sessionData == null)
+            {
+                ErrorMessage = "Failed to load session";
+                IsLoading = false;
+                return;
+            }
+
+            SessionId = sessionData.Id;
+
+            // Fetch questions for this session
+            var questionsResponse = await HttpClient.GetAsync($"/api/sessions/{SessionId}/questions");
+            if (!questionsResponse.IsSuccessStatusCode)
+            {
+                ErrorMessage = "Failed to load questions for this session.";
+                IsLoading = false;
+                return;
+            }
+
+            var questionsJson = await questionsResponse.Content.ReadAsStringAsync();
+            var qOptions = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            Questions = System.Text.Json.JsonSerializer.Deserialize<List<Question>>(questionsJson, qOptions) ?? new List<Question>();
+            Questions = Questions.OrderBy(q => q.SortOrder).ToList();
+
+            if (Questions.Count == 0)
+            {
+                ErrorMessage = "No questions available for this session yet.";
+            }
+
+            IsLoading = false;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading session");
+            ErrorMessage = "An error occurred while loading the session. Please try again.";
+            IsLoading = false;
+        }
     }
 
-    private Question CurrentQ => Questions[CurrentQuestion - 1];
+    private Question? CurrentQ => Questions.Count > 0 ? Questions[CurrentQuestion - 1] : null;
 
     private void SelectAnswer(string answer)
     {
@@ -330,7 +400,7 @@
     {
         if (CurrentQuestion < TotalQuestions)
         {
-            if (CurrentOpenAnswer != string.Empty && CurrentQ.Type == 2)
+            if (CurrentOpenAnswer != string.Empty && CurrentQ?.Type == QuestionType.OpenEnded)
             {
                 SelectedAnswers[CurrentQuestion - 1] = CurrentOpenAnswer;
             }
@@ -354,18 +424,17 @@
 
     private void SubmitQuiz()
     {
-        if (CurrentOpenAnswer != string.Empty && CurrentQ.Type == 2)
+        if (CurrentOpenAnswer != string.Empty && CurrentQ?.Type == QuestionType.OpenEnded)
         {
             SelectedAnswers[CurrentQuestion - 1] = CurrentOpenAnswer;
         }
         Completed = true;
     }
 
-    public class Question
+    private class SessionResponse
     {
-        public int Id { get; set; }
-        public string Text { get; set; } = string.Empty;
-        public int Type { get; set; }
-        public List<string> Options { get; set; } = new();
+        public Guid Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string JoinCode { get; set; } = string.Empty;
     }
 }

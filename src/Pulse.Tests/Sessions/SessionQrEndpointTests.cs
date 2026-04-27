@@ -25,7 +25,6 @@ public class SessionQrEndpointTests
             Title = "QR Session",
             InstructorCode = "INST001",
             JoinCode = "JOIN42",
-            Status = "Active",
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         });

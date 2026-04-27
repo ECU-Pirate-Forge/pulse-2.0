@@ -4,8 +4,10 @@
 @using System.Net.Http.Json
 @using Pulse.Shared.Models
 @using Pulse.Domain.Entities
+@rendermode InteractiveServer
 @inject NavigationManager NavManager
 @inject HttpClient Http
+@inject ILogger<QuestionManagement> Logger
 
 <PageTitle>Manage Questions - Pulse</PageTitle>
 
@@ -152,6 +154,11 @@
     <div class="form-section">
         <div class="form-title">Create New Question</div>
         
+        @if (!string.IsNullOrEmpty(SaveError))
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-3">@SaveError</MudAlert>
+        }
+        
         <MudStack Spacing="3">
             <MudTextField @bind-Value="NewQuestion.Text"
                           Label="Question Text"
@@ -182,26 +189,58 @@
                 <MudButton Variant="Variant.Filled"
                            Color="Color.Primary"
                            Size="Size.Large"
-                           Disabled="string.IsNullOrWhiteSpace(NewQuestion.Text) || !HasMinimumRequiredOptions(NewQuestion)"
-                           OnClick="SaveQuestion"
+                           Disabled="string.IsNullOrWhiteSpace(NewQuestion.Text) || !HasMinimumRequiredOptions(NewQuestion) || IsSaving"
+                           OnClick="@(async (e) => await SaveQuestion())"
                            Style="font-weight: 600;">
-                    Add Question
+                    @if (IsSaving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" />  } else { <text>Add Question</text> }
                 </MudButton>
             </div>
         </MudStack>
     </div>
 
-    <!-- Questions List -->
-    <MudText Typo="Typo.h5" Style="font-weight: 700; margin-bottom: 16px;">
-        Questions (@Questions.Count)
-    </MudText>
+    <!-- Questions List Header -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <MudText Typo="Typo.h5" Style="font-weight: 700;">
+            Questions (@Questions.Count)
+        </MudText>
+        @if (Questions.Count > 1)
+        {
+            <MudButton Variant="@(IsReorderMode ? Variant.Filled : Variant.Outlined)"
+                       Color="@(IsReorderMode ? Color.Warning : Color.Primary)"
+                       Size="Size.Small"
+                       StartIcon="@(IsReorderMode ? Icons.Material.Filled.Done : Icons.Material.Filled.DragIndicator)"
+                       OnClick="ToggleReorderMode">
+                @(IsReorderMode ? "Done Reordering" : "Reorder Questions")
+            </MudButton>
+        }
+    </div>
 
-    @if (Questions.Count == 0)
+    @if (IsLoadingQuestions)
+    {
+        <MudProgressLinear Indeterminate="true" Class="mb-4" />
+    }
+    else if (Questions.Count == 0)
     {
         <div class="empty-state">
             <div class="empty-icon">❓</div>
             <div class="form-title">No Questions Yet</div>
             <p style="color: #6b7280; margin-bottom: 20px;">Create your first question using the form above</p>
+        </div>
+    }
+    else if (IsReorderMode)
+    {
+        <div class="form-section">
+            <p style="color: #6b7280; margin-bottom: 16px;">
+                <strong>Drag questions to reorder them.</strong> Click "Done Reordering" when you are finished.
+            </p>
+            <DraggableQuestionList 
+                Questions="ConvertToQuestionEntities(Questions)" 
+                OnOrderChanged="HandleOrderChanged" />
+            
+            @if (!string.IsNullOrEmpty(ReorderError))
+            {
+                <MudAlert Severity="Severity.Error" Class="mt-3">@ReorderError</MudAlert>
+            }
         </div>
     }
     else
@@ -237,8 +276,9 @@
             }
         </div>
     }
-    <!-- Question Bank Section -->
+
     <MudDivider Class="my-6" />
+
     <MudText Typo="Typo.h5" Style="font-weight: 700; margin-bottom: 16px;">📚 Question Bank</MudText>
 
     @if (IsBankLoading)
@@ -311,6 +351,12 @@
     private bool IsBankLoading = false;
     private string? BankError = null;
 
+    private bool IsReorderMode = false;
+    private string? ReorderError = null;
+    private bool IsSaving = false;
+    private string? SaveError = null;
+    private bool IsLoadingQuestions = true;
+
     private IEnumerable<QuestionBankItem> FilteredBankItems =>
         string.IsNullOrWhiteSpace(BankSearch)
             ? BankItems
@@ -318,25 +364,47 @@
 
     protected override async Task OnInitializedAsync()
     {
-        Questions = new List<QuestionModel>
-        {
-            new()
-            {
-                Id = Guid.NewGuid(),
-                Text = "What is the capital of France?",
-                Type = 0,
-                Options = new List<string> { "London", "Berlin", "Paris", "Madrid" }
-            },
-            new()
-            {
-                Id = Guid.NewGuid(),
-                Text = "How confident are you with this material?",
-                Type = 1,
-                Options = new List<string>()
-            }
-        };
-
+        await LoadQuestionsAsync();
         await LoadQuestionBankAsync();
+    }
+
+    private async Task LoadQuestionsAsync()
+    {
+        IsLoadingQuestions = true;
+        try
+        {
+            if (string.IsNullOrEmpty(SessionId))
+            {
+                SaveError = "Session ID is missing";
+                return;
+            }
+
+            var response = await Http.GetAsync($"/api/sessions/{SessionId}/questions");
+            if (response.IsSuccessStatusCode)
+            {
+                var questions = await response.Content.ReadFromJsonAsync<List<Question>>();
+                Questions = questions?.Select(q => new QuestionModel
+                {
+                    Id = q.Id,
+                    Text = q.Text,
+                    Type = (int)q.Type,
+                    Options = q.Options
+                }).ToList() ?? [];
+            }
+            else
+            {
+                SaveError = $"Failed to load questions: {response.StatusCode}";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading questions");
+            SaveError = "An error occurred while loading questions. Please try again.";
+        }
+        finally
+        {
+            IsLoadingQuestions = false;
+        }
     }
 
     private async Task LoadQuestionBankAsync()
@@ -366,15 +434,23 @@
         }
     }
 
-    private void ImportFromBank(QuestionBankItem item)
+    private async Task ImportFromBank(QuestionBankItem item)
     {
-        Questions.Add(new QuestionModel
+        try
         {
-            Id = Guid.NewGuid(),
-            Text = item.Text,
-            Type = (int)item.Type,
-            Options = new List<string>(item.Options ?? [])
-        });
+            var request = new { QuestionBankItemIds = new[] { item.Id } };
+            var response = await Http.PostAsJsonAsync($"/api/sessions/{SessionId}/questions/import", request);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                // Reload questions after successful import
+                await LoadQuestionsAsync();
+            }
+        }
+        catch
+        {
+            // Error importing question
+        }
     }
 
     private bool HasMinimumRequiredOptions(QuestionModel question)
@@ -390,7 +466,7 @@
         NewQuestion.Options = updatedOptions;
     }
 
-    private void SaveQuestion()
+    private async Task SaveQuestion()
     {
         var nonEmptyOptions = NewQuestion.Options
             .Where(o => !string.IsNullOrWhiteSpace(o))
@@ -401,20 +477,110 @@
             return;
         }
 
-        Questions.Add(new QuestionModel
-        {
-            Id = Guid.NewGuid(),
-            Text = NewQuestion.Text,
-            Type = NewQuestion.Type,
-            Options = nonEmptyOptions
-        });
+        IsSaving = true;
+        SaveError = null;
 
-        NewQuestion = new() { Options = new List<string> { "", "" }, Type = 0 };
+        try
+        {
+            var question = new Question
+            {
+                Id = Guid.NewGuid(),
+                SessionId = Guid.Parse(SessionId),
+                Text = NewQuestion.Text,
+                Type = (QuestionType)NewQuestion.Type,
+                Options = nonEmptyOptions,
+                SortOrder = Questions.Count
+            };
+
+            var response = await Http.PostAsJsonAsync($"/api/sessions/{SessionId}/questions", question);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var createdQuestion = await response.Content.ReadFromJsonAsync<Question>();
+                if (createdQuestion != null)
+                {
+                    Questions.Add(new QuestionModel
+                    {
+                        Id = createdQuestion.Id,
+                        Text = createdQuestion.Text,
+                        Type = (int)createdQuestion.Type,
+                        Options = createdQuestion.Options
+                    });
+
+                    NewQuestion = new() { Options = new List<string> { "", "" }, Type = 0 };
+                }
+            }
+            else
+            {
+                SaveError = "Failed to save question. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error saving question");
+            SaveError = "An error occurred while saving the question. Please try again.";
+        }
+        finally
+        {
+            IsSaving = false;
+        }
     }
 
-    private void DeleteQuestion(Guid id)
+    private async Task DeleteQuestion(Guid id)
     {
-        Questions.RemoveAll(q => q.Id == id);
+        try
+        {
+            var response = await Http.DeleteAsync($"/questions/{id}");
+            if (response.IsSuccessStatusCode)
+            {
+                Questions.RemoveAll(q => q.Id == id);
+            }
+        }
+        catch
+        {
+            // Error deleting question
+        }
+    }
+
+    private void ToggleReorderMode()
+    {
+        IsReorderMode = !IsReorderMode;
+        ReorderError = null;
+    }
+
+    private async Task HandleOrderChanged(List<Question> reorderedQuestions)
+    {
+        try
+        {
+            // Update local list with reordered questions (don't persist reorder yet)
+            Questions = reorderedQuestions.Select(q => new QuestionModel
+            {
+                Id = q.Id,
+                Text = q.Text,
+                Type = (int)q.Type,
+                Options = q.Options
+            }).ToList();
+
+            ReorderError = null;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error updating question order");
+            ReorderError = "An error occurred while updating question order. Please try again.";
+        }
+    }
+
+    private List<Question> ConvertToQuestionEntities(List<QuestionModel> models)
+    {
+        return models.Select((model, index) => new Question
+        {
+            Id = model.Id,
+            SessionId = Guid.Parse(SessionId),
+            Text = model.Text,
+            Type = (QuestionType)model.Type,
+            Options = model.Options,
+            SortOrder = index
+        }).ToList();
     }
 
     private string GetTypeName(int type) => type switch

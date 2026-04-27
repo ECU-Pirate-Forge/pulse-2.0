@@ -19,47 +19,6 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// Define seeding method
-async Task SeedDemoSessions(IServiceProvider services, IConfiguration configuration)
-{
-    using var scope = services.CreateScope();
-    var repo = scope.ServiceProvider.GetRequiredService<ISessionRepository>();
-
-    var instructorCode = configuration["Security:InstructorCode"] ?? "TEST-INSTRUCTOR-CODE";
-
-    var demoSessions = new[]
-    {
-        new { Code = "BIO123", Title = "Biology Quiz - Chapter 5" },
-        new { Code = "MATH45", Title = "Math Concepts Test" },
-        new { Code = "HIST99", Title = "History Final Exam" }
-    };
-
-    foreach (var demo in demoSessions)
-    {
-        var existingSession = await repo.GetByJoinCodeAsync(demo.Code);
-        if (existingSession == null)
-        {
-            var session = new Session
-            {
-                Id = Guid.NewGuid(),
-                Title = demo.Title,
-                JoinCode = demo.Code,
-                InstructorCode = instructorCode,
-                Status = "Active",
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            };
-            await repo.InsertAsync(session);
-        }
-    }
-}
-
-// Seed demo sessions in development
-if (app.Environment.IsDevelopment())
-{
-    await SeedDemoSessions(app.Services, app.Configuration);
-}
-
 app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseMiddleware<InstructorCodeMiddleware>();
 app.UseHttpsRedirection();
@@ -102,6 +61,37 @@ app.MapGet("/api/sessions/{id:guid}", (ISessionRepository repo, Guid id, HttpCon
 app.MapPut("/questions/{id:guid}", QuestionEndpointHandlers.UpdateQuestion);
 app.MapDelete("/questions/{id:guid}", QuestionEndpointHandlers.DeleteQuestion);
 app.MapPut("/api/questions/reorder", QuestionEndpointHandlers.ReorderQuestions);
+
+// Session-specific question endpoints
+app.MapGet("/api/sessions/{sessionId:guid}/questions", (Guid sessionId, QuestionRepository questionRepo) =>
+{
+    var questions = questionRepo.GetBySessionId(sessionId).OrderBy(q => q.SortOrder).ToList();
+    return Results.Ok(questions);
+});
+
+app.MapPost("/api/sessions/{sessionId:guid}/questions",
+    (Guid sessionId, Question question, QuestionRepository questionRepo, QuestionService questionService) =>
+    {
+        question.SessionId = sessionId;
+
+        var normalizedOptions = (question.Options ?? Enumerable.Empty<string>())
+            .Where(option => !string.IsNullOrWhiteSpace(option))
+            .Select(option => option.Trim())
+            .ToList();
+
+        var validation = questionService.ValidateQuestion(new QuestionDTO
+        {
+            Type = question.Type,
+            Options = normalizedOptions
+        });
+
+        if (!validation.IsValid)
+            return Results.BadRequest(validation.ErrorMessage);
+
+        question.Options = normalizedOptions;
+        var created = questionRepo.Insert(question);
+        return Results.Created($"/api/sessions/{sessionId}/questions/{created.Id}", created);
+    });
 
 app.MapPost("/api/questionbank", QuestionBankEndpointHandlers.CreateQuestionBankItem);
 app.MapGet("/api/questionbank", QuestionBankEndpointHandlers.GetQuestionBankItems);

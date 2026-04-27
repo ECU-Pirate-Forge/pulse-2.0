@@ -23,7 +23,6 @@ public class SessionListPageTests : Bunit.TestContext
             {
                 Id = sessionId,
                 Title = "Physics Quiz",
-                Status = "Draft",
                 JoinCode = "ABC123",
                 InstructorCode = InstructorCode
             }
@@ -47,7 +46,6 @@ public class SessionListPageTests : Bunit.TestContext
         cut.WaitForAssertion(() =>
         {
             Assert.Contains("Physics Quiz", cut.Markup);
-            Assert.Contains("Draft", cut.Markup);
         });
 
         var getRequest = Assert.Single(handler.Requests, r => r.Method == HttpMethod.Get);
@@ -55,12 +53,8 @@ public class SessionListPageTests : Bunit.TestContext
         Assert.Equal(InstructorCode, getRequest.InstructorCode);
     }
 
-    [Theory]
-    [InlineData("Draft", "open", "POST")]
-    [InlineData("Open", "activate", "POST")]
-    [InlineData("Active", "close", "POST")]
-    [InlineData("Draft", "delete", "DELETE")]
-    public void ActionButton_CallsEndpoint_AndRefreshesList(string status, string action, string expectedMethod)
+    [Fact]
+    public void OpenButton_CallsOpenEndpoint()
     {
         var sessionId = Guid.NewGuid();
         var sessions = new List<Session>
@@ -69,7 +63,6 @@ public class SessionListPageTests : Bunit.TestContext
             {
                 Id = sessionId,
                 Title = "Session A",
-                Status = status,
                 JoinCode = "JOINME",
                 InstructorCode = InstructorCode
             }
@@ -82,11 +75,7 @@ public class SessionListPageTests : Bunit.TestContext
                 return JsonResponse(HttpStatusCode.OK, sessions);
             }
 
-            var expectedPath = action == "delete"
-                ? $"/api/sessions/{sessionId}"
-                : $"/api/sessions/{sessionId}/{action}";
-
-            if (request.Method.Method == expectedMethod && request.RequestUri?.AbsolutePath == expectedPath)
+            if (request.Method == HttpMethod.Post && request.RequestUri?.AbsolutePath == $"/api/sessions/{sessionId}/open")
             {
                 return JsonResponse(HttpStatusCode.OK, new { ok = true });
             }
@@ -101,18 +90,66 @@ public class SessionListPageTests : Bunit.TestContext
 
         cut.WaitForAssertion(() => Assert.Contains("Session A", cut.Markup));
 
-        var selector = $"button[data-testid='{action}-{sessionId}']";
+        var selector = $"button[data-testid='open-{sessionId}']";
         cut.Find(selector).Click();
 
         cut.WaitForAssertion(() =>
         {
-            var actionPath = action == "delete"
-                ? $"/api/sessions/{sessionId}"
-                : $"/api/sessions/{sessionId}/{action}";
-
             Assert.Contains(handler.Requests, r =>
-                r.Method.Method == expectedMethod &&
-                r.Path == actionPath &&
+                r.Method == HttpMethod.Post &&
+                r.Path == $"/api/sessions/{sessionId}/open" &&
+                r.InstructorCode == InstructorCode);
+
+            var getCount = handler.Requests.Count(r => r.Method == HttpMethod.Get && r.Path == "/api/sessions");
+            Assert.True(getCount >= 2, "Expected list refresh GET after action success.");
+        });
+    }
+
+    [Fact]
+    public void DeleteButton_CallsDeleteEndpoint()
+    {
+        var sessionId = Guid.NewGuid();
+        var sessions = new List<Session>
+        {
+            new()
+            {
+                Id = sessionId,
+                Title = "Session A",
+                JoinCode = "JOINME",
+                InstructorCode = InstructorCode
+            }
+        };
+
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            if (request.Method == HttpMethod.Get && request.RequestUri?.AbsolutePath == "/api/sessions")
+            {
+                return JsonResponse(HttpStatusCode.OK, sessions);
+            }
+
+            if (request.Method == HttpMethod.Delete && request.RequestUri?.AbsolutePath == $"/api/sessions/{sessionId}")
+            {
+                return JsonResponse(HttpStatusCode.OK, new { ok = true });
+            }
+
+            return JsonResponse(HttpStatusCode.NotFound, new { error = "Not found" });
+        });
+
+        Services.AddSingleton(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+
+        var cut = Render<SessionListPage>(parameters =>
+            parameters.Add(p => p.InstructorCode, InstructorCode));
+
+        cut.WaitForAssertion(() => Assert.Contains("Session A", cut.Markup));
+
+        var selector = $"button[data-testid='delete-{sessionId}']";
+        cut.Find(selector).Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains(handler.Requests, r =>
+                r.Method == HttpMethod.Delete &&
+                r.Path == $"/api/sessions/{sessionId}" &&
                 r.InstructorCode == InstructorCode);
 
             var getCount = handler.Requests.Count(r => r.Method == HttpMethod.Get && r.Path == "/api/sessions");
@@ -130,7 +167,6 @@ public class SessionListPageTests : Bunit.TestContext
             {
                 Id = sessionId,
                 Title = "Session B",
-                Status = "Draft",
                 JoinCode = "JOINB",
                 InstructorCode = InstructorCode
             }

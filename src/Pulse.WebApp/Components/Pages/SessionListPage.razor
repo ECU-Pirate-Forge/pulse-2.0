@@ -39,7 +39,6 @@ else if (!string.IsNullOrWhiteSpace(ErrorMessage))
         <thead>
             <tr>
                 <th>Title</th>
-                <th>Status</th>
                 <th>Actions</th>
             </tr>
         </thead>
@@ -48,35 +47,13 @@ else if (!string.IsNullOrWhiteSpace(ErrorMessage))
             {
                 <tr>
                     <td>@session.Title</td>
-                    <td>@session.Status</td>
                     <td>
-                        @if (CanOpen(session.Status))
-                        {
-                            <button class="btn btn-outline-primary btn-sm me-1"
-                                    @onclick="() => OpenSessionAsync(session.Id)"
-                                    disabled="@IsBusy"
-                                    data-testid="@($"open-{session.Id}")">
-                                Open
-                            </button>
-                        }
-                        @if (CanActivate(session.Status))
-                        {
-                            <button class="btn btn-outline-success btn-sm me-1"
-                                    @onclick="() => ActivateSessionAsync(session.Id)"
-                                    disabled="@IsBusy"
-                                    data-testid="@($"activate-{session.Id}")">
-                                Activate
-                            </button>
-                        }
-                        @if (CanClose(session.Status))
-                        {
-                            <button class="btn btn-outline-warning btn-sm me-1"
-                                    @onclick="() => CloseSessionAsync(session.Id)"
-                                    disabled="@IsBusy"
-                                    data-testid="@($"close-{session.Id}")">
-                                Close
-                            </button>
-                        }
+                        <button class="btn btn-outline-primary btn-sm me-1"
+                                @onclick="() => OpenSessionAsync(session.Id)"
+                                disabled="@IsBusy"
+                                data-testid="@($"open-{session.Id}")">
+                            Open
+                        </button>
                         <button class="btn btn-outline-danger btn-sm"
                                 @onclick="() => DeleteSessionAsync(session.Id)"
                                 disabled="@IsBusy"
@@ -143,12 +120,6 @@ else if (!string.IsNullOrWhiteSpace(ErrorMessage))
 
     private Task OpenSessionAsync(Guid sessionId) =>
         InvokeActionAsync(HttpMethod.Post, $"/api/sessions/{sessionId}/open", "open");
-
-    private Task ActivateSessionAsync(Guid sessionId) =>
-        InvokeActionAsync(HttpMethod.Post, $"/api/sessions/{sessionId}/activate", "activate");
-
-    private Task CloseSessionAsync(Guid sessionId) =>
-        InvokeActionAsync(HttpMethod.Post, $"/api/sessions/{sessionId}/close", "close");
 
     private Task DeleteSessionAsync(Guid sessionId) =>
         InvokeActionAsync(HttpMethod.Delete, $"/api/sessions/{sessionId}", "delete");
@@ -221,20 +192,4 @@ else if (!string.IsNullOrWhiteSpace(ErrorMessage))
             _ => "We could not load sessions right now. Please try again."
         };
     }
-
-    private static bool CanOpen(string? status) =>
-        NormalizeStatus(status) == "draft";
-
-    private static bool CanActivate(string? status) =>
-        NormalizeStatus(status) == "open";
-
-    private static bool CanClose(string? status)
-    {
-        var normalized = NormalizeStatus(status);
-        return normalized is "open" or "active";
-    }
-
-    private static string NormalizeStatus(string? status) =>
-        status?.Trim().ToLowerInvariant() ?? string.Empty;
 }
-

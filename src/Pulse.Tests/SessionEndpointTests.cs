@@ -154,7 +154,6 @@ public class SessionEndpointTests
             Title = "Test Session",
             InstructorCode = "SECRETCODE",
             JoinCode = "JOIN01",
-            Status = "Draft",
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         });

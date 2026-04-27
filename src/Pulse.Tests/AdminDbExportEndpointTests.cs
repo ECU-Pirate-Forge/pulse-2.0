@@ -106,7 +106,6 @@ public sealed class AdminDbExportEndpointTests
                     Title = "Export Test Session",
                     InstructorCode = "TEST-INSTRUCTOR-CODE",
                     JoinCode = "ABC123",
-                    Status = "Draft",
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
                 });

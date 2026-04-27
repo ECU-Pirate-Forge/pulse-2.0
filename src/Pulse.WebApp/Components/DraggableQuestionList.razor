@@ -1,0 +1,248 @@
+@using Pulse.Domain.Entities
+@using System.Collections.Generic
+
+<div class="draggable-question-list">
+    @if (LocalQuestions == null || LocalQuestions.Count == 0)
+    {
+        <div class="empty-state">
+            <p class="text-muted">No questions to display</p>
+        </div>
+    }
+    else
+    {
+        <div class="questions-list">
+            @foreach (var (question, index) in LocalQuestions.Select((q, i) => (q, i)))
+            {
+                <div class="question-item"
+                     draggable="true"
+                     @ondragstart="@((DragEventArgs e) => OnDragStart(e, index))"
+                     @ondragover:preventDefault
+                     @ondragover="@((DragEventArgs e) => OnDragOver(e))"
+                     @ondrop:preventDefault
+                     @ondrop="@((DragEventArgs e) => OnDrop(e, index))"
+                     @ondragend="@((DragEventArgs e) => OnDragEnd(e))"
+                     @key="question.Id">
+                    
+                    <div class="drag-handle">
+                        <span class="handle-icon">⋮⋮</span>
+                    </div>
+                    
+                    <div class="question-content">
+                        <div class="question-meta">
+                            <span class="question-number">@(index + 1)</span>
+                            <span class="question-type">@GetTypeName(question.Type)</span>
+                        </div>
+                        <div class="question-text">@question.Text</div>
+                        @if (question.Type == QuestionType.MultipleChoice && question.Options?.Count > 0)
+                        {
+                            <div class="question-options">
+                                @string.Join(", ", question.Options)
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .draggable-question-list {
+        width: 100%;
+        user-select: none;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 24px;
+        background: #f9fafb;
+        border-radius: 8px;
+    }
+
+    .questions-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .question-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 16px;
+        background: white;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        cursor: move;
+        transition: all 0.2s ease;
+        position: relative;
+        z-index: auto;
+    }
+
+    .question-item:hover {
+        border-color: #667eea;
+        box-shadow: 0 4px 8px rgba(102, 126, 234, 0.1);
+    }
+
+    .question-item.dragging {
+        opacity: 0.5;
+        background: #f3f4f6;
+        z-index: 10;
+    }
+
+    .question-item.drag-over {
+        border-color: #667eea;
+        border-style: dashed;
+        background: #f0f4ff;
+        z-index: 5;
+    }
+
+    .drag-handle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        color: #9ca3af;
+        flex-shrink: 0;
+        cursor: grab;
+    }
+
+    .drag-handle:active {
+        cursor: grabbing;
+    }
+
+    .handle-icon {
+        font-weight: bold;
+        font-size: 0.875rem;
+        letter-spacing: -2px;
+    }
+
+    .question-content {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .question-meta {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 4px;
+        align-items: center;
+    }
+
+    .question-number {
+        display: inline-block;
+        background: #e0e7ff;
+        color: #4f46e5;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .question-type {
+        display: inline-block;
+        background: #dbeafe;
+        color: #0369a1;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .question-text {
+        font-weight: 500;
+        color: #1f2937;
+        margin-bottom: 4px;
+    }
+
+    .question-options {
+        font-size: 0.875rem;
+        color: #6b7280;
+        font-style: italic;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public List<Question>? Questions { get; set; }
+
+    [Parameter]
+    public EventCallback<List<Question>> OnOrderChanged { get; set; }
+
+    private List<Question> LocalQuestions { get; set; } = new();
+    private int _draggedIndex = -1;
+
+    protected override void OnParametersSet()
+    {
+        // Create a copy to allow local state management
+        LocalQuestions = Questions != null ? new List<Question>(Questions) : new();
+    }
+
+    private void OnDragStart(DragEventArgs e, int index)
+    {
+        _draggedIndex = index;
+        if (e.DataTransfer != null)
+        {
+            e.DataTransfer.EffectAllowed = "move";
+            e.DataTransfer.DropEffect = "move";
+        }
+    }
+
+    private void OnDragOver(DragEventArgs e)
+    {
+        if (e.DataTransfer != null)
+        {
+            e.DataTransfer.EffectAllowed = "move";
+            e.DataTransfer.DropEffect = "move";
+        }
+    }
+
+    private async Task OnDrop(DragEventArgs e, int targetIndex)
+    {
+        if (_draggedIndex < 0 || _draggedIndex == targetIndex)
+        {
+            _draggedIndex = -1;
+            return;
+        }
+
+        // Perform the reorder
+        var draggedQuestion = LocalQuestions[_draggedIndex];
+        LocalQuestions.RemoveAt(_draggedIndex);
+
+        // Adjust target index if dragging down
+        if (_draggedIndex < targetIndex)
+        {
+            targetIndex--;
+        }
+
+        LocalQuestions.Insert(targetIndex, draggedQuestion);
+
+        // Update SortOrder for all questions
+        for (int i = 0; i < LocalQuestions.Count; i++)
+        {
+            LocalQuestions[i].SortOrder = i;
+        }
+
+        _draggedIndex = -1;
+
+        // Notify parent of the new order - don't call StateHasChanged() here
+        // as it causes the DOM to shift during the drag operation
+        await OnOrderChanged.InvokeAsync(LocalQuestions);
+    }
+
+    private void OnDragEnd(DragEventArgs e)
+    {
+        _draggedIndex = -1;
+        // The re-render will happen naturally when the parent component
+        // updates its state after HandleOrderChanged is called
+    }
+
+    private string GetTypeName(QuestionType type) => type switch
+    {
+        QuestionType.MultipleChoice => "Multiple Choice",
+        QuestionType.LikertScale => "Likert Scale",
+        QuestionType.OpenEnded => "Open Ended",
+        _ => "Unknown"
+    };
+}

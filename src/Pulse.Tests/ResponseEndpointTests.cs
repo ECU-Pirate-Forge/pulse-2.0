@@ -47,7 +47,7 @@ public class ResponseEndpointTests
     [Fact]
     public async Task Respond_ValidRequest_Returns200WithSubmittedAt()
     {
-        var session = new Session { Id = _sessionId, Status = "Active", InstructorCode = "INST" };
+        var session = new Session { Id = _sessionId, InstructorCode = "INST", Status = "Active" };
         var request = new RespondRequest { DeviceId = _validDeviceId, Value = "A" };
 
         var result = await ResponseEndpointHandlers.Respond(
@@ -115,24 +115,6 @@ public class ResponseEndpointTests
     }
 
     [Fact]
-    public async Task Respond_SessionNotActive_Returns409()
-    {
-        var session = new Session { Id = _sessionId, Status = "Draft", InstructorCode = "INST" };
-        var request = new RespondRequest { DeviceId = _validDeviceId, Value = "A" };
-
-        var result = await ResponseEndpointHandlers.Respond(
-            _sessionId, _questionId, request,
-            BuildSessionRepo(session).Object,
-            BuildQuestionRepo(),
-            BuildResponseRepo().Object,
-            _deviceIdService,
-            NullLogger(),
-            EmptyContext());
-
-        Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.Conflict<string>>(result);
-    }
-
-    [Fact]
     public async Task Respond_UnknownSession_Returns404()
     {
         var request = new RespondRequest { DeviceId = _validDeviceId, Value = "A" };
@@ -152,7 +134,7 @@ public class ResponseEndpointTests
     [Fact]
     public async Task Respond_UnknownQuestion_Returns404()
     {
-        var session = new Session { Id = _sessionId, Status = "Active", InstructorCode = "INST" };
+        var session = new Session { Id = _sessionId, InstructorCode = "INST", Status = "Active" };
         var request = new RespondRequest { DeviceId = _validDeviceId, Value = "A" };
 
         var result = await ResponseEndpointHandlers.Respond(

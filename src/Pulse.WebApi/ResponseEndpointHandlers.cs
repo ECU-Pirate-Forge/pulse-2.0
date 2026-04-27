@@ -31,7 +31,8 @@ public static class ResponseEndpointHandlers
 
         if (!string.Equals(session.Status, "Active", StringComparison.OrdinalIgnoreCase))
         {
-            logger.LogWarning("Response rejected — session not active SessionId={SessionId} CorrelationId={CorrelationId}", sessionId, context.TraceIdentifier);
+            logger.LogWarning("Response submitted to session not active SessionId={SessionId} Status={Status} CorrelationId={CorrelationId}",
+                sessionId, session.Status, context.TraceIdentifier);
             return Results.Conflict("Session is not active.");
         }
 
