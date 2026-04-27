@@ -1,9 +1,11 @@
 using System.ComponentModel.DataAnnotations;
+using LiteDB;
 
 namespace Pulse.Domain.Entities;
 
 public class Question
 {
+    [BsonId]
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid SessionId { get; set; }
 
