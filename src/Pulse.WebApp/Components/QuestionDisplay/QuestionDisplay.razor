@@ -38,11 +38,11 @@
                                 <input 
                                     type="radio" 
                                     class="form-check-input" 
-                                    id="option_@index" 
-                                    name="response" 
+                                    id="option_@(Question.Id)_@index" 
+                                    name="response_@Question.Id" 
                                     value="@option" 
                                     @onchange="@((ChangeEventArgs e) => SelectedResponse = e.Value?.ToString() ?? string.Empty)" />
-                                <label class="form-check-label" for="option_@index">
+                                <label class="form-check-label" for="option_@(Question.Id)_@index">
                                     @option
                                 </label>
                             </div>
@@ -59,11 +59,11 @@
                                 <input 
                                     type="radio" 
                                     class="form-check-input" 
-                                    id="likert_@i" 
-                                    name="likert" 
+                                    id="likert_@(Question.Id)_@i" 
+                                    name="likert_@Question.Id" 
                                     value="@i" 
                                     @onchange="@((ChangeEventArgs e) => SelectedResponse = e.Value?.ToString() ?? string.Empty)" />
-                                <label class="form-check-label" for="likert_@i">
+                                <label class="form-check-label" for="likert_@(Question.Id)_@i">
                                     @scaleLabel
                                 </label>
                             </div>

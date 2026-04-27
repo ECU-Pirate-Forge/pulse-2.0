@@ -7,6 +7,7 @@
 @rendermode InteractiveServer
 @inject NavigationManager NavManager
 @inject HttpClient Http
+@inject ILogger<QuestionManagement> Logger
 
 <PageTitle>Manage Questions - Pulse</PageTitle>
 
@@ -230,16 +231,11 @@
     {
         <div class="form-section">
             <p style="color: #6b7280; margin-bottom: 16px;">
-                <strong>Drag questions to reorder them.</strong> The new order will be saved when you click "Done Reordering".
+                <strong>Drag questions to reorder them.</strong> Click "Done Reordering" when you are finished.
             </p>
             <DraggableQuestionList 
                 Questions="ConvertToQuestionEntities(Questions)" 
                 OnOrderChanged="HandleOrderChanged" />
-            
-            @if (IsReorderSaving)
-            {
-                <MudProgressLinear Indeterminate="true" Class="mt-3" />
-            }
             
             @if (!string.IsNullOrEmpty(ReorderError))
             {
@@ -356,7 +352,6 @@
     private string? BankError = null;
 
     private bool IsReorderMode = false;
-    private bool IsReorderSaving = false;
     private string? ReorderError = null;
     private bool IsSaving = false;
     private string? SaveError = null;
@@ -403,7 +398,8 @@
         }
         catch (Exception ex)
         {
-            SaveError = $"Error loading questions: {ex.Message}";
+            Logger.LogError(ex, "Error loading questions");
+            SaveError = "An error occurred while loading questions. Please try again.";
         }
         finally
         {
@@ -521,7 +517,8 @@
         }
         catch (Exception ex)
         {
-            SaveError = $"Error saving question: {ex.Message}";
+            Logger.LogError(ex, "Error saving question");
+            SaveError = "An error occurred while saving the question. Please try again.";
         }
         finally
         {
@@ -568,7 +565,8 @@
         }
         catch (Exception ex)
         {
-            ReorderError = $"Error updating question order: {ex.Message}";
+            Logger.LogError(ex, "Error updating question order");
+            ReorderError = "An error occurred while updating question order. Please try again.";
         }
     }
 
