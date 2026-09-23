@@ -27,7 +27,7 @@ graph TD
             subgraph API["ASP.NET Core Minimal API Endpoints"]
                 SessionAPI["Session endpoints\n(POST /api/sessions, GET /sessions, GET /api/sessions/{id}, PUT /api/sessions/{id}/unblind)"]
                 QuestionAPI["Question endpoints\n(/questions and /api/sessions/{sessionId}/questions)"]
-                ResponseAPI["Response endpoint\n(POST …/respond, GET …/results)"]
+                ResponseAPI["Survey submission and results\n(POST …/submit, GET …/results)"]
                 QrAPI["QR endpoints\n(GET /api/sessions/qr/{joinCode}, GET /sessions/{id}/qr)"]
             end
 
@@ -163,8 +163,8 @@ sequenceDiagram
     %% ── 3. RESPONSE SUBMISSION ────────────────────────────────────────────────
     rect rgb(255, 248, 230)
         Note over IB,SB: 3 — Response Submission
-        SB->>API: POST /api/sessions/{id}/questions/{qid}/respond\n{deviceId, value}
-        API->>DB: Upsert Response (by questionId + deviceId)
+        SB->>API: POST /api/sessions/{id}/submit\n{deviceId, answers[]}
+        API->>DB: Atomically upsert responses and completion marker
         DB-->>API: ok
         API->>DB: Aggregate tallies for question
         DB-->>API: Updated tallies

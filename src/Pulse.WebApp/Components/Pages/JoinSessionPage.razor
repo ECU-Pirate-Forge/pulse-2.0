@@ -42,9 +42,14 @@
                 return;
             }
 
-            errorMessage = response.StatusCode == System.Net.HttpStatusCode.NotFound
-                ? "That survey code was not found. Check the code with your instructor."
-                : "Pulse could not check that survey right now. Please try again.";
+            errorMessage = response.StatusCode switch
+            {
+                System.Net.HttpStatusCode.NotFound =>
+                    "That survey code was not found. Check the code with your instructor.",
+                System.Net.HttpStatusCode.Conflict =>
+                    "This survey is not currently accepting responses.",
+                _ => "Pulse could not check that survey right now. Please try again."
+            };
         }
         catch (HttpRequestException)
         {

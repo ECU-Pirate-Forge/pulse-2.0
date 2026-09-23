@@ -1,5 +1,6 @@
 using MudBlazor.Services;
 using Pulse.WebApp.Components;
+using Pulse.WebApp.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,6 +11,7 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 builder.Services.AddMudServices();
+builder.Services.AddScoped<IDeviceIdService, DeviceIdService>();
 
 builder.Services.AddHttpClient("webapi", client =>
 {
