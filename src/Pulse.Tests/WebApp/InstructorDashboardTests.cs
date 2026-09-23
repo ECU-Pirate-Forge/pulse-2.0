@@ -5,8 +5,8 @@ using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor.Services;
+using Pulse.Admin.Components.Pages;
 using Pulse.Shared.Models;
-using Pulse.WebApp.Components.Pages;
 
 namespace Pulse.Tests.WebApp;
 
