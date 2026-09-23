@@ -40,6 +40,13 @@ public static class QuestionBankEndpointHandlers
         });
         if (!validation.IsValid)
             return TypedResults.BadRequest(validation.ErrorMessage!);
+        var triviaValidation = ValidateTriviaConfiguration(
+            request.Type.Value,
+            request.TriviaEligible,
+            normalizedOptions,
+            NormalizeOptions(request.CorrectAnswers));
+        if (triviaValidation is not null)
+            return TypedResults.BadRequest(triviaValidation);
 
         var item = new QuestionBankItem
         {
@@ -53,6 +60,8 @@ public static class QuestionBankEndpointHandlers
             ModerationStatus = QuestionModerationStatus.Approved,
             Source = QuestionSource.InstructorAuthored,
             ContributorAttribution = "Instructor",
+            TriviaEligible = request.TriviaEligible,
+            CorrectAnswers = NormalizeOptions(request.CorrectAnswers),
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -70,6 +79,7 @@ public static class QuestionBankEndpointHandlers
         string? tag = null,
         QuestionModerationStatus? moderationStatus = null,
         QuestionSource? source = null,
+        bool? triviaEligible = null,
         QuestionBankSort sort = QuestionBankSort.Newest,
         int page = 1,
         int pageSize = 20)
@@ -88,6 +98,7 @@ public static class QuestionBankEndpointHandlers
             tag,
             moderationStatus,
             source,
+            triviaEligible,
             sort)).ToList();
         var totalCount = filtered.Count;
         var items = filtered
@@ -148,7 +159,14 @@ public static class QuestionBankEndpointHandlers
         var matchingPairs = request.MatchingPairs is null
             ? item.MatchingPairs
             : NormalizePairs(request.MatchingPairs);
+        var triviaEligible = request.TriviaEligible ?? item.TriviaEligible;
+        var correctAnswers = request.CorrectAnswers is null
+            ? item.CorrectAnswers
+            : NormalizeOptions(request.CorrectAnswers);
         var validationError = ValidateRequest(text, type, options, matchingPairs, questionService);
+        if (validationError is not null)
+            return TypedResults.BadRequest(validationError);
+        validationError = ValidateTriviaConfiguration(type, triviaEligible, options, correctAnswers);
         if (validationError is not null)
             return TypedResults.BadRequest(validationError);
 
@@ -157,6 +175,8 @@ public static class QuestionBankEndpointHandlers
         item.Type = type;
         item.Options = options;
         item.MatchingPairs = matchingPairs;
+        item.TriviaEligible = triviaEligible;
+        item.CorrectAnswers = correctAnswers;
         item.Course = request.Course?.Trim() ?? item.Course;
         item.Topic = request.Topic?.Trim() ?? item.Topic;
         if (request.Tags is not null)
@@ -211,6 +231,25 @@ public static class QuestionBankEndpointHandlers
             .Select(tag => tag.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+
+    private static string? ValidateTriviaConfiguration(
+        QuestionType type,
+        bool triviaEligible,
+        IReadOnlyCollection<string> options,
+        IReadOnlyCollection<string> correctAnswers)
+    {
+        if (!triviaEligible)
+            return null;
+        if (type == QuestionType.Matching)
+            return "Matching questions are not currently eligible for trivia.";
+        if (correctAnswers.Count == 0)
+            return "Trivia questions require at least one correct answer.";
+
+        var allowedAnswers = type == QuestionType.TrueFalse ? ["True", "False"] : options;
+        return correctAnswers.All(answer => allowedAnswers.Contains(answer, StringComparer.Ordinal))
+            ? null
+            : "Correct answers must match the available options.";
+    }
 }
 
 public class CreateQuestionBankItemRequest
@@ -222,6 +261,8 @@ public class CreateQuestionBankItemRequest
     public string? Course { get; init; }
     public string? Topic { get; init; }
     public List<string>? Tags { get; init; }
+    public bool TriviaEligible { get; init; }
+    public List<string>? CorrectAnswers { get; init; }
 }
 
 public sealed class SubmitQuestionSuggestionRequest : CreateQuestionBankItemRequest;
@@ -236,6 +277,8 @@ public sealed class ModerateQuestionBankItemRequest
     public QuestionType? Type { get; init; }
     public List<string>? Options { get; init; }
     public List<MatchingPair>? MatchingPairs { get; init; }
+    public bool? TriviaEligible { get; init; }
+    public List<string>? CorrectAnswers { get; init; }
 }
 
 public sealed record QuestionBankListResponse(List<QuestionBankItem> Items, int TotalCount);

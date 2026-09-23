@@ -18,6 +18,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IResponseRepository, ResponseRepository>();
         services.AddSingleton<DeviceIdValidationService>();
         services.AddSingleton<ISessionEventPublisher, SignalRSessionEventPublisher>();
+        services.AddSingleton<TriviaRepository>();
+        services.AddSingleton<TriviaScoringService>();
 
         return services;
     }

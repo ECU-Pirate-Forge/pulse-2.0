@@ -33,6 +33,7 @@ public sealed record QuestionBankQuery(
     string? Tag = null,
     QuestionModerationStatus? ModerationStatus = null,
     QuestionSource? Source = null,
+    bool? TriviaEligible = null,
     QuestionBankSort Sort = QuestionBankSort.Newest);
 
 public class QuestionBankItem
@@ -49,6 +50,8 @@ public class QuestionBankItem
     public QuestionModerationStatus ModerationStatus { get; set; } = QuestionModerationStatus.Approved;
     public QuestionSource Source { get; set; } = QuestionSource.Legacy;
     public string ContributorAttribution { get; set; } = string.Empty;
+    public bool TriviaEligible { get; set; }
+    public List<string> CorrectAnswers { get; set; } = [];
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }

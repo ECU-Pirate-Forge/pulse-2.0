@@ -45,6 +45,11 @@
             {
                 <label class="bank-wide">Pairs <textarea @bind="draft.OptionsText" rows="3" placeholder="HTTP = Protocol"></textarea></label>
             }
+            <label><span><input type="checkbox" @bind="draft.TriviaEligible" /> Eligible for trivia</span></label>
+            @if (draft.TriviaEligible)
+            {
+                <label>Correct answers <input @bind="draft.CorrectAnswersText" placeholder="Separate answers with commas" /></label>
+            }
         </div>
         <button class="pulse-button pulse-button-primary" @onclick="CreateAsync">Add approved question</button>
     </section>
@@ -100,6 +105,11 @@
                         <label>Tags <input value="@string.Join(", ", item.Tags)" @onchange="args => SetTags(item, args.Value?.ToString())" /></label>
                     </div>
                     <p><strong>@item.Type</strong> · @item.ContributorAttribution</p>
+                    <label><span><input type="checkbox" @bind="item.TriviaEligible" /> Eligible for trivia</span></label>
+                    @if (item.TriviaEligible)
+                    {
+                        <label>Correct answers <input value="@string.Join(", ", item.CorrectAnswers)" @onchange="args => SetCorrectAnswers(item, args.Value?.ToString())" /></label>
+                    }
                     @if (item.Options.Count > 0)
                     {
                         <p>@string.Join(" · ", item.Options)</p>
@@ -195,7 +205,9 @@
                 : [],
             MatchingPairs = draft.Type == QuestionType.Matching
                 ? ParsePairs(draft.OptionsText)
-                : []
+                : [],
+            draft.TriviaEligible,
+            CorrectAnswers = draft.CorrectAnswersText.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
         };
         using var request = Authorized(HttpMethod.Post, "/api/questionbank", requestBody);
         var response = await Http.SendAsync(request);
@@ -217,7 +229,9 @@
             item.Text,
             item.Course,
             item.Topic,
-            item.Tags
+            item.Tags,
+            item.TriviaEligible,
+            item.CorrectAnswers
         });
         var response = await Http.SendAsync(request);
         if (!response.IsSuccessStatusCode)
@@ -241,6 +255,11 @@
     private static void SetTags(QuestionBankItem item, string? tags) =>
         item.Tags = SplitLines((tags ?? string.Empty).Replace(',', '\n'));
 
+    private static void SetCorrectAnswers(QuestionBankItem item, string? answers) =>
+        item.CorrectAnswers = (answers ?? string.Empty)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToList();
+
     private static List<string> SplitLines(string value) =>
         value.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
 
@@ -261,5 +280,7 @@
         public string Topic { get; set; } = string.Empty;
         public string TagsText { get; set; } = string.Empty;
         public string OptionsText { get; set; } = string.Empty;
+        public bool TriviaEligible { get; set; }
+        public string CorrectAnswersText { get; set; } = string.Empty;
     }
 }

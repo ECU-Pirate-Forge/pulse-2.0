@@ -22,6 +22,8 @@ public class ModeratedQuestionBankTests
                 Text = "Which protocol secures HTTP?",
                 Type = QuestionType.MultipleChoice,
                 Options = ["HTTPS", "FTP"],
+                TriviaEligible = true,
+                CorrectAnswers = ["HTTPS"],
                 Course = "CSCI 3000",
                 Topic = "Networking",
                 Tags = ["security", "web"]
@@ -33,8 +35,28 @@ public class ModeratedQuestionBankTests
         Assert.Equal(QuestionModerationStatus.Pending, accepted.Value!.ModerationStatus);
         Assert.Equal(QuestionSource.StudentSuggestion, accepted.Value.Source);
         Assert.Equal("Anonymous student", accepted.Value.ContributorAttribution);
+        Assert.False(accepted.Value.TriviaEligible);
+        Assert.Empty(accepted.Value.CorrectAnswers);
         repository.Verify(repo => repo.Insert(It.Is<QuestionBankItem>(item =>
             item.ModerationStatus == QuestionModerationStatus.Pending)), Times.Once);
+    }
+
+    [Fact]
+    public void CreateTriviaEligibleQuestion_RequiresCorrectAnswer()
+    {
+        var result = QuestionBankEndpointHandlers.CreateQuestionBankItem(
+            new CreateQuestionBankItemRequest
+            {
+                Text = "Choose one",
+                Type = QuestionType.MultipleChoice,
+                Options = ["A", "B"],
+                TriviaEligible = true
+            },
+            Repository().Object,
+            new QuestionService());
+
+        var badRequest = Assert.IsType<BadRequest<string>>(result.Result);
+        Assert.Contains("correct answer", badRequest.Value!, StringComparison.OrdinalIgnoreCase);
     }
 
     [Theory]

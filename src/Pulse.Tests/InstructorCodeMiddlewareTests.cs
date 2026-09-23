@@ -152,6 +152,7 @@ public class InstructorCodeMiddlewareTests
     [InlineData("PUT", "/api/questions/reorder")]
     [InlineData("POST", "/api/questionbank")]
     [InlineData("POST", "/api/questionbank/import/preview")]
+    [InlineData("GET", "/api/questionbank")]
     [InlineData("PUT", "/api/questionbank/11111111-1111-1111-1111-111111111111")]
     public void IsInstructorOnlyReturnsTrueForQuestionAuthoringRoutes(string method, string path)
     {
