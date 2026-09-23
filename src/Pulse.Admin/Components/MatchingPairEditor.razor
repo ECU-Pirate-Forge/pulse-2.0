@@ -1,0 +1,94 @@
+@using MudBlazor
+@using Pulse.Domain.Entities
+
+<MudStack Spacing="2">
+    <MudText Typo="Typo.subtitle2">Matching pairs (minimum 2)</MudText>
+    @for (var i = 0; i < LocalPairs.Count; i++)
+    {
+        var index = i;
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" @key="_pairKeys[index]">
+            <MudTextField Value="LocalPairs[index].Prompt"
+                          ValueChanged="@((string? value) => UpdatePrompt(index, value ?? string.Empty))"
+                          Label="@($"Prompt {index + 1}")"
+                          Variant="Variant.Outlined" />
+            <MudTextField Value="LocalPairs[index].Match"
+                          ValueChanged="@((string? value) => UpdateMatch(index, value ?? string.Empty))"
+                          Label="@($"Match {index + 1}")"
+                          Variant="Variant.Outlined" />
+            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                           Color="Color.Error"
+                           Disabled="@(LocalPairs.Count <= 2)"
+                           OnClick="@(() => RemovePair(index))"
+                           aria-label="@($"Remove matching pair {index + 1}")" />
+        </MudStack>
+    }
+    <MudButton Variant="Variant.Outlined"
+               Color="Color.Primary"
+               Size="Size.Small"
+               StartIcon="@Icons.Material.Filled.Add"
+               OnClick="AddPair">
+        Add Pair
+    </MudButton>
+</MudStack>
+
+@code {
+    [Parameter]
+    public List<MatchingPair> Pairs { get; set; } = [];
+
+    [Parameter]
+    public EventCallback<List<MatchingPair>> PairsChanged { get; set; }
+
+    private List<MatchingPair> LocalPairs = [];
+    private List<Guid> _pairKeys = [];
+    private List<MatchingPair>? _lastPairs;
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(Pairs, _lastPairs))
+            return;
+
+        _lastPairs = Pairs;
+        LocalPairs = (Pairs ?? [])
+            .Select(pair => new MatchingPair { Prompt = pair.Prompt, Match = pair.Match })
+            .ToList();
+
+        while (LocalPairs.Count < 2)
+            LocalPairs.Add(new MatchingPair());
+
+        _pairKeys = LocalPairs.Select(_ => Guid.NewGuid()).ToList();
+    }
+
+    private async Task AddPair()
+    {
+        LocalPairs.Add(new MatchingPair());
+        _pairKeys.Add(Guid.NewGuid());
+        await NotifyParent();
+    }
+
+    private async Task RemovePair(int index)
+    {
+        if (LocalPairs.Count <= 2)
+            return;
+
+        LocalPairs.RemoveAt(index);
+        _pairKeys.RemoveAt(index);
+        await NotifyParent();
+    }
+
+    private async Task UpdatePrompt(int index, string value)
+    {
+        LocalPairs[index].Prompt = value;
+        await NotifyParent();
+    }
+
+    private async Task UpdateMatch(int index, string value)
+    {
+        LocalPairs[index].Match = value;
+        await NotifyParent();
+    }
+
+    private Task NotifyParent() =>
+        PairsChanged.InvokeAsync(LocalPairs
+            .Select(pair => new MatchingPair { Prompt = pair.Prompt, Match = pair.Match })
+            .ToList());
+}

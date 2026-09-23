@@ -148,6 +148,19 @@ public class InstructorCodeMiddlewareTests
         Assert.False(isProtected);
     }
 
+    [Theory]
+    [InlineData("PUT", "/api/questions/reorder")]
+    [InlineData("POST", "/api/questionbank")]
+    [InlineData("POST", "/api/questionbank/import/preview")]
+    public void IsInstructorOnlyReturnsTrueForQuestionAuthoringRoutes(string method, string path)
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Method = method;
+        context.Request.Path = path;
+
+        Assert.True(InstructorOnlyEndpointMatcher.IsInstructorOnly(context.Request));
+    }
+
     [Fact]
     public async Task ValidInstructorCodeSetsContextItemAndCallsNext()
     {

@@ -2,6 +2,7 @@ using LiteDB;
 using Microsoft.AspNetCore.Http;
 using Moq;
 using Pulse.Common.Services;
+using Pulse.Application.Services;
 using Pulse.Domain.Entities;
 using Pulse.Shared.Models;
 using Pulse.WebApi;
@@ -62,7 +63,8 @@ public class QuestionBankImportEndpointTests
             BuildContext("INST001"),
             BuildSessionRepo(session).Object,
             BuildBankRepo(bankItem).Object,
-            BuildQuestionRepo());
+            BuildQuestionRepo(),
+            new QuestionService());
 
         var ok = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.Ok<List<Question>>>(result);
         Assert.NotNull(ok.Value);
@@ -81,7 +83,8 @@ public class QuestionBankImportEndpointTests
             BuildContext("INST001"),
             BuildSessionRepo().Object,
             BuildBankRepo().Object,
-            BuildQuestionRepo());
+            BuildQuestionRepo(),
+            new QuestionService());
 
         Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.BadRequest<string>>(result);
     }
@@ -95,7 +98,8 @@ public class QuestionBankImportEndpointTests
             BuildContext("INST001"),
             BuildSessionRepo(null).Object,
             BuildBankRepo().Object,
-            BuildQuestionRepo());
+            BuildQuestionRepo(),
+            new QuestionService());
 
         Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.NotFound<string>>(result);
     }
@@ -109,7 +113,8 @@ public class QuestionBankImportEndpointTests
             BuildContext(null),
             BuildSessionRepo().Object,
             BuildBankRepo().Object,
-            BuildQuestionRepo());
+            BuildQuestionRepo(),
+            new QuestionService());
 
         var statusResult = Assert.IsAssignableFrom<Microsoft.AspNetCore.Http.IStatusCodeHttpResult>(result);
         Assert.Equal(401, statusResult.StatusCode);
@@ -126,7 +131,8 @@ public class QuestionBankImportEndpointTests
             BuildContext("WRONGCODE"),
             BuildSessionRepo(session).Object,
             BuildBankRepo().Object,
-            BuildQuestionRepo());
+            BuildQuestionRepo(),
+            new QuestionService());
 
         var statusResult = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.StatusCodeHttpResult>(result);
         Assert.Equal(403, statusResult.StatusCode);
@@ -143,7 +149,8 @@ public class QuestionBankImportEndpointTests
             BuildContext("INST001"),
             BuildSessionRepo(session).Object,
             BuildBankRepo(null).Object,
-            BuildQuestionRepo());
+            BuildQuestionRepo(),
+            new QuestionService());
 
         Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.BadRequest<string>>(result);
     }
@@ -166,7 +173,8 @@ public class QuestionBankImportEndpointTests
             BuildContext("INST001"),
             BuildSessionRepo(session).Object,
             BuildBankRepo(bankItem).Object,
-            BuildQuestionRepo());
+            BuildQuestionRepo(),
+            new QuestionService());
 
         var ok = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.Ok<List<Question>>>(result);
         Assert.NotEqual(_bankItemId, ok.Value![0].Id);
@@ -183,7 +191,7 @@ public class QuestionBankImportEndpointTests
         var id1 = Guid.NewGuid();
         var id2 = Guid.NewGuid();
         var item1 = new QuestionBankItem { Id = id1, Text = "Q1", Type = QuestionType.MultipleChoice, Options = ["A", "B"] };
-        var item2 = new QuestionBankItem { Id = id2, Text = "Q2", Type = QuestionType.LikertScale, Options = [] };
+        var item2 = new QuestionBankItem { Id = id2, Text = "Q2", Type = QuestionType.TrueFalse, Options = [] };
 
         var repo = new Mock<IQuestionBankRepository>();
         repo.Setup(r => r.GetById(id1)).Returns(item1);
@@ -195,7 +203,8 @@ public class QuestionBankImportEndpointTests
             BuildContext("INST001"),
             BuildSessionRepo(session).Object,
             repo.Object,
-            BuildQuestionRepo());
+            BuildQuestionRepo(),
+            new QuestionService());
 
         var ok = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.Ok<List<Question>>>(result);
         Assert.Equal(2, ok.Value!.Count);
@@ -211,7 +220,7 @@ public class QuestionBankImportEndpointTests
         var id1 = Guid.NewGuid();
         var id2 = Guid.NewGuid();
         var bankItem1 = new QuestionBankItem { Id = id1, Text = "Q1", Type = QuestionType.MultipleChoice, Options = ["A", "B"] };
-        var bankItem2 = new QuestionBankItem { Id = id2, Text = "Q2", Type = QuestionType.LikertScale, Options = [] };
+        var bankItem2 = new QuestionBankItem { Id = id2, Text = "Q2", Type = QuestionType.TrueFalse, Options = [] };
 
         var questionRepo = BuildQuestionRepo();
         questionRepo.Insert(new Question { Id = Guid.NewGuid(), SessionId = _sessionId, Text = "Existing", Type = QuestionType.MultipleChoice, Options = ["A", "B"], SortOrder = 0 });
@@ -227,7 +236,8 @@ public class QuestionBankImportEndpointTests
             BuildContext("INST001"),
             BuildSessionRepo(session).Object,
             bankRepo.Object,
-            questionRepo);
+            questionRepo,
+            new QuestionService());
 
         var ok = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.Ok<List<Question>>>(result);
         Assert.Equal(2, ok.Value!.Count);
@@ -247,7 +257,8 @@ public class QuestionBankImportEndpointTests
             BuildContext("INST001"),
             BuildSessionRepo(session).Object,
             BuildBankRepo(bankItem).Object,
-            BuildQuestionRepo());
+            BuildQuestionRepo(),
+            new QuestionService());
 
         var ok = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.Ok<List<Question>>>(result);
         Assert.Single(ok.Value!);

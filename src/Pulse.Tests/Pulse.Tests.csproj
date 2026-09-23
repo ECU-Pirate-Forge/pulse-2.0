@@ -23,6 +23,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Pulse.WebApi\Pulse.WebApi.csproj" />
     <ProjectReference Include="..\Pulse.WebApp\Pulse.WebApp.csproj" />
+    <ProjectReference Include="..\Pulse.Admin\Pulse.Admin.csproj" />
     <ProjectReference Include="..\Pulse.Application\Pulse.Application.csproj" />
   </ItemGroup>
 

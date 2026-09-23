@@ -1,4 +1,5 @@
 using Pulse.Common.Services;
+using Pulse.Application.Services;
 using Pulse.Domain.Entities;
 using Pulse.Shared.Models;
 using Pulse.WebApi.Middleware;
@@ -13,7 +14,8 @@ public static class QuestionBankImportEndpointHandlers
         HttpContext context,
         ISessionRepository sessionRepo,
         IQuestionBankRepository bankRepo,
-        QuestionRepository questionRepo)
+        QuestionRepository questionRepo,
+        QuestionService questionService)
     {
         var instructorCode = context.Items[InstructorCodeMiddleware.HeaderName]?.ToString();
 
@@ -33,6 +35,9 @@ public static class QuestionBankImportEndpointHandlers
         if (!string.Equals(session.InstructorCode, instructorCode, StringComparison.Ordinal))
             return Results.StatusCode(403);
 
+        if (session.Status != SessionStatus.Draft)
+            return Results.Conflict("Questions can only be imported while the survey is in Draft.");
+
         var distinctIds = request.QuestionBankItemIds.Distinct().ToList();
         var bankItems = new List<QuestionBankItem>();
         foreach (var id in distinctIds)
@@ -40,6 +45,16 @@ public static class QuestionBankImportEndpointHandlers
             var item = bankRepo.GetById(id);
             if (item is null)
                 return Results.BadRequest($"Question bank item {id} not found.");
+
+            var validation = questionService.ValidateQuestion(new QuestionDTO
+            {
+                Type = item.Type,
+                Options = item.Options ?? [],
+                MatchingPairs = item.MatchingPairs ?? []
+            });
+            if (!validation.IsValid)
+                return Results.BadRequest($"Question bank item {id}: {validation.ErrorMessage}");
+
             bankItems.Add(item);
         }
 
@@ -58,7 +73,10 @@ public static class QuestionBankImportEndpointHandlers
                 SessionId = sessionId,
                 Text = item.Text,
                 Type = item.Type,
-                Options = item.Options.ToList(),
+                Options = (item.Options ?? []).ToList(),
+                MatchingPairs = (item.MatchingPairs ?? [])
+                    .Select(pair => new MatchingPair { Prompt = pair.Prompt, Match = pair.Match })
+                    .ToList(),
                 SortOrder = existingMaxSortOrder + 1 + i,
                 CreatedAt = DateTime.UtcNow
             };

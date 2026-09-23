@@ -39,8 +39,6 @@ app.MapGet("/questions", (QuestionRepository repo) =>
     return repo.GetAll();
 });
 
-app.MapPost("/questions", QuestionEndpointHandlers.CreateQuestion);
-
 app.MapGet("/api/sessions/{id:guid}", (ISessionRepository repo, Guid id, HttpContext ctx) =>
 {
     var instructorCode = ctx.Request.Headers["InstructorCode"].FirstOrDefault();
@@ -58,9 +56,9 @@ app.MapGet("/api/sessions/{id:guid}", (ISessionRepository repo, Guid id, HttpCon
     return Results.Ok(session);
 });
 
-app.MapPut("/questions/{id:guid}", QuestionEndpointHandlers.UpdateQuestion);
-app.MapDelete("/questions/{id:guid}", QuestionEndpointHandlers.DeleteQuestion);
-app.MapPut("/api/questions/reorder", QuestionEndpointHandlers.ReorderQuestions);
+app.MapPut("/questions/{id:guid}", QuestionEndpointHandlers.UpdateQuestionForInstructor);
+app.MapDelete("/questions/{id:guid}", QuestionEndpointHandlers.DeleteQuestionForInstructor);
+app.MapPut("/api/questions/reorder", QuestionEndpointHandlers.ReorderQuestionsForInstructor);
 
 // Session-specific question endpoints
 app.MapGet("/api/sessions/{sessionId:guid}/questions", (Guid sessionId, QuestionRepository questionRepo) =>
@@ -69,29 +67,7 @@ app.MapGet("/api/sessions/{sessionId:guid}/questions", (Guid sessionId, Question
     return Results.Ok(questions);
 });
 
-app.MapPost("/api/sessions/{sessionId:guid}/questions",
-    (Guid sessionId, Question question, QuestionRepository questionRepo, QuestionService questionService) =>
-    {
-        question.SessionId = sessionId;
-
-        var normalizedOptions = (question.Options ?? Enumerable.Empty<string>())
-            .Where(option => !string.IsNullOrWhiteSpace(option))
-            .Select(option => option.Trim())
-            .ToList();
-
-        var validation = questionService.ValidateQuestion(new QuestionDTO
-        {
-            Type = question.Type,
-            Options = normalizedOptions
-        });
-
-        if (!validation.IsValid)
-            return Results.BadRequest(validation.ErrorMessage);
-
-        question.Options = normalizedOptions;
-        var created = questionRepo.Insert(question);
-        return Results.Created($"/api/sessions/{sessionId}/questions/{created.Id}", created);
-    });
+app.MapPost("/api/sessions/{sessionId:guid}/questions", QuestionEndpointHandlers.CreateQuestionForSession);
 
 app.MapPost("/api/questionbank", QuestionBankEndpointHandlers.CreateQuestionBankItem);
 app.MapGet("/api/questionbank", QuestionBankEndpointHandlers.GetQuestionBankItems);
@@ -104,6 +80,8 @@ app.MapPost("/api/sessions/{sessionId:guid}/questions/{questionId:guid}/respond"
 app.MapGet("/api/sessions/{id:guid}/results", SessionResultsEndpointHandlers.GetSessionResults);
 
 app.MapPut("/api/sessions/{id:guid}/unblind", SessionEndpointHandlers.UnblindSession);
+app.MapPut("/api/sessions/{id:guid}/activate", SessionEndpointHandlers.ActivateSession);
+app.MapPut("/api/sessions/{id:guid}/close", SessionEndpointHandlers.CloseSession);
 app.MapGet("/api/admin/export-db", AdminEndpointHandlers.ExportDb);
 app.MapPost("/api/questionbank/import/preview", CsvPreviewEndpointHandlers.PreviewImport).DisableAntiforgery();
 app.MapPost("/api/sessions/{sessionId:guid}/questions/import", QuestionBankImportEndpointHandlers.ImportQuestions);

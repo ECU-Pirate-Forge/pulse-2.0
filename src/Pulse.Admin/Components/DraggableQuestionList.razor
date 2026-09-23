@@ -80,7 +80,7 @@
     }
 
     .question-item:hover {
-        border-color: #667eea;
+        border-color: var(--pulse-purple-700);
         box-shadow: 0 4px 8px rgba(102, 126, 234, 0.1);
     }
 
@@ -91,7 +91,7 @@
     }
 
     .question-item.drag-over {
-        border-color: #667eea;
+        border-color: var(--pulse-purple-700);
         border-style: dashed;
         background: #f0f4ff;
         z-index: 5;
@@ -241,8 +241,9 @@
     private string GetTypeName(QuestionType type) => type switch
     {
         QuestionType.MultipleChoice => "Multiple Choice",
-        QuestionType.LikertScale => "Likert Scale",
-        QuestionType.OpenEnded => "Open Ended",
+        QuestionType.MultipleAnswer => "Multiple Answer",
+        QuestionType.TrueFalse => "True / False",
+        QuestionType.Matching => "Matching",
         _ => "Unknown"
     };
 }

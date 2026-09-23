@@ -14,6 +14,7 @@ public class Question
 
     public QuestionType Type { get; set; }
     public List<string> Options { get; set; } = new List<string>();
+    public List<MatchingPair> MatchingPairs { get; set; } = new List<MatchingPair>();
     public int SortOrder { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

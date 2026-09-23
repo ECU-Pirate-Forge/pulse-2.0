@@ -1,0 +1,14 @@
+.placeholder-page {
+    max-width: 48rem;
+}
+
+.placeholder-page h1 {
+    margin: 0;
+    color: var(--pulse-purple-900);
+}
+
+.placeholder-page > p:not(.pulse-eyebrow) {
+    margin-bottom: 2rem;
+    color: var(--pulse-muted);
+    font-size: 1.125rem;
+}

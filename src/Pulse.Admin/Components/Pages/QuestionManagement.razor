@@ -1,6 +1,7 @@
 @page "/instructor/questions/{SessionId}"
 @using MudBlazor
 @using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
 @using System.Net.Http.Json
 @using Pulse.Shared.Models
 @using Pulse.Domain.Entities
@@ -8,15 +9,17 @@
 @inject NavigationManager NavManager
 @inject HttpClient Http
 @inject ILogger<QuestionManagement> Logger
+@inject ProtectedSessionStorage ProtectedStorage
 
 <PageTitle>Manage Questions - Pulse</PageTitle>
 
 <style>
     .questions-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: var(--pulse-purple-900);
         color: white;
         padding: 24px;
-        border-radius: 12px;
+        border-top: 6px solid var(--pulse-gold-500);
+        border-radius: var(--pulse-radius-md);
         margin-bottom: 24px;
     }
 
@@ -65,7 +68,7 @@
         border-radius: 12px;
         padding: 20px;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-        border-left: 4px solid #667eea;
+        border-left: 4px solid var(--pulse-purple-700);
         transition: all 0.2s;
     }
 
@@ -150,9 +153,22 @@
         </MudStack>
     </div>
 
+    @if (!IsLoaded)
+    {
+        <MudProgressLinear Indeterminate="true" Class="mb-4" />
+    }
+    else
+    {
     <!-- Add Question Form -->
     <div class="form-section">
-        <div class="form-title">Create New Question</div>
+        <div class="form-title">@(EditingQuestionId.HasValue ? "Edit Question" : "Create New Question")</div>
+
+        @if (SessionStatus != SessionStatus.Draft)
+        {
+            <MudAlert Severity="Severity.Info" Class="mb-3">
+                This survey is @SessionStatus. Questions can only be changed while it is in Draft.
+            </MudAlert>
+        }
         
         @if (!string.IsNullOrEmpty(SaveError))
         {
@@ -169,13 +185,15 @@
             <MudSelect @bind-Value="NewQuestion.Type"
                        Label="Question Type"
                        T="int"
-                       Variant="Variant.Outlined">
+                       Variant="Variant.Outlined"
+                       Disabled="@(SessionStatus != SessionStatus.Draft)">
                 <MudSelectItem T="int" Value="0">Multiple Choice</MudSelectItem>
-                <MudSelectItem T="int" Value="1">Likert Scale (1-5)</MudSelectItem>
-                <MudSelectItem T="int" Value="2">Open Ended</MudSelectItem>
+                <MudSelectItem T="int" Value="3">Multiple Answer</MudSelectItem>
+                <MudSelectItem T="int" Value="4">True / False</MudSelectItem>
+                <MudSelectItem T="int" Value="5">Matching</MudSelectItem>
             </MudSelect>
 
-            @if (NewQuestion.Type == 0)
+            @if (NewQuestion.Type is 0 or 3)
             {
                 <div class="form-section" style="margin-bottom: 16px;">
                     <OptionListEditor 
@@ -184,15 +202,26 @@
                         MinimumOptions="2" />
                 </div>
             }
+            else if (NewQuestion.Type == 5)
+            {
+                <div class="form-section" style="margin-bottom: 16px;">
+                    <MatchingPairEditor Pairs="NewQuestion.MatchingPairs"
+                                        PairsChanged="OnMatchingPairsChanged" />
+                </div>
+            }
 
             <div class="button-row">
+                @if (EditingQuestionId.HasValue)
+                {
+                    <MudButton Variant="Variant.Text" OnClick="CancelEdit">Cancel</MudButton>
+                }
                 <MudButton Variant="Variant.Filled"
                            Color="Color.Primary"
                            Size="Size.Large"
-                           Disabled="string.IsNullOrWhiteSpace(NewQuestion.Text) || !HasMinimumRequiredOptions(NewQuestion) || IsSaving"
+                           Disabled="string.IsNullOrWhiteSpace(NewQuestion.Text) || !HasValidTypeData(NewQuestion) || IsSaving || SessionStatus != SessionStatus.Draft"
                            OnClick="@(async (e) => await SaveQuestion())"
                            Style="font-weight: 600;">
-                    @if (IsSaving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" />  } else { <text>Add Question</text> }
+                    @if (IsSaving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" />  } else { <text>@(EditingQuestionId.HasValue ? "Save Changes" : "Add Question")</text> }
                 </MudButton>
             </div>
         </MudStack>
@@ -203,7 +232,7 @@
         <MudText Typo="Typo.h5" Style="font-weight: 700;">
             Questions (@Questions.Count)
         </MudText>
-        @if (Questions.Count > 1)
+        @if (Questions.Count > 1 && SessionStatus == SessionStatus.Draft)
         {
             <MudButton Variant="@(IsReorderMode ? Variant.Filled : Variant.Outlined)"
                        Color="@(IsReorderMode ? Color.Warning : Color.Primary)"
@@ -222,8 +251,7 @@
     else if (Questions.Count == 0)
     {
         <div class="empty-state">
-            <div class="empty-icon">❓</div>
-            <div class="form-title">No Questions Yet</div>
+            <div class="form-title">No questions yet</div>
             <p style="color: #6b7280; margin-bottom: 20px;">Create your first question using the form above</p>
         </div>
     }
@@ -252,7 +280,7 @@
                     <div class="question-type">@GetTypeName(q.Type)</div>
                     <div class="question-text">@q.Text</div>
 
-                    @if (q.Type == 0 && q.Options?.Count > 0)
+                    @if (q.Type is 0 or 3 && q.Options?.Count > 0)
                     {
                         <div class="question-options">
                             <strong>Options:</strong><br />
@@ -262,8 +290,27 @@
                             }
                         </div>
                     }
+                    else if (q.Type == 5 && q.MatchingPairs.Count > 0)
+                    {
+                        <div class="question-options">
+                            <strong>Pairs:</strong><br />
+                            @foreach (var pair in q.MatchingPairs)
+                            {
+                                <div>@pair.Prompt → @pair.Match</div>
+                            }
+                        </div>
+                    }
 
+                    @if (SessionStatus == SessionStatus.Draft)
+                    {
                     <div class="question-actions">
+                        <MudButton Variant="Variant.Outlined"
+                                   Size="Size.Small"
+                                   Color="Color.Primary"
+                                   Class="action-button"
+                                   @onclick="@(() => EditQuestion(q))">
+                            Edit
+                        </MudButton>
                         <MudButton Variant="Variant.Outlined"
                                    Size="Size.Small"
                                    Color="Color.Error"
@@ -272,6 +319,7 @@
                             Delete
                         </MudButton>
                     </div>
+                    }
                 </div>
             }
         </div>
@@ -279,7 +327,7 @@
 
     <MudDivider Class="my-6" />
 
-    <MudText Typo="Typo.h5" Style="font-weight: 700; margin-bottom: 16px;">📚 Question Bank</MudText>
+    <MudText Typo="Typo.h5" Style="font-weight: 700; margin-bottom: 16px;">Question Bank</MudText>
 
     @if (IsBankLoading)
     {
@@ -300,7 +348,6 @@
         @if (!FilteredBankItems.Any())
         {
             <div class="empty-state">
-                <div class="empty-icon">📚</div>
                 <div class="form-title">No Questions in Bank</div>
                 <p style="color: #6b7280;">The question bank is empty.</p>
             </div>
@@ -313,7 +360,7 @@
                     <div class="question-card">
                         <div class="question-type">@GetTypeName((int)item.Type)</div>
                         <div class="question-text">@item.Text</div>
-                        @if (item.Type == QuestionType.MultipleChoice && item.Options?.Count > 0)
+                        @if (item.Type is QuestionType.MultipleChoice or QuestionType.MultipleAnswer && item.Options?.Count > 0)
                         {
                             <div class="question-options">
                                 <strong>Options:</strong><br />
@@ -323,6 +370,8 @@
                                 }
                             </div>
                         }
+                        @if (SessionStatus == SessionStatus.Draft)
+                        {
                         <div class="question-actions">
                             <MudButton Variant="Variant.Filled"
                                        Size="Size.Small"
@@ -332,10 +381,12 @@
                                 Import
                             </MudButton>
                         </div>
+                        }
                     </div>
                 }
             </div>
         }
+    }
     }
 </MudContainer>
 
@@ -345,6 +396,10 @@
 
     private List<QuestionModel> Questions = new();
     private QuestionModel NewQuestion = new() { Options = new List<string> { "", "" } };
+    private Guid? EditingQuestionId;
+    private string _instructorCode = string.Empty;
+    private SessionStatus SessionStatus = SessionStatus.Draft;
+    private bool IsLoaded;
 
     private List<QuestionBankItem> BankItems = new();
     private string BankSearch = string.Empty;
@@ -362,10 +417,38 @@
             ? BankItems
             : BankItems.Where(i => i.Text.Contains(BankSearch, StringComparison.OrdinalIgnoreCase));
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (!firstRender)
+            return;
+
+        var storedCode = await ProtectedStorage.GetAsync<string>("instructorCode");
+        if (!storedCode.Success || string.IsNullOrWhiteSpace(storedCode.Value))
+        {
+            NavManager.NavigateTo("/instructor");
+            return;
+        }
+
+        _instructorCode = storedCode.Value;
+        await LoadSessionAsync();
         await LoadQuestionsAsync();
         await LoadQuestionBankAsync();
+        IsLoaded = true;
+        StateHasChanged();
+    }
+
+    private async Task LoadSessionAsync()
+    {
+        using var request = CreateInstructorRequest(HttpMethod.Get, $"/api/sessions/{SessionId}");
+        var response = await Http.SendAsync(request);
+        if (!response.IsSuccessStatusCode)
+        {
+            SaveError = "Unable to load this survey.";
+            return;
+        }
+
+        var session = await response.Content.ReadFromJsonAsync<Session>();
+        SessionStatus = session?.Status ?? SessionStatus.Draft;
     }
 
     private async Task LoadQuestionsAsync()
@@ -388,7 +471,8 @@
                     Id = q.Id,
                     Text = q.Text,
                     Type = (int)q.Type,
-                    Options = q.Options
+                    Options = q.Options,
+                    MatchingPairs = q.MatchingPairs
                 }).ToList() ?? [];
             }
             else
@@ -438,32 +522,49 @@
     {
         try
         {
-            var request = new { QuestionBankItemIds = new[] { item.Id } };
-            var response = await Http.PostAsJsonAsync($"/api/sessions/{SessionId}/questions/import", request);
+            using var request = CreateInstructorRequest(
+                HttpMethod.Post,
+                $"/api/sessions/{SessionId}/questions/import",
+                new { QuestionBankItemIds = new[] { item.Id } });
+            var response = await Http.SendAsync(request);
             
             if (response.IsSuccessStatusCode)
             {
-                // Reload questions after successful import
                 await LoadQuestionsAsync();
             }
+            else
+            {
+                BankError = "Unable to import this question.";
+            }
         }
-        catch
+        catch (Exception ex)
         {
-            // Error importing question
+            Logger.LogError(ex, "Error importing question bank item {QuestionBankItemId}", item.Id);
+            BankError = "Unable to import this question.";
         }
     }
 
-    private bool HasMinimumRequiredOptions(QuestionModel question)
+    private bool HasValidTypeData(QuestionModel question)
     {
-        if (question.Type != 0)
-            return true;
+        if (question.Type is 0 or 3)
+            return question.Options.Count(o => !string.IsNullOrWhiteSpace(o)) >= 2;
 
-        return question.Options.Count(o => !string.IsNullOrWhiteSpace(o)) >= 2;
+        if (question.Type == 5)
+            return question.MatchingPairs.Count(pair =>
+                !string.IsNullOrWhiteSpace(pair.Prompt) &&
+                !string.IsNullOrWhiteSpace(pair.Match)) >= 2;
+
+        return question.Type == 4;
     }
 
     private void OnOptionsChanged(List<string> updatedOptions)
     {
         NewQuestion.Options = updatedOptions;
+    }
+
+    private void OnMatchingPairsChanged(List<MatchingPair> updatedPairs)
+    {
+        NewQuestion.MatchingPairs = updatedPairs;
     }
 
     private async Task SaveQuestion()
@@ -472,7 +573,7 @@
             .Where(o => !string.IsNullOrWhiteSpace(o))
             .ToList();
 
-        if (string.IsNullOrWhiteSpace(NewQuestion.Text) || !HasMinimumRequiredOptions(NewQuestion))
+        if (string.IsNullOrWhiteSpace(NewQuestion.Text) || !HasValidTypeData(NewQuestion))
         {
             return;
         }
@@ -489,25 +590,46 @@
                 Text = NewQuestion.Text,
                 Type = (QuestionType)NewQuestion.Type,
                 Options = nonEmptyOptions,
+                MatchingPairs = NewQuestion.MatchingPairs,
                 SortOrder = Questions.Count
             };
 
-            var response = await Http.PostAsJsonAsync($"/api/sessions/{SessionId}/questions", question);
+            using var request = EditingQuestionId.HasValue
+                ? CreateInstructorRequest(HttpMethod.Put, $"/questions/{EditingQuestionId}", new
+                {
+                    question.Text,
+                    question.Type,
+                    question.Options,
+                    question.MatchingPairs
+                })
+                : CreateInstructorRequest(HttpMethod.Post, $"/api/sessions/{SessionId}/questions", question);
+            var response = await Http.SendAsync(request);
             
             if (response.IsSuccessStatusCode)
             {
                 var createdQuestion = await response.Content.ReadFromJsonAsync<Question>();
                 if (createdQuestion != null)
                 {
-                    Questions.Add(new QuestionModel
+                    var model = new QuestionModel
                     {
                         Id = createdQuestion.Id,
                         Text = createdQuestion.Text,
                         Type = (int)createdQuestion.Type,
-                        Options = createdQuestion.Options
-                    });
+                        Options = createdQuestion.Options,
+                        MatchingPairs = createdQuestion.MatchingPairs
+                    };
 
-                    NewQuestion = new() { Options = new List<string> { "", "" }, Type = 0 };
+                    if (EditingQuestionId.HasValue)
+                    {
+                        var index = Questions.FindIndex(item => item.Id == EditingQuestionId.Value);
+                        Questions[index] = model;
+                    }
+                    else
+                    {
+                        Questions.Add(model);
+                    }
+
+                    CancelEdit();
                 }
             }
             else
@@ -530,22 +652,30 @@
     {
         try
         {
-            var response = await Http.DeleteAsync($"/questions/{id}");
+            using var request = CreateInstructorRequest(HttpMethod.Delete, $"/questions/{id}");
+            var response = await Http.SendAsync(request);
             if (response.IsSuccessStatusCode)
             {
                 Questions.RemoveAll(q => q.Id == id);
             }
+            else
+            {
+                SaveError = "Unable to delete the question.";
+            }
         }
-        catch
+        catch (Exception ex)
         {
-            // Error deleting question
+            Logger.LogError(ex, "Error deleting question {QuestionId}", id);
+            SaveError = "Unable to delete the question.";
         }
     }
 
-    private void ToggleReorderMode()
+    private async Task ToggleReorderMode()
     {
+        if (IsReorderMode)
+            await PersistQuestionOrderAsync();
+
         IsReorderMode = !IsReorderMode;
-        ReorderError = null;
     }
 
     private async Task HandleOrderChanged(List<Question> reorderedQuestions)
@@ -558,7 +688,8 @@
                 Id = q.Id,
                 Text = q.Text,
                 Type = (int)q.Type,
-                Options = q.Options
+                Options = q.Options,
+                MatchingPairs = q.MatchingPairs
             }).ToList();
 
             ReorderError = null;
@@ -570,6 +701,18 @@
         }
     }
 
+    private async Task PersistQuestionOrderAsync()
+    {
+        using var request = CreateInstructorRequest(
+            HttpMethod.Put,
+            "/api/questions/reorder",
+            new { QuestionIds = Questions.Select(question => question.Id).ToList() });
+        var response = await Http.SendAsync(request);
+        ReorderError = response.IsSuccessStatusCode
+            ? null
+            : "Unable to save the question order.";
+    }
+
     private List<Question> ConvertToQuestionEntities(List<QuestionModel> models)
     {
         return models.Select((model, index) => new Question
@@ -579,6 +722,7 @@
             Text = model.Text,
             Type = (QuestionType)model.Type,
             Options = model.Options,
+            MatchingPairs = model.MatchingPairs,
             SortOrder = index
         }).ToList();
     }
@@ -586,10 +730,41 @@
     private string GetTypeName(int type) => type switch
     {
         0 => "Multiple Choice",
-        1 => "Likert Scale",
-        2 => "Open Ended",
+        3 => "Multiple Answer",
+        4 => "True / False",
+        5 => "Matching",
         _ => "Unknown"
     };
+
+    private void EditQuestion(QuestionModel question)
+    {
+        EditingQuestionId = question.Id;
+        NewQuestion = new QuestionModel
+        {
+            Id = question.Id,
+            Text = question.Text,
+            Type = question.Type,
+            Options = question.Options.ToList(),
+            MatchingPairs = question.MatchingPairs
+                .Select(pair => new MatchingPair { Prompt = pair.Prompt, Match = pair.Match })
+                .ToList()
+        };
+    }
+
+    private void CancelEdit()
+    {
+        EditingQuestionId = null;
+        NewQuestion = new QuestionModel { Options = ["", ""], MatchingPairs = [], Type = 0 };
+    }
+
+    private HttpRequestMessage CreateInstructorRequest(HttpMethod method, string uri, object? content = null)
+    {
+        var request = new HttpRequestMessage(method, uri);
+        request.Headers.TryAddWithoutValidation("InstructorCode", _instructorCode);
+        if (content is not null)
+            request.Content = JsonContent.Create(content);
+        return request;
+    }
 
     private void GoBack()
     {
@@ -602,6 +777,7 @@
         public string Text { get; set; } = string.Empty;
         public int Type { get; set; }
         public List<string> Options { get; set; } = new();
+        public List<MatchingPair> MatchingPairs { get; set; } = new();
     }
 
     private class QuestionBankResponse

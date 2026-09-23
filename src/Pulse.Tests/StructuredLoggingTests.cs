@@ -45,7 +45,7 @@ public class StructuredLoggingTests
     [Fact]
     public async Task Respond_ValidRequest_EmitsInformationLog()
     {
-        var session = new Session { Id = _sessionId, InstructorCode = "INST", Status = "Active" };
+        var session = new Session { Id = _sessionId, InstructorCode = "INST", Status = SessionStatus.Active };
         var request = new RespondRequest { DeviceId = _validDeviceId, Value = "A" };
 
         var loggerMock = new Mock<ILogger>();

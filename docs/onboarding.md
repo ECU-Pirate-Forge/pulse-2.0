@@ -57,6 +57,18 @@ Current development URLs from launch settings:
 - Web App: http://pulse-webapp.dev.localhost:5243 and https://pulse-webapp.dev.localhost:7004
 - Admin App: http://pulse-admin.dev.localhost:5049 and https://pulse-admin.dev.localhost:7019
 
+### Mobile UI smoke test with devtunnel
+
+With AppHost running, expose the student app's HTTPS port:
+
+```powershell
+devtunnel host -p 7004 --protocol https --allow-anonymous
+```
+
+Open the reported public HTTPS URL on the test device, accept the one-time developer-tunnel warning, and verify the student home and join-code form at phone width. The explicit `https` protocol is required; automatic protocol detection can forward HTTP to the local TLS endpoint and return 502.
+
+Anonymous access is intended only for temporary classroom-device testing. Stop the tunnel after the smoke test. QR testing also requires `App:JoinBaseUrl` to be set to the reported public student URL before QR generation; a repeatable scripted workflow will be added in the release-hardening phase.
+
 ## 5. Current Dependency Injection Snapshot
 
 This section reflects current registrations in code.

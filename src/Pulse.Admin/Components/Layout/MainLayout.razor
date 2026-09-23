@@ -1,26 +1,59 @@
-﻿@using MudBlazor
+@using MudBlazor
 @inherits LayoutComponentBase
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
+<MudThemeProvider Theme="_theme" />
+<MudDialogProvider />
+<MudSnackbarProvider />
+<MudPopoverProvider />
+
+<a class="pulse-skip-link" href="#main-content">Skip to main content</a>
+<div class="admin-shell">
+    <header class="admin-header">
+        <a class="pulse-brand" href="/" aria-label="Pulse instructor home">
+            <span class="pulse-brand-mark" aria-hidden="true">P</span>
+            <span>Pulse</span>
+            <span class="admin-product-name">Instructor</span>
+        </a>
+        <span class="admin-header-label">Classroom engagement workspace</span>
+    </header>
+    <div class="admin-body">
+        <aside class="admin-sidebar">
+            <NavMenu />
+        </aside>
+        <main id="main-content" class="admin-content">
+            <ErrorBoundary>
+                <ChildContent>
+                    @Body
+                </ChildContent>
+                <ErrorContent>
+                    <div class="pulse-card admin-error" role="alert">
+                        <h1>Pulse could not load this workspace</h1>
+                        <p>Reload the page and try again.</p>
+                        <a class="pulse-button pulse-button-primary" href="/">Return to instructor home</a>
+                    </div>
+                </ErrorContent>
+            </ErrorBoundary>
+        </main>
     </div>
-    <MudThemeProvider />
-    <MudDialogProvider />
-    <MudSnackbarProvider />
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
-        </div>
-
-        <article class="content px-4">
-            @Body
-        </article>
-    </main>
 </div>
 
-<div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
-    <span class="dismiss">🗙</span>
-</div>
+@code {
+    private readonly MudTheme _theme = new()
+    {
+        PaletteLight = new PaletteLight
+        {
+            Primary = "#592A8A",
+            Secondary = "#FDC82F",
+            Background = "#F7F5F8",
+            Surface = "#FFFFFF",
+            TextPrimary = "#211C27",
+            TextSecondary = "#625B68",
+            AppbarBackground = "#321653",
+            AppbarText = "#FFFFFF"
+        },
+        LayoutProperties = new LayoutProperties
+        {
+            DefaultBorderRadius = "6px"
+        }
+    };
+}

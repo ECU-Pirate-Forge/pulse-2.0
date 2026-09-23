@@ -1,8 +1,38 @@
-﻿@page "/"
-@using MudBlazor
+@page "/"
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Pulse Instructor</PageTitle>
 
-<MudButton Color="Color.Primary" Variant="Variant.Filled">
-    Hello MudBlazor
-</MudButton>
+<div class="admin-home">
+    <header class="admin-page-heading">
+        <p class="pulse-eyebrow">Instructor workspace</p>
+        <h1>Understand the room, then respond.</h1>
+        <p>Create anonymous surveys, share access, and prepare for instructor-controlled result review.</p>
+    </header>
+
+    <section class="workspace-grid" aria-label="Pulse workspaces">
+        <article class="pulse-card workspace-card workspace-primary">
+            <p class="workspace-number" aria-hidden="true">01</p>
+            <div>
+                <h2>Surveys</h2>
+                <p>Create a survey, share its QR code, and monitor anonymous responses.</p>
+            </div>
+            <a class="pulse-button pulse-button-secondary" href="/surveys">Open Surveys</a>
+        </article>
+        <article class="pulse-card workspace-card">
+            <p class="workspace-number" aria-hidden="true">02</p>
+            <div>
+                <h2>Trivia</h2>
+                <p>Run individual or team competitions with instructor-controlled scoring.</p>
+            </div>
+            <a class="pulse-button pulse-button-outline" href="/trivia">Open Trivia</a>
+        </article>
+        <article class="pulse-card workspace-card">
+            <p class="workspace-number" aria-hidden="true">03</p>
+            <div>
+                <h2>Question Bank</h2>
+                <p>Organize reusable questions and review student suggestions.</p>
+            </div>
+            <a class="pulse-button pulse-button-outline" href="/question-bank">Open Question Bank</a>
+        </article>
+    </section>
+</div>
