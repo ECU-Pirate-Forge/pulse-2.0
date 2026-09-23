@@ -134,7 +134,7 @@ public static class SessionEndpointHandlers
         if (!string.Equals(session.InstructorCode, instructorCode, StringComparison.Ordinal))
             return Results.StatusCode(403);
 
-        session.IsUnblinded = true;
+        session.ResultsVisibility = ResultsVisibility.Revealed;
         session.UpdatedAt = DateTime.UtcNow;
         var updated = repo.Update(session);
         if (!updated)

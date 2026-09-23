@@ -1,9 +1,9 @@
 
 # Pulse 2.0
 
-Pulse is a classroom pulse and feedback platform built to help instructors check understanding in real time while class is in progress. Instructors create and run sessions, students join with a code or QR flow, and responses are aggregated live so teaching can be adjusted immediately.
+Pulse is a classroom pulse and feedback platform built to help instructors check understanding while class is in progress. Instructors create sessions, students join with a code or QR flow, and responses are aggregated for instructor review. Real-time updates are part of the approved redesign work.
 
-The solution is implemented as a multi-project .NET 10 application with Blazor frontends, minimal APIs, SignalR for real-time updates, and LiteDB for local persistence.
+The solution is implemented as a multi-project .NET 10 application with Blazor frontends, minimal APIs, and LiteDB for local persistence. SignalR-based real-time updates are part of the approved redesign plan but are not implemented yet.
 
 ## Project Background
 
@@ -11,9 +11,8 @@ Traditional end-of-class surveys are too slow for in-class decision making. Puls
 
 Current architecture highlights:
 
-- ASP.NET Core + Blazor Server apps for instructor and student experiences
+- ASP.NET Core + Blazor Server apps intended for separate instructor and student experiences
 - Minimal API endpoints for session, question, response, and results workflows
-- SignalR session groups for near real-time broadcast updates
 - LiteDB repositories for lightweight local data persistence
 - Aspire AppHost for local orchestration and observability
 
@@ -21,20 +20,22 @@ Current architecture highlights:
 
 Typical classroom usage flow:
 
-1. Instructor starts a session in the admin app.
+1. Instructor creates a session using the current instructor workflow.
 2. Instructor adds questions (manually, from question bank content, or via CSV import workflows).
 3. Instructor activates the session and shares the join path using a join code or QR code.
 4. Students join from the web app and submit responses from their own devices.
-5. Pulse validates and records responses, then updates live aggregates for the active session.
-6. Instructor monitors real-time results to adjust teaching during class.
-7. Instructor can unblind results when appropriate and close the session when complete.
+5. Pulse validates and records responses.
+6. Instructor can retrieve aggregate results.
+7. Instructor can persist the unblinded-results setting.
+
+Activation, closure, live instructor updates, and student-side result reveal are planned work rather than completed behavior.
 
 
 ## Fully Implemented Features
 
 The following are currently implemented in this repository (and covered by project tests):
 
-- Session lifecycle management: create, retrieve, activate, close, and unblind session state
+- Session creation, retrieval, instructor-scoped listing, and unblind-state persistence
 - Instructor access protection on management endpoints via instructor code middleware
 - Instructor-scoped session listing via `GET /sessions`
 - Question authoring workflow: create, fetch, update, and delete question data
@@ -42,7 +43,7 @@ The following are currently implemented in this repository (and covered by proje
 - Question bank APIs and repository support for reusable question content
 - Question bank CSV preview/import workflow with parser validation
 - Student response submission with validation and upsert-by-device behavior
-- Response aggregation service logic for live tally/result views
+- Response aggregation service logic for instructor tally/result retrieval
 - QR endpoint support for session join flows (by join code and by session id)
 - Global exception middleware for consistent API error handling
 - Structured logging behavior coverage
@@ -54,14 +55,20 @@ Planned and in-progress future work is tracked in the sprint backlog and impleme
 
 Near-term roadmap:
 
-- Complete and refine instructor UI workflows for session and question management
-- Continue expanding student experience and responsiveness across devices
+- Reframe Pulse around anonymous surveys rather than quiz administration
+- Establish an accessible ECU purple-and-gold design system
+- Separate student workflows into `Pulse.WebApp` and instructor workflows into `Pulse.Admin`
+- Add multiple-answer, true/false, and matching survey questions
+- Complete activate/close lifecycle behavior and atomic survey submission
+- Add SignalR instructor monitoring and server-enforced student result blinding
+- Add a repeatable devtunnel workflow for real-device testing
 - Improve API documentation depth with request/response examples per endpoint
 - Add broader integration and end-to-end test coverage for critical classroom flows
 
 Mid-term roadmap:
 
-- AI-assisted question generation workflow refinement and UX hardening
+- Add a moderated question bank with student suggestions
+- Add separate individual and instructor-defined team trivia experiences
 - Enhanced analytics/reporting views for post-session review
 - Operational hardening (telemetry, diagnostics, reliability, and deployment readiness)
 

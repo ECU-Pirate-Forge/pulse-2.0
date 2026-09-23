@@ -32,6 +32,14 @@ Pulse API is running
 
 ## Sessions
 
+Session payloads use string enum values:
+
+- `mode`: `Survey` or `Trivia`
+- `status`: `Draft`, `Active`, or `Closed`
+- `resultsVisibility`: `Blinded` or `Revealed`
+
+Existing LiteDB records with no mode are treated as `Survey`.
+
 ### POST /api/sessions
 
 Create a new draft session.
@@ -118,7 +126,7 @@ Response 200:
 
 ### PUT /api/sessions/{id}/unblind
 
-Set session IsUnblinded to true.
+Set session `resultsVisibility` to `Revealed`.
 
 Protected: Yes (InstructorCode required)
 
@@ -128,6 +136,17 @@ Response codes:
 - 401 Unauthorized
 - 403 Forbidden
 - 404 Not Found
+
+## Approved survey V1 contracts
+
+The shared V1 contracts are defined for the survey redesign but are not all wired to HTTP endpoints yet. They establish these rules for subsequent phases:
+
+- A whole-survey submission contains a device id and a collection of answers.
+- Each answer contains one question id and a list of selected values.
+- Multiple-answer selections are one atomic answer, not separate response records.
+- Persistence must maintain at most one current response per device and question; changing an answer replaces the prior value.
+- Instructor results include unique participant and completed-submission counts.
+- A blinded student result-status response contains visibility only and cannot contain aggregate tallies.
 
 ### GET /api/sessions/{id}/results
 

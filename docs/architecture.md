@@ -4,7 +4,7 @@
 
 ## Solution Architecture
 
-This diagram shows the full deployment topology of Pulse: how the Aspire AppHost orchestrates the Web server and Foundry Local, what lives inside the Web process, and how instructor and student browsers interact with it.
+This diagram is the target deployment topology for Pulse. The current repository already has separate WebApp, Admin, WebApi, and Aspire projects, but instructor pages still live primarily in WebApp, Admin remains a scaffold, and SignalR is not implemented. The approved redesign will move instructor workflows to Admin and add the dashed/planned real-time behavior without breaking existing join links.
 
 ```mermaid
 graph TD
@@ -93,9 +93,29 @@ graph TD
 
 ---
 
-## Activity Flow
+## Route compatibility
 
-This sequence diagram traces the core classroom workflow end-to-end: an instructor sets up a session, students join via QR code, submit responses, and the instructor views live tallies — culminating in the optional unblinding of results to students.
+The application split must preserve existing links while establishing clear ownership:
+
+- `Pulse.WebApp` owns the canonical student route `/join/{joinCode}`.
+- Existing `/quiz/{joinCode}` links redirect to `/join/{joinCode}` during the transition.
+- Existing `/instructor` and `/instructor/*` WebApp routes redirect to their `Pulse.Admin` equivalents after those pages move.
+- QR codes always use the configured public WebApp base URL, never the API or Admin URL.
+- Redirects remain until usage data and release notes support their removal.
+
+## Persistence compatibility
+
+LiteDB session documents retain their existing stored field names while application code uses typed concepts:
+
+- Existing string `Status` values map to `SessionStatus`; unknown or missing values safely default to `Draft`.
+- A missing `Mode` defaults to `Survey`, so existing sessions are never interpreted as trivia.
+- Existing `IsUnblinded` values map to typed `ResultsVisibility`.
+- Draft-to-Active and Active-to-Closed are the only valid lifecycle transitions.
+- Future schema changes must include repository tests that read representative legacy documents.
+
+## Target Activity Flow
+
+This sequence diagram describes the approved target classroom workflow, not the current implementation. In particular, activation/closure endpoints, SignalR events, atomic whole-survey submission, and student-side result reveal still need to be implemented.
 
 ```mermaid
 sequenceDiagram
@@ -171,9 +191,9 @@ sequenceDiagram
 
 ---
 
-## Phase 2 — AI Question Generation
+## Deferred AI Question Generation
 
-This short sequence shows the planned Phase 2 AI-assisted question generation flow, where an instructor enters a topic and Foundry Local returns suggested questions for review before they are persisted.
+This sequence captures an earlier AI-assisted question-generation concept. It is deferred behind the approved survey redesign, moderated question bank, and trivia phases; Foundry Local is not currently registered in the AppHost.
 
 ```mermaid
 sequenceDiagram
