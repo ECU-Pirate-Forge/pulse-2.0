@@ -271,8 +271,18 @@
                                     <span class="session-label">Questions:</span>
                                     <span class="session-value">@session.QuestionCount</span>
                                 </div>
+                                <div class="session-info-row">
+                                    <span class="session-label">Status:</span>
+                                    <span class="session-value">@session.Status</span>
+                                </div>
                             </div>
+                            @if (!string.IsNullOrWhiteSpace(session.ActionError))
+                            {
+                                <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3">@session.ActionError</MudAlert>
+                            }
                             <div class="session-actions">
+                                @if (session.Status == SessionStatus.Draft)
+                                {
                                 <MudButton Variant="Variant.Outlined"
                                            Size="Size.Small"
                                            Color="Color.Primary"
@@ -280,6 +290,25 @@
                                            @onclick="@(() => ManageQuestions(session.Id))">
                                     Edit
                                 </MudButton>
+                                <MudButton Variant="Variant.Filled"
+                                           Size="Size.Small"
+                                           Color="Color.Primary"
+                                           Class="action-button"
+                                           Disabled="@(session.QuestionCount == 0)"
+                                           @onclick="@(() => TransitionSessionAsync(session, "activate"))">
+                                    Activate
+                                </MudButton>
+                                }
+                                else if (session.Status == SessionStatus.Active)
+                                {
+                                <MudButton Variant="Variant.Filled"
+                                           Size="Size.Small"
+                                           Color="Color.Warning"
+                                           Class="action-button"
+                                           @onclick="@(() => TransitionSessionAsync(session, "close"))">
+                                    Close
+                                </MudButton>
+                                }
                                 <MudButton Variant="Variant.Outlined"
                                            Size="Size.Small"
                                            Color="Color.Info"
@@ -409,7 +438,8 @@
                             Id = s.Id,
                             Title = s.Title,
                             JoinCode = s.JoinCode,
-                            QuestionCount = questionCount
+                            QuestionCount = questionCount,
+                            Status = s.Status
                         });
                     }
                 }
@@ -492,11 +522,32 @@
     private void DeleteSession(Guid sessionId) =>
         Sessions.RemoveAll(s => s.Id == sessionId);
 
+    private async Task TransitionSessionAsync(SessionModel session, string transition)
+    {
+        session.ActionError = null;
+        using var request = new HttpRequestMessage(
+            HttpMethod.Put,
+            $"/api/sessions/{session.Id}/{transition}");
+        request.Headers.TryAddWithoutValidation("InstructorCode", _instructorCode);
+        var response = await Http.SendAsync(request);
+        if (!response.IsSuccessStatusCode)
+        {
+            session.ActionError = $"Unable to {transition} this survey.";
+            return;
+        }
+
+        var updated = await response.Content.ReadFromJsonAsync<Session>();
+        if (updated is not null)
+            session.Status = updated.Status;
+    }
+
     public class SessionModel
     {
         public Guid Id { get; set; }
         public string Title { get; set; } = string.Empty;
         public string JoinCode { get; set; } = string.Empty;
         public int QuestionCount { get; set; }
+        public SessionStatus Status { get; set; }
+        public string? ActionError { get; set; }
     }
 }

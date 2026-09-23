@@ -105,6 +105,18 @@ public static class InstructorOnlyEndpointMatcher
             return true;
         }
 
+        if (HttpMethods.IsPut(method) && path.Equals("/api/questions/reorder", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (HttpMethods.IsPost(method) &&
+            (path.Equals("/api/questionbank", StringComparison.OrdinalIgnoreCase) ||
+             path.Equals("/api/questionbank/import/preview", StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
         if ((HttpMethods.IsPost(method) || HttpMethods.IsGet(method))
             && (path.Equals("/sessions", StringComparison.OrdinalIgnoreCase) || path.Equals("/api/sessions", StringComparison.OrdinalIgnoreCase)))
         {
@@ -116,7 +128,11 @@ public static class InstructorOnlyEndpointMatcher
         {
             return true;
         }
-        if (HttpMethods.IsPut(method) && path.StartsWith("/api/sessions/", StringComparison.OrdinalIgnoreCase) && path.EndsWith("/unblind", StringComparison.OrdinalIgnoreCase))
+        if (HttpMethods.IsPut(method) &&
+            path.StartsWith("/api/sessions/", StringComparison.OrdinalIgnoreCase) &&
+            (path.EndsWith("/unblind", StringComparison.OrdinalIgnoreCase) ||
+             path.EndsWith("/activate", StringComparison.OrdinalIgnoreCase) ||
+             path.EndsWith("/close", StringComparison.OrdinalIgnoreCase)))
         {
             return true;
         }

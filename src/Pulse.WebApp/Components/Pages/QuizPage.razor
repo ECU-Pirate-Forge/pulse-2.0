@@ -218,40 +218,57 @@
                         </div>
                         break;
 
-                    <!-- Likert Scale -->
-                    case QuestionType.LikertScale:
-                        <div>
-                            <div class="likert-scale">
-                                @for (int i = 1; i <= 5; i++)
-                                {
-                                    var scale = i;
-                                    var isSelected = SelectedAnswers.ContainsKey(CurrentQuestion - 1) && SelectedAnswers[CurrentQuestion - 1] == scale.ToString();
-                                    <div class="likert-option @(isSelected ? "selected" : "")"
-                                         role="button"
-                                         tabindex="0"
-                                         @onclick="@(() => SelectAnswer(scale.ToString()))"
-                                         @onkeydown="@((e) => { if (e.Key == "Enter" || e.Key == " ") SelectAnswer(scale.ToString()); })"
-                                         @onkeydown:preventDefault>
-                                        @scale
-                                    </div>
-                                }
-                            </div>
-                            <div class="likert-labels">
-                                <span>Strongly Disagree</span>
-                                <span>Neutral</span>
-                                <span>Strongly Agree</span>
-                            </div>
+                    case QuestionType.MultipleAnswer:
+                        <div class="mc-option">
+                            @foreach (var opt in CurrentQ.Options)
+                            {
+                                var option = opt;
+                                var isSelected = CurrentMultipleAnswers.Contains(option);
+                                <label class="mc-button @(isSelected ? "selected" : "")">
+                                    <input type="checkbox"
+                                           checked="@isSelected"
+                                           @onchange="@(_ => ToggleMultipleAnswer(option))" />
+                                    @option
+                                </label>
+                            }
                         </div>
                         break;
 
-                    <!-- Open Ended -->
-                    case QuestionType.OpenEnded:
-                        <MudTextField @bind-Value="CurrentOpenAnswer"
-                                      Label="Your Answer"
-                                      Variant="Variant.Outlined"
-                                      Lines="6"
-                                      Class="open-ended-input"
-                                      Placeholder="Type your response here..." />
+                    case QuestionType.TrueFalse:
+                        <div class="mc-option">
+                            @foreach (var option in new[] { "True", "False" })
+                            {
+                                var answer = option;
+                                var isSelected = SelectedAnswers.GetValueOrDefault(CurrentQuestion - 1) == answer;
+                                <label class="mc-button @(isSelected ? "selected" : "")">
+                                    <input type="radio"
+                                           name="@($"question-{CurrentQ.Id}")"
+                                           value="@answer"
+                                           checked="@isSelected"
+                                           @onchange="@(_ => SelectAnswer(answer))" />
+                                    @answer
+                                </label>
+                            }
+                        </div>
+                        break;
+
+                    case QuestionType.Matching:
+                        <MudStack Spacing="3">
+                            @foreach (var pair in CurrentQ.MatchingPairs)
+                            {
+                                var prompt = pair.Prompt;
+                                <MudSelect T="string"
+                                           Label="@prompt"
+                                           Value="@CurrentMatchingAnswers.GetValueOrDefault(prompt)"
+                                           ValueChanged="@((string? value) => SetMatchingAnswer(prompt, value))"
+                                           Variant="Variant.Outlined">
+                                    @foreach (var choice in CurrentQ.MatchingPairs.Select(item => item.Match))
+                                    {
+                                        <MudSelectItem T="string" Value="@choice">@choice</MudSelectItem>
+                                    }
+                                </MudSelect>
+                            }
+                        </MudStack>
                         break;
                 }
             }
@@ -316,8 +333,9 @@
     private bool Completed = false;
     private bool IsLoading = true;
     private string ErrorMessage = string.Empty;
-    private string CurrentOpenAnswer = string.Empty;
     private Dictionary<int, string> SelectedAnswers = new();
+    private Dictionary<int, HashSet<string>> MultipleAnswers = new();
+    private Dictionary<int, Dictionary<string, string>> MatchingAnswers = new();
 
     private List<Question> Questions = new();
     private Guid SessionId = Guid.Empty;
@@ -391,16 +409,35 @@
         SelectedAnswers[CurrentQuestion - 1] = answer;
     }
 
+    private HashSet<string> CurrentMultipleAnswers =>
+        MultipleAnswers.TryGetValue(CurrentQuestion - 1, out var answers)
+            ? answers
+            : MultipleAnswers[CurrentQuestion - 1] = [];
+
+    private Dictionary<string, string> CurrentMatchingAnswers =>
+        MatchingAnswers.TryGetValue(CurrentQuestion - 1, out var answers)
+            ? answers
+            : MatchingAnswers[CurrentQuestion - 1] = [];
+
+    private void ToggleMultipleAnswer(string answer)
+    {
+        if (!CurrentMultipleAnswers.Add(answer))
+            CurrentMultipleAnswers.Remove(answer);
+    }
+
+    private void SetMatchingAnswer(string prompt, string? answer)
+    {
+        if (string.IsNullOrWhiteSpace(answer))
+            CurrentMatchingAnswers.Remove(prompt);
+        else
+            CurrentMatchingAnswers[prompt] = answer;
+    }
+
     private void NextQuestion()
     {
         if (CurrentQuestion < TotalQuestions)
         {
-            if (CurrentOpenAnswer != string.Empty && CurrentQ?.Type == QuestionType.OpenEnded)
-            {
-                SelectedAnswers[CurrentQuestion - 1] = CurrentOpenAnswer;
-            }
             CurrentQuestion++;
-            CurrentOpenAnswer = SelectedAnswers.ContainsKey(CurrentQuestion - 1) ? SelectedAnswers[CurrentQuestion - 1] : string.Empty;
         }
     }
 
@@ -408,21 +445,12 @@
     {
         if (CurrentQuestion > 1)
         {
-            if (CurrentOpenAnswer != string.Empty)
-            {
-                SelectedAnswers[CurrentQuestion - 1] = CurrentOpenAnswer;
-            }
             CurrentQuestion--;
-            CurrentOpenAnswer = SelectedAnswers.ContainsKey(CurrentQuestion - 1) ? SelectedAnswers[CurrentQuestion - 1] : string.Empty;
         }
     }
 
     private void SubmitQuiz()
     {
-        if (CurrentOpenAnswer != string.Empty && CurrentQ?.Type == QuestionType.OpenEnded)
-        {
-            SelectedAnswers[CurrentQuestion - 1] = CurrentOpenAnswer;
-        }
         Completed = true;
     }
 

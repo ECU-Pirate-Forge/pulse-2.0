@@ -241,8 +241,9 @@
     private string GetTypeName(QuestionType type) => type switch
     {
         QuestionType.MultipleChoice => "Multiple Choice",
-        QuestionType.LikertScale => "Likert Scale",
-        QuestionType.OpenEnded => "Open Ended",
+        QuestionType.MultipleAnswer => "Multiple Answer",
+        QuestionType.TrueFalse => "True / False",
+        QuestionType.Matching => "Matching",
         _ => "Unknown"
     };
 }

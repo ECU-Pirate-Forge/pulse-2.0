@@ -37,7 +37,7 @@ public static class ResponseEndpointHandlers
         }
 
         var question = questionRepo.GetById(questionId);
-        if (question is null)
+        if (question is null || question.SessionId != sessionId)
             return Results.NotFound("Question not found.");
 
         var response = new Response

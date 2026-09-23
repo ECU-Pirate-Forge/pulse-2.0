@@ -65,8 +65,9 @@ public class DraggableQuestionListComponentTests : BunitContext
         var questions = new List<Question>
         {
             new() { Id = Guid.NewGuid(), Text = "Q1", Type = QuestionType.MultipleChoice, SortOrder = 0 },
-            new() { Id = Guid.NewGuid(), Text = "Q2", Type = QuestionType.LikertScale, SortOrder = 1 },
-            new() { Id = Guid.NewGuid(), Text = "Q3", Type = QuestionType.OpenEnded, SortOrder = 2 }
+            new() { Id = Guid.NewGuid(), Text = "Q2", Type = QuestionType.MultipleAnswer, SortOrder = 1 },
+            new() { Id = Guid.NewGuid(), Text = "Q3", Type = QuestionType.TrueFalse, SortOrder = 2 },
+            new() { Id = Guid.NewGuid(), Text = "Q4", Type = QuestionType.Matching, SortOrder = 3 }
         };
 
         var component = Render<DraggableQuestionList>(parameters => parameters
@@ -75,8 +76,9 @@ public class DraggableQuestionListComponentTests : BunitContext
         // Act & Assert
         var markup = component.Markup;
         Assert.Contains("Multiple Choice", markup);
-        Assert.Contains("Likert Scale", markup);
-        Assert.Contains("Open Ended", markup);
+        Assert.Contains("Multiple Answer", markup);
+        Assert.Contains("True / False", markup);
+        Assert.Contains("Matching", markup);
     }
 
     [Fact]

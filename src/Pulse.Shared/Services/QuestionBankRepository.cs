@@ -1,4 +1,5 @@
 using LiteDB;
+using Pulse.Domain.Entities;
 using Pulse.Shared.Models;
 
 namespace Pulse.Common.Services;
@@ -16,6 +17,7 @@ public class QuestionBankRepository : IQuestionBankRepository
 
     public QuestionBankItem Insert(QuestionBankItem item)
     {
+        CopyStructuredData(item);
         _col.Insert(item);
         return item;
     }
@@ -24,7 +26,11 @@ public class QuestionBankRepository : IQuestionBankRepository
 
     public QuestionBankItem? GetById(Guid id) => _col.FindById(id);
 
-    public bool Update(QuestionBankItem item) => _col.Update(item);
+    public bool Update(QuestionBankItem item)
+    {
+        CopyStructuredData(item);
+        return _col.Update(item);
+    }
 
     public bool Delete(Guid id) => _col.Delete(id);
 
@@ -39,5 +45,13 @@ public class QuestionBankRepository : IQuestionBankRepository
             all = all.Where(x => (int)x.Type == type.Value);
 
         return all;
+    }
+
+    private static void CopyStructuredData(QuestionBankItem item)
+    {
+        item.Options = new List<string>(item.Options ?? []);
+        item.MatchingPairs = (item.MatchingPairs ?? [])
+            .Select(pair => new MatchingPair { Prompt = pair.Prompt, Match = pair.Match })
+            .ToList();
     }
 }

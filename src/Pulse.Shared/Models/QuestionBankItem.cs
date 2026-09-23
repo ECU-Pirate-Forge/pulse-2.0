@@ -10,5 +10,6 @@ public class QuestionBankItem
     public string Text { get; set; } = string.Empty;
     public QuestionType Type { get; set; }
     public List<string> Options { get; set; } = [];
+    public List<MatchingPair> MatchingPairs { get; set; } = [];
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

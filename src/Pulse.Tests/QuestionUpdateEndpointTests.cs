@@ -18,7 +18,7 @@ public class QuestionUpdateEndpointTests
         {
             Id = Guid.NewGuid(),
             Text = "Original text",
-            Type = QuestionType.OpenEnded,
+            Type = QuestionType.TrueFalse,
             Options = new List<string>()
         };
 
@@ -56,7 +56,7 @@ public class QuestionUpdateEndpointTests
         {
             Id = Guid.NewGuid(),
             Text = "Original",
-            Type = QuestionType.OpenEnded,
+            Type = QuestionType.TrueFalse,
             Options = new List<string>()
         };
 
@@ -84,7 +84,7 @@ public class QuestionUpdateEndpointTests
         var request = new UpdateQuestionRequest
         {
             Text = "Updated",
-            Type = QuestionType.OpenEnded,
+            Type = QuestionType.TrueFalse,
             Options = new List<string>()
         };
 
@@ -102,7 +102,7 @@ public class QuestionUpdateEndpointTests
         var request = new UpdateQuestionRequest
         {
             Text = "Updated",
-            Type = QuestionType.OpenEnded,
+            Type = QuestionType.TrueFalse,
             Options = new List<string>()
         };
 

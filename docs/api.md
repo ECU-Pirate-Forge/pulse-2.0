@@ -87,7 +87,7 @@ Response 200: array of session objects.
 
 ### GET /api/sessions/join/{joinCode}
 
-Public student join lookup by join code.
+Public student join lookup by join code. Only Active surveys can be joined.
 
 Protected: No
 
@@ -102,6 +102,7 @@ Response 200:
 Response errors:
 
 - 400 when join code is missing/empty
+- 409 when the survey is Draft or Closed
 - 404 when no session exists for the code
 
 ### GET /api/sessions/qr/{joinCode}
@@ -137,6 +138,34 @@ Response codes:
 - 403 Forbidden
 - 404 Not Found
 
+### PUT /api/sessions/{id}/activate
+
+Transition an owned Draft survey to Active.
+
+Protected: Yes (InstructorCode required)
+
+Response codes:
+
+- 200 OK (updated session)
+- 401 Unauthorized
+- 403 Forbidden
+- 404 Not Found
+- 409 Conflict (invalid lifecycle transition)
+
+### PUT /api/sessions/{id}/close
+
+Transition an owned Active survey to Closed.
+
+Protected: Yes (InstructorCode required)
+
+Response codes:
+
+- 200 OK (updated session)
+- 401 Unauthorized
+- 403 Forbidden
+- 404 Not Found
+- 409 Conflict (invalid lifecycle transition)
+
 ## Approved survey V1 contracts
 
 The shared V1 contracts are defined for the survey redesign but are not all wired to HTTP endpoints yet. They establish these rules for subsequent phases:
@@ -164,7 +193,7 @@ Response 200 shape:
 		{
 			"questionId": "22222222-2222-2222-2222-222222222222",
 			"text": "How confident are you with this topic?",
-			"type": "Likert",
+			"type": "MultipleChoice",
 			"tallies": [
 				{ "option": "Low", "count": 2 },
 				{ "option": "High", "count": 8 }
@@ -192,7 +221,8 @@ Response codes:
 
 Create a question scoped to a specific session.
 
-Protected: No (current implementation)
+Protected: Yes (InstructorCode required). The session must be owned by the
+instructor and remain in Draft.
 
 Request body (example):
 
@@ -209,6 +239,10 @@ Response codes:
 
 - 201 Created (created question)
 - 400 Bad Request (validation errors)
+- 401 Unauthorized
+- 403 Forbidden
+- 404 Not Found
+- 409 Conflict (session is not Draft)
 
 ### GET /questions
 
@@ -216,32 +250,9 @@ Get all questions.
 
 Protected: No
 
-### POST /questions
-
-Create a question.
-
-Protected: Yes (InstructorCode required)
-
-Request body (example):
-
-```json
-{
-	"sessionId": "11111111-1111-1111-1111-111111111111",
-	"text": "What is 2 + 2?",
-	"type": 0,
-	"options": ["3", "4", "5"],
-	"sortOrder": 0
-}
-```
-
-Response codes:
-
-- 200 OK (created question)
-- 400 Bad Request (validation errors)
-
 ### PUT /questions/{id}
 
-Update question text/type/options.
+Update question text and type-specific data while its survey remains in Draft.
 
 Protected: Yes (InstructorCode required)
 
@@ -251,7 +262,8 @@ Request body:
 {
 	"text": "Updated prompt",
 	"type": 0,
-	"options": ["Option A", "Option B"]
+	"options": ["Option A", "Option B"],
+	"matchingPairs": []
 }
 ```
 
@@ -259,7 +271,10 @@ Response codes:
 
 - 200 OK
 - 400 Bad Request
+- 401 Unauthorized
+- 403 Forbidden
 - 404 Not Found
+- 409 Conflict (session is not Draft)
 
 ### DELETE /questions/{id}
 
@@ -271,13 +286,17 @@ Response codes:
 
 - 204 No Content
 - 400 Bad Request
+- 401 Unauthorized
+- 403 Forbidden
 - 404 Not Found
+- 409 Conflict (session is not Draft)
 
 ### PUT /api/questions/reorder
 
 Reorder questions by providing ordered question ids.
 
-Protected: No (current implementation)
+Protected: Yes (InstructorCode required). All questions must belong to the
+same owned Draft survey.
 
 Request body:
 
@@ -294,6 +313,21 @@ Response codes:
 
 - 200 OK (updated ordered questions)
 - 400 Bad Request
+- 401 Unauthorized
+- 403 Forbidden
+- 404 Not Found
+- 409 Conflict (session is not Draft)
+
+Supported authored question types:
+
+- `0` / `MultipleChoice`: at least two options.
+- `3` / `MultipleAnswer`: at least two options.
+- `4` / `TrueFalse`: no authored options.
+- `5` / `Matching`: at least two unique prompts with complete
+  `prompt`/`match` pairs.
+
+Persisted legacy type values `1` and `2` remain readable but cannot be newly
+authored or imported.
 
 ## Question Bank
 
@@ -301,7 +335,7 @@ Response codes:
 
 Create a reusable question bank item.
 
-Protected: No (current implementation)
+Protected: Yes (InstructorCode required)
 
 Request body:
 
@@ -352,9 +386,12 @@ Response 200:
 
 Preview and validate CSV content before import.
 
-Protected: No (current implementation)
+Protected: Yes (InstructorCode required)
 
-Expected request: multipart/form-data with a CSV file.
+Expected request: multipart/form-data with a CSV file. Columns are
+`text,type,options,matchingPairs`. Options use `|` separators. Matching pairs
+use `Prompt=>Match|Prompt=>Match`. Type accepts the four names above or their
+numeric values.
 
 Response codes:
 
@@ -365,7 +402,8 @@ Response codes:
 
 Import validated question bank content into a session.
 
-Protected: No (current implementation)
+Protected: Yes (InstructorCode required). The destination survey must be an
+owned Draft survey, and every bank item must use a supported authored type.
 
 Response codes:
 

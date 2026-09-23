@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http.HttpResults;
+using Pulse.Application.Services;
 using Pulse.Common.Services;
 using Pulse.Domain.Entities;
 using Pulse.Shared.Models;
@@ -9,7 +10,8 @@ public static class QuestionBankEndpointHandlers
 {
     public static Results<Created<QuestionBankItem>, BadRequest<string>> CreateQuestionBankItem(
         CreateQuestionBankItemRequest request,
-        IQuestionBankRepository repo)
+        IQuestionBankRepository repo,
+        QuestionService questionService)
     {
         if (string.IsNullOrWhiteSpace(request.Text))
             return TypedResults.BadRequest("Text is required.");
@@ -17,22 +19,34 @@ public static class QuestionBankEndpointHandlers
         if (request.Type is null)
             return TypedResults.BadRequest("Type is required.");
 
-        if (!Enum.IsDefined(typeof(QuestionType), request.Type))
-            return TypedResults.BadRequest("Type is invalid.");
-
         var normalizedOptions = (request.Options ?? [])
             .Where(o => !string.IsNullOrWhiteSpace(o))
             .Select(o => o.Trim())
             .ToList();
 
-        if (request.Type == QuestionType.MultipleChoice && normalizedOptions.Count < 2)
-            return TypedResults.BadRequest("Multiple-choice items must include at least 2 options.");
+        var normalizedPairs = (request.MatchingPairs ?? [])
+            .Select(pair => new MatchingPair
+            {
+                Prompt = pair?.Prompt?.Trim() ?? string.Empty,
+                Match = pair?.Match?.Trim() ?? string.Empty
+            })
+            .ToList();
+
+        var validation = questionService.ValidateQuestion(new QuestionDTO
+        {
+            Type = request.Type.Value,
+            Options = normalizedOptions,
+            MatchingPairs = normalizedPairs
+        });
+        if (!validation.IsValid)
+            return TypedResults.BadRequest(validation.ErrorMessage!);
 
         var item = new QuestionBankItem
         {
             Text = request.Text.Trim(),
             Type = request.Type.Value,
             Options = normalizedOptions,
+            MatchingPairs = normalizedPairs,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -69,6 +83,7 @@ public sealed class CreateQuestionBankItemRequest
     public string? Text { get; init; }
     public QuestionType? Type { get; init; }
     public List<string>? Options { get; init; }
+    public List<MatchingPair>? MatchingPairs { get; init; }
 }
 
 public sealed record QuestionBankListResponse(List<QuestionBankItem> Items, int TotalCount);

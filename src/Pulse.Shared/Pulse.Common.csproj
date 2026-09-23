@@ -13,6 +13,7 @@
   <ItemGroup>
     <Compile Include="..\Pulse.Domain\Entities\Question.cs" Link="Models\Question.cs" />
     <Compile Include="..\Pulse.Domain\Entities\QuestionType.cs" Link="Models\QuestionType.cs" />
+    <Compile Include="..\Pulse.Domain\Entities\MatchingPair.cs" Link="Models\MatchingPair.cs" />
   </ItemGroup>
 
   <ItemGroup>
