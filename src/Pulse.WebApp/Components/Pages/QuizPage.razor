@@ -1,14 +1,18 @@
 @page "/quiz/{JoinCode}"
 @using System.Net
 @using System.Net.Http.Json
+@using System.Text.Json
 @using Pulse.Domain.Entities
 @using Pulse.Shared.Contracts.V1
+@using Pulse.Shared.Services
 @using Pulse.WebApp.Services
+@implements IAsyncDisposable
 @rendermode InteractiveServer
 @inject NavigationManager Navigation
 @inject HttpClient Http
 @inject IDeviceIdService DeviceIdService
 @inject ILogger<QuizPage> Logger
+@inject IServiceProvider Services
 
 <PageTitle>Anonymous survey | Pulse</PageTitle>
 
@@ -30,12 +34,39 @@
     }
     else if (isSubmitted)
     {
-        <section class="pulse-card survey-status" aria-live="polite">
-            <p class="pulse-eyebrow">Response received</p>
-            <h1>Survey submitted</h1>
-            <p>Your anonymous responses have been recorded.</p>
-            <p>The results are currently hidden. Your instructor will reveal aggregate results when they are ready.</p>
-        </section>
+        @if (revealedResults is null)
+        {
+            <section class="pulse-card survey-status" aria-live="polite">
+                <p class="pulse-eyebrow">Response received</p>
+                <h1>Survey submitted</h1>
+                <p>Your anonymous responses have been recorded.</p>
+                <p>The results are currently hidden. This page will update when your instructor reveals aggregate results.</p>
+            </section>
+        }
+        else
+        {
+            <header class="survey-header" aria-live="polite">
+                <p class="pulse-eyebrow">Results revealed</p>
+                <h1>@revealedResults.Title</h1>
+                <p>These aggregate results include responses from the class.</p>
+            </header>
+            <section class="survey-results">
+                @foreach (var question in revealedResults.Questions)
+                {
+                    <article class="pulse-card survey-result">
+                        <h2>@question.Text</h2>
+                        <p>@question.ResponseCount responses</p>
+                        @foreach (var tally in question.Tallies)
+                        {
+                            <div class="survey-result-row">
+                                <div><span>@tally.Value</span><strong>@tally.Count</strong></div>
+                                <progress value="@tally.Count" max="@Math.Max(1, question.ResponseCount)"></progress>
+                            </div>
+                        }
+                    </article>
+                }
+            </section>
+        }
     }
     else
     {
@@ -148,6 +179,9 @@
     private bool isLoading = true;
     private bool isSubmitting;
     private bool isSubmitted;
+    private readonly CancellationTokenSource lifetime = new();
+    private SessionRealtimeConnection? realtimeConnection;
+    private StudentSurveyResultsResponse? revealedResults;
 
     protected override async Task OnInitializedAsync()
     {
@@ -270,6 +304,7 @@
             }
 
             isSubmitted = true;
+            await BeginResultsMonitoringAsync();
         }
         catch (HttpRequestException ex)
         {
@@ -296,6 +331,77 @@
                     .ToList(),
             _ => []
         };
+
+    private async Task BeginResultsMonitoringAsync()
+    {
+        await LoadStudentResultsAsync();
+
+        var factory = Services.GetService<SessionRealtimeConnectionFactory>();
+        if (factory is not null)
+        {
+            realtimeConnection = factory.Create(
+                _ => Task.CompletedTask,
+                () => InvokeAsync(StateHasChanged),
+                () => InvokeAsync(LoadStudentResultsAsync));
+            try
+            {
+                await realtimeConnection.StartAsync(sessionId, lifetime.Token);
+            }
+            catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException)
+            {
+                Logger.LogWarning(ex, "Live result updates unavailable for survey {SessionId}; polling will continue", sessionId);
+            }
+        }
+
+        _ = PollForResultsAsync();
+    }
+
+    private async Task PollForResultsAsync()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+        try
+        {
+            while (revealedResults is null && await timer.WaitForNextTickAsync(lifetime.Token))
+                await InvokeAsync(LoadStudentResultsAsync);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
+        {
+        }
+    }
+
+    private async Task LoadStudentResultsAsync()
+    {
+        try
+        {
+            var response = await Http.GetAsync(
+                $"/api/sessions/{sessionId}/results/student",
+                lifetime.Token);
+            if (!response.IsSuccessStatusCode)
+                return;
+
+            var json = await response.Content.ReadAsStringAsync(lifetime.Token);
+            using var document = JsonDocument.Parse(json);
+            if (!document.RootElement.TryGetProperty("questions", out _))
+                return;
+
+            revealedResults = JsonSerializer.Deserialize<StudentSurveyResultsResponse>(
+                json,
+                new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (HttpRequestException ex)
+        {
+            Logger.LogWarning(ex, "Unable to refresh student results for survey {SessionId}", sessionId);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        lifetime.Cancel();
+        if (realtimeConnection is not null)
+            await realtimeConnection.DisposeAsync();
+        lifetime.Dispose();
+    }
 
     private sealed record JoinSessionResponse(Guid Id, string Title, string JoinCode);
 }

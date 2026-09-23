@@ -223,21 +223,37 @@ Response 200 shape:
 {
 	"sessionId": "11111111-1111-1111-1111-111111111111",
 	"title": "Week 5 Quick Check",
+	"participantCount": 10,
+	"completedCount": 9,
 	"questions": [
 		{
 			"questionId": "22222222-2222-2222-2222-222222222222",
 			"text": "How confident are you with this topic?",
 			"type": "MultipleChoice",
 			"tallies": [
-				{ "option": "Low", "count": 2 },
-				{ "option": "High", "count": 8 }
+				{ "value": "Low", "count": 2 },
+				{ "value": "High", "count": 8 }
 			],
-			"totalResponses": 10
+			"responseCount": 10
 		}
-	],
-	"totalResponses": 10
+	]
 }
 ```
+
+### GET /api/sessions/{id}/results/student
+
+Return only `resultsVisibility` while a survey is blinded. After the instructor
+reveals results, return the aggregate question tallies. This endpoint never
+returns participant identifiers or individual answers.
+
+Protected: No
+
+### SignalR /hubs/session
+
+Clients call `JoinSession(sessionId)` to join a session-scoped group. The hub
+publishes `SubmissionUpdated`, `SessionClosed`, and `ResultsRevealed` events.
+The Blazor clients also poll the corresponding results endpoint so a temporary
+WebSocket interruption does not leave the classroom view stale.
 
 ## Questions
 

@@ -4,7 +4,7 @@
 
 ## Solution Architecture
 
-This diagram is the target deployment topology for Pulse. The repository has separate WebApp, Admin, WebApi, and Aspire projects, and instructor session/question/QR workflows now live in Admin with compatibility redirects from their former WebApp routes. SignalR is not implemented yet; the approved redesign will add the dashed/planned real-time behavior without breaking existing join links.
+This diagram shows the Pulse deployment topology. The repository has separate WebApp, Admin, WebApi, and Aspire projects. Instructor session, question, QR, and live-results workflows live in Admin, while anonymous survey participation and revealed aggregate results live in WebApp. SignalR distributes live progress, closure, and reveal events without breaking existing join links.
 
 ```mermaid
 graph TD
@@ -115,7 +115,7 @@ LiteDB session documents retain their existing stored field names while applicat
 
 ## Target Activity Flow
 
-This sequence diagram describes the approved target classroom workflow, not the current implementation. In particular, activation/closure endpoints, SignalR events, atomic whole-survey submission, and student-side result reveal still need to be implemented.
+This sequence diagram describes the implemented classroom survey workflow, including lifecycle endpoints, atomic whole-survey submission, SignalR events, polling fallback, and instructor-controlled student result reveal.
 
 ```mermaid
 sequenceDiagram

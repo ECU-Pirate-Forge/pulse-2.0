@@ -75,6 +75,9 @@ public class ResponseRepository : IResponseRepository
     public IEnumerable<Response> GetByQuestionId(Guid questionId) =>
         _col.Find(r => r.QuestionId == questionId);
 
+    public IEnumerable<Response> GetBySession(Guid sessionId) =>
+        _col.Find(response => response.SessionId == sessionId);
+
     public IEnumerable<Response> GetBySessionAndDevice(Guid sessionId, string deviceId) =>
         _col.Find(response =>
             response.SessionId == sessionId &&

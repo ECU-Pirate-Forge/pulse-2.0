@@ -17,7 +17,8 @@ public static class SurveySubmissionEndpointHandlers
         IResponseRepository responseRepo,
         DeviceIdValidationService deviceIdService,
         ILoggerFactory loggerFactory,
-        HttpContext context)
+        HttpContext context,
+        ISessionEventPublisher? eventPublisher = null)
     {
         var deviceValidation = deviceIdService.ValidateDeviceId(request.DeviceId);
         if (!deviceValidation.IsValid)
@@ -61,6 +62,22 @@ public static class SurveySubmissionEndpointHandlers
                 DeviceId = canonicalDeviceId,
                 SubmittedAt = submittedAt
             });
+
+        if (eventPublisher is not null)
+        {
+            var participantCount = responseRepo.GetBySession(sessionId)
+                .Select(response => response.DeviceId)
+                .Distinct(StringComparer.Ordinal)
+                .Count();
+            var completedCount = responseRepo.GetSubmissionsBySession(sessionId)
+                .Select(submission => submission.DeviceId)
+                .Distinct(StringComparer.Ordinal)
+                .Count();
+            await eventPublisher.PublishSubmissionUpdatedAsync(
+                sessionId,
+                new SessionProgressUpdate(participantCount, completedCount),
+                context.RequestAborted);
+        }
 
         loggerFactory.CreateLogger("SurveySubmissionEndpointHandlers")
             .LogInformation(

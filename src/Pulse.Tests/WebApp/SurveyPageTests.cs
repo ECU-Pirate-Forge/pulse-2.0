@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using MudBlazor.Services;
 using Pulse.Domain.Entities;
 using Pulse.Shared.Contracts.V1;
+using Pulse.Shared.Models;
 using Pulse.WebApp.Components.Pages;
 using Pulse.WebApp.Services;
 
@@ -72,6 +73,36 @@ public class SurveyPageTests : BunitContext
         Assert.Equal(["A"], answer.Values);
     }
 
+    [Fact]
+    public void RevealedResults_ReplaceBlindedWaitState()
+    {
+        var question = new Question
+        {
+            Id = Guid.NewGuid(),
+            SessionId = _sessionId,
+            Text = "Choose one",
+            Type = QuestionType.MultipleChoice,
+            Options = ["A", "B"]
+        };
+        var handler = new SurveyHandler(_sessionId, [question])
+        {
+            RevealResults = true
+        };
+        Services.AddSingleton(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+
+        var cut = Render<QuizPage>(parameters => parameters.Add(page => page.JoinCode, "ABC123"));
+        cut.WaitForElement($"input[value='A']").Change("A");
+        cut.Find("[data-testid='submit-survey']").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("Results revealed", cut.Markup);
+            Assert.Contains("A", cut.Markup);
+            Assert.Contains(">1<", cut.Markup);
+            Assert.DoesNotContain("results are currently hidden", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        });
+    }
+
     private HttpClient CreateHttpClient(List<Question> questions) =>
         new(new SurveyHandler(_sessionId, questions)) { BaseAddress = new Uri("http://localhost") };
 
@@ -122,6 +153,7 @@ public class SurveyPageTests : BunitContext
     private sealed class SurveyHandler(Guid sessionId, List<Question> questions) : HttpMessageHandler
     {
         public SubmitSurveyRequest? SubmittedRequest { get; private set; }
+        public bool RevealResults { get; init; }
 
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
@@ -150,6 +182,28 @@ public class SurveyPageTests : BunitContext
                 SubmittedRequest = await request.Content!.ReadFromJsonAsync<SubmitSurveyRequest>(
                     cancellationToken: cancellationToken);
                 return JsonResponse(HttpStatusCode.OK, new SubmitSurveyResponse(DateTime.UtcNow));
+            }
+
+            if (request.Method == HttpMethod.Get &&
+                request.RequestUri?.AbsolutePath == $"/api/sessions/{sessionId}/results/student")
+            {
+                return RevealResults
+                    ? JsonResponse(
+                        HttpStatusCode.OK,
+                        new StudentSurveyResultsResponse(
+                            sessionId,
+                            "Survey",
+                            [
+                                new SurveyQuestionResultsResponse(
+                                    questions[0].Id,
+                                    questions[0].Text,
+                                    questions[0].Type.ToString(),
+                                    [new OptionTallyResponse("A", 1)],
+                                    1)
+                            ]))
+                    : JsonResponse(
+                        HttpStatusCode.OK,
+                        new StudentResultsStatusResponse(ResultsVisibility.Blinded));
             }
 
             return JsonResponse(HttpStatusCode.NotFound, new { error = "Not found" });
