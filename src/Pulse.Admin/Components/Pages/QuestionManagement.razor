@@ -497,7 +497,10 @@
         BankError = null;
         try
         {
-            var response = await Http.GetAsync("/api/questionbank");
+            using var request = CreateInstructorRequest(
+                HttpMethod.Get,
+                $"/api/questionbank?moderationStatus={QuestionModerationStatus.Approved}&pageSize=100");
+            var response = await Http.SendAsync(request);
             if (response.IsSuccessStatusCode)
             {
                 var result = await response.Content.ReadFromJsonAsync<QuestionBankResponse>();

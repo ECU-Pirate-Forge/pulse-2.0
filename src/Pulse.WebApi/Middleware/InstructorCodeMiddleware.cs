@@ -117,6 +117,12 @@ public static class InstructorOnlyEndpointMatcher
             return true;
         }
 
+        if (HttpMethods.IsPut(method) &&
+            path.StartsWith("/api/questionbank/", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
         if ((HttpMethods.IsPost(method) || HttpMethods.IsGet(method))
             && (path.Equals("/sessions", StringComparison.OrdinalIgnoreCase) || path.Equals("/api/sessions", StringComparison.OrdinalIgnoreCase)))
         {

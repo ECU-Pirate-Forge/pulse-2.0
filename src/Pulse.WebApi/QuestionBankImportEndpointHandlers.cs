@@ -46,6 +46,9 @@ public static class QuestionBankImportEndpointHandlers
             if (item is null)
                 return Results.BadRequest($"Question bank item {id} not found.");
 
+            if (item.ModerationStatus != QuestionModerationStatus.Approved)
+                return Results.BadRequest($"Question bank item {id} must be approved before it can be imported.");
+
             var validation = questionService.ValidateQuestion(new QuestionDTO
             {
                 Type = item.Type,

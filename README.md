@@ -27,6 +27,8 @@ Typical classroom usage flow:
 5. Pulse validates and records responses.
 6. Instructor can retrieve aggregate results.
 7. Instructor can persist the unblinded-results setting.
+8. Students can anonymously suggest questions; instructors review, edit,
+   approve, reject, search, and filter the reusable question bank.
 
 Activation, closure, live instructor updates, and student-side result reveal are planned work rather than completed behavior.
 
