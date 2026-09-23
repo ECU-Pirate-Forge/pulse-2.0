@@ -2,6 +2,7 @@
 @using System.Net.Http
 @inject HttpClient HttpClient
 @inject NavigationManager NavManager
+@inject IConfiguration Configuration
 
 <div class="session-qr-container">
     @if (IsLoading)
@@ -27,7 +28,7 @@
         <MudStack Row="true" Spacing="4" AlignItems="AlignItems.Center">
             <!-- QR Code Image -->
             <div class="qr-image-wrapper">
-                <img src="@QRImageData" alt="Session QR Code" class="qr-image" />
+                <img src="@QRImageData" alt="QR code for joining this survey" class="qr-image" />
                 <div style="text-align: center; margin-top: 12px;">
                     <MudText Typo="Typo.caption" Style="color: #9ca3af;">Scan to join</MudText>
                 </div>
@@ -44,7 +45,7 @@
                     </div>
 
                     <div>
-                        <MudText Typo="Typo.subtitle2" Style="font-weight: 600; margin-bottom: 8px;">Session Code:</MudText>
+                        <MudText Typo="Typo.subtitle2" Style="font-weight: 600; margin-bottom: 8px;">Survey code:</MudText>
                         <div class="session-code-box">
                             <MudText Typo="Typo.h6" Style="font-family: monospace; letter-spacing: 2px;">@JoinCode</MudText>
                         </div>
@@ -112,10 +113,10 @@
     }
 
     .session-code-box {
-        background: #f0f3ff;
+        background: var(--pulse-purple-50);
         padding: 12px;
         border-radius: 8px;
-        border: 1px solid #dbeafe;
+        border: 1px solid var(--pulse-purple-100);
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -165,7 +166,7 @@
         try
         {
             // Construct the join URL from the application base URI so it works on any route
-            var baseUri = NavManager.BaseUri.TrimEnd('/');
+            var baseUri = (Configuration["StudentApp:BaseUrl"] ?? NavManager.BaseUri).TrimEnd('/');
             JoinUrl = $"{baseUri}/join/{JoinCode}";
 
             // Call the QR image endpoint
@@ -178,7 +179,7 @@
             }
             else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                ErrorMessage = "Session not found. Please verify the join code.";
+                ErrorMessage = "Survey not found. Please verify the join code.";
             }
             else
             {

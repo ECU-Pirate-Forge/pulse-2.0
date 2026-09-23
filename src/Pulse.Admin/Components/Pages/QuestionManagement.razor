@@ -13,10 +13,11 @@
 
 <style>
     .questions-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: var(--pulse-purple-900);
         color: white;
         padding: 24px;
-        border-radius: 12px;
+        border-top: 6px solid var(--pulse-gold-500);
+        border-radius: var(--pulse-radius-md);
         margin-bottom: 24px;
     }
 
@@ -65,7 +66,7 @@
         border-radius: 12px;
         padding: 20px;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-        border-left: 4px solid #667eea;
+        border-left: 4px solid var(--pulse-purple-700);
         transition: all 0.2s;
     }
 
@@ -222,8 +223,7 @@
     else if (Questions.Count == 0)
     {
         <div class="empty-state">
-            <div class="empty-icon">❓</div>
-            <div class="form-title">No Questions Yet</div>
+            <div class="form-title">No questions yet</div>
             <p style="color: #6b7280; margin-bottom: 20px;">Create your first question using the form above</p>
         </div>
     }

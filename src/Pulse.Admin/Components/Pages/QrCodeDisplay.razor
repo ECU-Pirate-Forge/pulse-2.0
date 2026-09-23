@@ -9,7 +9,7 @@
     .qr-page-container {
         min-height: calc(100vh - 70px);
         padding: 32px 16px;
-        background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
+        background: var(--pulse-background);
     }
 
     .qr-page-card {
@@ -22,7 +22,8 @@
     }
 
     .qr-page-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: var(--pulse-purple-900);
+        border-top: 6px solid var(--pulse-gold-500);
         color: white;
         padding: 32px;
         display: flex;
@@ -96,7 +97,7 @@
         <!-- Header -->
         <div class="qr-page-header">
             <div>
-                <div class="qr-page-title">📱 Share Session</div>
+                <div class="qr-page-title">Share survey</div>
                 <div class="qr-page-subtitle">Students can scan or enter the code to join</div>
             </div>
             <MudIcon Icon="@Icons.Material.Filled.QrCode" Style="font-size: 3rem; opacity: 0.8;" />
@@ -106,13 +107,13 @@
         <div class="qr-page-content">
             <!-- Instructions -->
             <div class="qr-page-instructions">
-                <div class="qr-page-instructions-title">✓ How to Share:</div>
+                <div class="qr-page-instructions-title">How to share</div>
                 <div class="qr-page-instructions-text">
                     <ol style="margin: 0; padding-left: 20px;">
                         <li>Share the QR code or session code with your students</li>
                         <li>Students can scan the QR code with their mobile device</li>
                         <li>Or they can visit Pulse and enter the session code manually</li>
-                        <li>They'll be able to access and start the quiz immediately</li>
+                        <li>They will open the anonymous survey directly</li>
                     </ol>
                 </div>
             </div>

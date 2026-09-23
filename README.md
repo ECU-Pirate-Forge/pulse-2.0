@@ -11,7 +11,7 @@ Traditional end-of-class surveys are too slow for in-class decision making. Puls
 
 Current architecture highlights:
 
-- ASP.NET Core + Blazor Server apps intended for separate instructor and student experiences
+- Separate ASP.NET Core + Blazor Server apps for instructor and student experiences
 - Minimal API endpoints for session, question, response, and results workflows
 - LiteDB repositories for lightweight local data persistence
 - Aspire AppHost for local orchestration and observability
@@ -45,6 +45,8 @@ The following are currently implemented in this repository (and covered by proje
 - Student response submission with validation and upsert-by-device behavior
 - Response aggregation service logic for instructor tally/result retrieval
 - QR endpoint support for session join flows (by join code and by session id)
+- Survey-first student landing/join experience and dedicated instructor workspace navigation
+- Shared accessible ECU purple-and-gold design tokens used by both Blazor apps
 - Global exception middleware for consistent API error handling
 - Structured logging behavior coverage
 - Admin DB export endpoint behavior

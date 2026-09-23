@@ -4,7 +4,7 @@
 
 ## Solution Architecture
 
-This diagram is the target deployment topology for Pulse. The current repository already has separate WebApp, Admin, WebApi, and Aspire projects, but instructor pages still live primarily in WebApp, Admin remains a scaffold, and SignalR is not implemented. The approved redesign will move instructor workflows to Admin and add the dashed/planned real-time behavior without breaking existing join links.
+This diagram is the target deployment topology for Pulse. The repository has separate WebApp, Admin, WebApi, and Aspire projects, and instructor session/question/QR workflows now live in Admin with compatibility redirects from their former WebApp routes. SignalR is not implemented yet; the approved redesign will add the dashed/planned real-time behavior without breaking existing join links.
 
 ```mermaid
 graph TD

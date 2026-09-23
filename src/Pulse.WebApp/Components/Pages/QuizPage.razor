@@ -8,11 +8,12 @@
 @inject HttpClient HttpClient
 @inject ILogger<QuizPage> Logger
 
-<PageTitle>Quiz - Pulse</PageTitle>
+<PageTitle>Survey | Pulse</PageTitle>
 
 <style>
     .quiz-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: var(--pulse-purple-900);
+        border-top: 6px solid var(--pulse-gold-500);
         color: white;
         padding: 20px;
         margin: -20px -20px 24px -20px;
@@ -29,7 +30,7 @@
 
     .progress-fill {
         height: 100%;
-        background: #10b981;
+        background: var(--pulse-gold-500);
         transition: width 0.3s ease;
     }
 
@@ -66,13 +67,13 @@
     }
 
     .mc-button:hover {
-        border-color: #667eea;
-        background: #f3f4ff;
+        border-color: var(--pulse-purple-700);
+        background: var(--pulse-purple-50);
     }
 
     .mc-button.selected {
-        border-color: #667eea;
-        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+        border-color: var(--pulse-purple-700);
+        background: var(--pulse-purple-100);
     }
 
     .likert-scale {
@@ -95,14 +96,14 @@
     }
 
     .likert-option:hover {
-        border-color: #667eea;
-        background: #f3f4ff;
+        border-color: var(--pulse-purple-700);
+        background: var(--pulse-purple-50);
     }
 
     .likert-option.selected {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: var(--pulse-purple-700);
         color: white;
-        border-color: #667eea;
+        border-color: var(--pulse-purple-700);
     }
 
     .likert-labels {
@@ -120,11 +121,6 @@
     .completion-screen {
         text-align: center;
         padding: 48px 32px;
-    }
-
-    .completion-icon {
-        font-size: 4rem;
-        margin-bottom: 16px;
     }
 
     .completion-title {
@@ -160,7 +156,7 @@
     {
         <div class="question-container" style="text-align: center; padding: 48px;">
             <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
-            <MudText Typo="Typo.h6" Class="mt-4">Loading quiz...</MudText>
+            <MudText Typo="Typo.h6" Class="mt-4">Loading survey...</MudText>
         </div>
     }
     else if (!string.IsNullOrEmpty(ErrorMessage))
@@ -181,14 +177,14 @@
     }
     else if (!Completed)
     {
-        <!-- Quiz Header -->
+        <!-- Survey Header -->
         <div class="quiz-header">
             <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
                 <div>
-                    <MudText Typo="Typo.h5" Style="font-weight: 600;">Quiz Session</MudText>
+                    <MudText Typo="Typo.h5" Style="font-weight: 600;">Anonymous survey</MudText>
                     <MudText Typo="Typo.caption">Question @CurrentQuestion of @TotalQuestions</MudText>
                 </div>
-                <MudIcon Icon="@Icons.Material.Filled.Quiz" Style="font-size: 2rem;" />
+                <MudIcon Icon="@Icons.Material.Filled.HowToVote" Style="font-size: 2rem;" />
             </MudStack>
             <div class="progress-bar">
                 <div class="progress-fill" style="width: @((CurrentQuestion * 100.0 / TotalQuestions).ToString("F0"))%"></div>
@@ -295,10 +291,9 @@
         <!-- Completion Screen -->
         <div class="question-container">
             <div class="completion-screen">
-                <div class="completion-icon">✅</div>
-                <div class="completion-title">Quiz Complete!</div>
+                <div class="completion-title">Survey submitted</div>
                 <div class="completion-text">
-                    Thank you for completing the quiz. Your responses have been recorded.
+                    Thank you. Your anonymous responses have been recorded.
                 </div>
                 <MudButton Variant="Variant.Filled"
                            Color="Color.Primary"

@@ -1,0 +1,19 @@
+.placeholder-page {
+    max-width: 48rem;
+}
+
+.placeholder-page h1 {
+    margin: 0;
+    color: var(--pulse-purple-900);
+}
+
+.placeholder-page > p:not(.pulse-eyebrow) {
+    color: var(--pulse-muted);
+    font-size: 1.125rem;
+}
+
+.placeholder-note {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    border-left: 0.25rem solid var(--pulse-gold-500);
+}

@@ -2,7 +2,7 @@ using Bunit;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Pulse.Domain.Entities;
-using Pulse.WebApp.Components;
+using Pulse.Admin.Components;
 using Xunit;
 
 namespace Pulse.Tests.WebApp;
