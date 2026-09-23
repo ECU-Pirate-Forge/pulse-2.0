@@ -67,6 +67,21 @@ public class SurveyFirstNavigationTests : BunitContext
             Assert.EndsWith("/quiz/ABC123", Services.GetRequiredService<NavigationManager>().Uri));
     }
 
+    [Fact]
+    public void InactiveJoinCode_ShowsNotAcceptingResponsesMessage()
+    {
+        Services.AddSingleton(new HttpClient(new InactiveJoinHandler())
+        {
+            BaseAddress = new Uri("http://localhost")
+        });
+
+        var cut = Render<JoinSessionPage>(parameters => parameters
+            .Add(p => p.JoinCode, "ABC123"));
+
+        cut.WaitForAssertion(() =>
+            Assert.Contains("not currently accepting responses", cut.Markup, StringComparison.OrdinalIgnoreCase));
+    }
+
     private sealed class SuccessfulJoinHandler : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(
@@ -79,6 +94,20 @@ public class SurveyFirstNavigationTests : BunitContext
                     id = Guid.NewGuid(),
                     title = "Week 1 feedback",
                     joinCode = "ABC123"
+                })
+            });
+    }
+
+    private sealed class InactiveJoinHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.Conflict)
+            {
+                Content = JsonContent.Create(new
+                {
+                    error = "This survey is not accepting responses."
                 })
             });
     }

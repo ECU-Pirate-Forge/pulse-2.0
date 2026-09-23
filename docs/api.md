@@ -177,6 +177,40 @@ The shared V1 contracts are defined for the survey redesign but are not all wire
 - Instructor results include unique participant and completed-submission counts.
 - A blinded student result-status response contains visibility only and cannot contain aggregate tallies.
 
+### POST /api/sessions/{sessionId}/submit
+
+Submit every answer for an Active survey in one atomic request.
+
+Protected: No
+
+Request body:
+
+```json
+{
+	"deviceId": "7ed9232b-e5ac-4588-8690-8cc50e4c650c",
+	"answers": [
+		{
+			"questionId": "22222222-2222-2222-2222-222222222222",
+			"values": ["Option A", "Option C"]
+		}
+	]
+}
+```
+
+Each question must appear exactly once. Single-choice and true/false answers
+contain one value, multiple-answer responses contain the selected option set,
+and matching responses contain one selected match per prompt in prompt order.
+The API validates the complete payload before writing. Repeated submissions
+from the same device replace its current answers and completion marker rather
+than adding duplicate rows.
+
+Response codes:
+
+- 200 OK
+- 400 Bad Request (invalid device, incomplete survey, or invalid answer)
+- 404 Not Found
+- 409 Conflict (session is not Active)
+
 ### GET /api/sessions/{id}/results
 
 Get aggregated results for all questions in a session.
