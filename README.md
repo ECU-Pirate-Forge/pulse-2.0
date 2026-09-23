@@ -29,6 +29,8 @@ Typical classroom usage flow:
 7. Instructor can persist the unblinded-results setting.
 8. Students can anonymously suggest questions; instructors review, edit,
    approve, reject, search, and filter the reusable question bank.
+9. Instructors can run separate individual or instructor-defined team trivia
+   games with server-timed scoring and live leaderboards.
 
 Activation, closure, live instructor updates, and student-side result reveal are planned work rather than completed behavior.
 

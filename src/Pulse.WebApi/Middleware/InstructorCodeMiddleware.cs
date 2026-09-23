@@ -117,8 +117,22 @@ public static class InstructorOnlyEndpointMatcher
             return true;
         }
 
+        if (HttpMethods.IsGet(method) &&
+            path.Equals("/api/questionbank", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
         if (HttpMethods.IsPut(method) &&
             path.StartsWith("/api/questionbank/", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (path.StartsWith("/api/trivia", StringComparison.OrdinalIgnoreCase) &&
+            !path.StartsWith("/api/trivia/join/", StringComparison.OrdinalIgnoreCase) &&
+            !path.Contains("/state/", StringComparison.OrdinalIgnoreCase) &&
+            !path.EndsWith("/answers", StringComparison.OrdinalIgnoreCase))
         {
             return true;
         }

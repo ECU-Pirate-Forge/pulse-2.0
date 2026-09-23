@@ -278,6 +278,32 @@ CSV preview accepts the columns `Text`, `Type`, `Options`, `MatchingPairs`,
 `Course`, `Topic`, and `Tags`. Use `|` between options and tags and encode
 matching pairs as `Prompt=>Match`.
 
+## Trivia
+
+Trivia is stored separately from anonymous survey sessions. Instructor routes
+require `InstructorCode`; join, player-state, and answer routes are public.
+
+- `GET|POST /api/trivia` lists or creates games.
+- `POST /api/trivia/{gameId}/teams` creates an instructor-defined team.
+- `POST /api/trivia/{gameId}/questions` copies an approved, trivia-eligible
+  bank item into the game.
+- `GET|POST /api/trivia/join/{joinCode}` returns join information or joins a
+  player. Reusing a device ID reconnects to the original participant.
+- `PUT /api/trivia/{gameId}/questions/{questionId}/open` starts the
+  server-authoritative timer.
+- `POST /api/trivia/{gameId}/questions/{questionId}/answers` accepts one
+  answer per participant and calculates correctness, base points, and time
+  bonus from the server receipt time.
+- `PUT /api/trivia/{gameId}/question/close` and
+  `PUT /api/trivia/{gameId}/finish` advance the game.
+- `GET /api/trivia/{gameId}/state/{participantId}` returns the player-safe
+  question and leaderboard without correct-answer data.
+- `GET /api/trivia/{gameId}/control` returns instructor game controls and
+  state.
+
+Instructor and player pages poll live state so reconnecting clients recover
+without trusting client clocks or previously cached leaderboard values.
+
 ### GET /api/sessions/{sessionId}/questions
 
 Get ordered questions for a specific session.

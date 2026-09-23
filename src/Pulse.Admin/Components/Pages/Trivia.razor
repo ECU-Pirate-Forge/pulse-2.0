@@ -1,12 +1,256 @@
 @page "/trivia"
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@using Pulse.Shared.Contracts.V1
+@using Pulse.Shared.Models
+@implements IDisposable
+@rendermode InteractiveServer
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ProtectedSessionStorage ProtectedStorage
 
 <PageTitle>Trivia | Pulse Instructor</PageTitle>
 
-<section class="placeholder-page" aria-labelledby="trivia-title">
-    <p class="pulse-eyebrow">Secondary workspace</p>
-    <h1 id="trivia-title">Trivia</h1>
-    <p>Individual and instructor-defined team competitions will be built after the survey workflow is complete.</p>
-    <div class="pulse-card placeholder-note">
-        <strong>Planned:</strong> server-authoritative scoring, configurable time bonuses, team assignment, and live leaderboards.
-    </div>
-</section>
+<main class="trivia-admin">
+    <header class="trivia-header">
+        <p class="pulse-eyebrow">Individual and team competitions</p>
+        <h1>Trivia control room</h1>
+        <p>Create a game, select approved bank questions, and control each round.</p>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(error))
+    {
+        <div class="pulse-alert pulse-alert-error" role="alert">@error</div>
+    }
+
+    <section class="pulse-card trivia-create">
+        <h2>Create a trivia game</h2>
+        <div class="trivia-form-grid">
+            <label>Game title <input @bind="newTitle" /></label>
+            <label>Competition mode
+                <select @bind="newMode">
+                    <option value="@TriviaCompetitionMode.Individual">Individual</option>
+                    <option value="@TriviaCompetitionMode.Team">Team</option>
+                </select>
+            </label>
+            <label>Base points <input type="number" min="0" @bind="basePoints" /></label>
+            <label>Maximum time bonus <input type="number" min="0" @bind="timeBonus" /></label>
+            <label>Seconds per question <input type="number" min="5" max="300" @bind="durationSeconds" /></label>
+        </div>
+        <button class="pulse-button pulse-button-primary" @onclick="CreateGameAsync">Create game</button>
+    </section>
+
+    @if (games.Count > 0)
+    {
+        <section class="pulse-card trivia-games">
+            <h2>Your games</h2>
+            <div class="trivia-game-list">
+                @foreach (var game in games)
+                {
+                    <button class="trivia-game-choice" @onclick="() => SelectGameAsync(game)">
+                        <strong>@game.Title</strong>
+                        <span>@game.CompetitionMode · @game.Status · @game.JoinCode</span>
+                    </button>
+                }
+            </div>
+        </section>
+    }
+
+    @if (control is not null)
+    {
+        <section class="trivia-control-grid">
+            <article class="pulse-card trivia-panel">
+                <p class="pulse-eyebrow">Join code @control.State.JoinCode</p>
+                <h2>@control.State.Title</h2>
+                <p>@control.ParticipantCount players · @control.State.Status</p>
+                @if (control.State.CompetitionMode == TriviaCompetitionMode.Team &&
+                     control.State.Status == TriviaGameStatus.Lobby)
+                {
+                    <label>Team name <input @bind="teamName" /></label>
+                    <button class="pulse-button pulse-button-secondary" @onclick="AddTeamAsync">Add team</button>
+                }
+                @if (control.Teams.Count > 0)
+                {
+                    <p><strong>Teams:</strong> @string.Join(", ", control.Teams.Select(team => team.Name))</p>
+                }
+                <button class="pulse-button pulse-button-secondary" @onclick="CloseQuestionAsync">Close current question</button>
+                <button class="pulse-button pulse-button-primary" @onclick="FinishGameAsync">Finish game</button>
+            </article>
+
+            <article class="pulse-card trivia-panel">
+                <h2>Add approved questions</h2>
+                @foreach (var item in eligibleQuestions)
+                {
+                    <div class="trivia-bank-row">
+                        <span>@item.Text</span>
+                        <button @onclick="() => AddQuestionAsync(item.Id)">Add</button>
+                    </div>
+                }
+            </article>
+        </section>
+
+        <section class="pulse-card trivia-panel">
+            <h2>Rounds</h2>
+            @foreach (var question in control.Questions)
+            {
+                <div class="trivia-question-row">
+                    <span>@question.Text</span>
+                    <button class="pulse-button pulse-button-secondary" @onclick="() => OpenQuestionAsync(question.Id)">Open question</button>
+                </div>
+            }
+        </section>
+
+        <section class="pulse-card trivia-panel">
+            <h2>Leaderboard</h2>
+            <ol>
+                @foreach (var entry in control.State.Leaderboard)
+                {
+                    <li><strong>@entry.Name</strong><span>@entry.Score points</span></li>
+                }
+            </ol>
+        </section>
+    }
+</main>
+
+@code {
+    private readonly CancellationTokenSource lifetime = new();
+    private string instructorCode = string.Empty;
+    private string newTitle = string.Empty;
+    private TriviaCompetitionMode newMode;
+    private int basePoints = 100;
+    private int timeBonus = 50;
+    private int durationSeconds = 20;
+    private string teamName = string.Empty;
+    private string? error;
+    private List<TriviaGame> games = [];
+    private List<QuestionBankItem> eligibleQuestions = [];
+    private TriviaGame? selectedGame;
+    private InstructorTriviaStateResponse? control;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+        var storedCode = await ProtectedStorage.GetAsync<string>("instructorCode");
+        instructorCode = storedCode.Success ? storedCode.Value ?? string.Empty : string.Empty;
+        if (string.IsNullOrWhiteSpace(instructorCode))
+        {
+            Navigation.NavigateTo("/surveys");
+            return;
+        }
+        await LoadGamesAsync();
+        await LoadBankAsync();
+        _ = PollAsync();
+    }
+
+    private async Task LoadGamesAsync()
+    {
+        using var request = Authorized(HttpMethod.Get, "/api/trivia");
+        var response = await Http.SendAsync(request, lifetime.Token);
+        games = response.IsSuccessStatusCode
+            ? await response.Content.ReadFromJsonAsync<List<TriviaGame>>(cancellationToken: lifetime.Token) ?? []
+            : [];
+        StateHasChanged();
+    }
+
+    private async Task LoadBankAsync()
+    {
+        using var request = Authorized(HttpMethod.Get, "/api/questionbank?moderationStatus=Approved&triviaEligible=true&pageSize=100");
+        var response = await Http.SendAsync(request, lifetime.Token);
+        var payload = response.IsSuccessStatusCode
+            ? await response.Content.ReadFromJsonAsync<QuestionBankResponse>(cancellationToken: lifetime.Token)
+            : null;
+        eligibleQuestions = payload?.Items.Where(item => item.TriviaEligible).ToList() ?? [];
+    }
+
+    private async Task CreateGameAsync()
+    {
+        using var request = Authorized(HttpMethod.Post, "/api/trivia", new CreateTriviaGameRequest(
+            newTitle, newMode, basePoints, timeBonus, durationSeconds));
+        var response = await Http.SendAsync(request, lifetime.Token);
+        if (!response.IsSuccessStatusCode)
+        {
+            error = "Pulse could not create the trivia game.";
+            return;
+        }
+        selectedGame = await response.Content.ReadFromJsonAsync<TriviaGame>(cancellationToken: lifetime.Token);
+        newTitle = string.Empty;
+        await LoadGamesAsync();
+        await RefreshControlAsync();
+    }
+
+    private async Task SelectGameAsync(TriviaGame game)
+    {
+        selectedGame = game;
+        await RefreshControlAsync();
+    }
+
+    private async Task AddTeamAsync()
+    {
+        await SendControlAsync(HttpMethod.Post, $"teams", new CreateTriviaTeamRequest(teamName));
+        teamName = string.Empty;
+    }
+
+    private Task AddQuestionAsync(Guid bankItemId) =>
+        SendControlAsync(HttpMethod.Post, "questions", new AddTriviaQuestionRequest(bankItemId));
+
+    private Task OpenQuestionAsync(Guid questionId) =>
+        SendControlAsync(HttpMethod.Put, $"questions/{questionId}/open");
+
+    private Task CloseQuestionAsync() =>
+        SendControlAsync(HttpMethod.Put, "question/close");
+
+    private Task FinishGameAsync() =>
+        SendControlAsync(HttpMethod.Put, "finish");
+
+    private async Task SendControlAsync(HttpMethod method, string path, object? body = null)
+    {
+        if (selectedGame is null)
+            return;
+        using var request = Authorized(method, $"/api/trivia/{selectedGame.Id}/{path}", body);
+        var response = await Http.SendAsync(request, lifetime.Token);
+        error = response.IsSuccessStatusCode ? null : await response.Content.ReadAsStringAsync(lifetime.Token);
+        await RefreshControlAsync();
+    }
+
+    private async Task RefreshControlAsync()
+    {
+        if (selectedGame is null)
+            return;
+        using var request = Authorized(HttpMethod.Get, $"/api/trivia/{selectedGame.Id}/control");
+        var response = await Http.SendAsync(request, lifetime.Token);
+        if (response.IsSuccessStatusCode)
+            control = await response.Content.ReadFromJsonAsync<InstructorTriviaStateResponse>(cancellationToken: lifetime.Token);
+        StateHasChanged();
+    }
+
+    private async Task PollAsync()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(lifetime.Token))
+                await InvokeAsync(RefreshControlAsync);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
+        {
+        }
+    }
+
+    private HttpRequestMessage Authorized(HttpMethod method, string path, object? body = null)
+    {
+        var request = new HttpRequestMessage(method, path);
+        request.Headers.TryAddWithoutValidation("InstructorCode", instructorCode);
+        if (body is not null)
+            request.Content = JsonContent.Create(body);
+        return request;
+    }
+
+    public void Dispose()
+    {
+        lifetime.Cancel();
+        lifetime.Dispose();
+    }
+
+    private sealed record QuestionBankResponse(List<QuestionBankItem> Items, int TotalCount);
+}

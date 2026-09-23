@@ -117,6 +117,13 @@ LiteDB session documents retain their existing stored field names while applicat
 
 This sequence diagram describes the implemented classroom survey workflow, including lifecycle endpoints, atomic whole-survey submission, SignalR events, polling fallback, and instructor-controlled student result reveal.
 
+Trivia uses its own game, team, participant, question, and answer collections.
+Approved bank questions are copied into a game so later bank edits cannot
+change an active competition. The API timestamps question opening and answer
+receipt, calculates points, and returns player-safe state without correct
+answers. Individual and team leaderboards are derived from persisted awarded
+points and refreshed by the Blazor clients.
+
 ```mermaid
 sequenceDiagram
     actor IB as Instructor Browser

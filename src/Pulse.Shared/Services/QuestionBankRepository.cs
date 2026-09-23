@@ -66,6 +66,9 @@ public class QuestionBankRepository : IQuestionBankRepository
         if (query.Source is not null)
             all = all.Where(x => x.Source == query.Source);
 
+        if (query.TriviaEligible is not null)
+            all = all.Where(x => x.TriviaEligible == query.TriviaEligible);
+
         return query.Sort switch
         {
             QuestionBankSort.Oldest => all.OrderBy(x => x.CreatedAt),
@@ -85,5 +88,6 @@ public class QuestionBankRepository : IQuestionBankRepository
             .Select(tag => tag.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+        item.CorrectAnswers = new List<string>(item.CorrectAnswers ?? []);
     }
 }

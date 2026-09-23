@@ -58,6 +58,12 @@
     background: white;
 }
 
+.bank-page input[type="checkbox"] {
+    width: 1.25rem;
+    min-height: 1.25rem;
+    accent-color: var(--pulse-purple-700);
+}
+
 .bank-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
