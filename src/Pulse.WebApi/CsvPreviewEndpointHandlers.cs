@@ -1,6 +1,7 @@
 using Pulse.Common.Services;
 using Pulse.Application.Services;
 using Pulse.Domain.Entities;
+using Pulse.Shared.Models;
 
 namespace Pulse.WebApi;
 
@@ -40,6 +41,9 @@ public static class CsvPreviewEndpointHandlers
             var typeRaw = values.Count > 1 ? values[1].Trim() : string.Empty;
             var optionsRaw = values.Count > 2 ? values[2].Trim() : string.Empty;
             var matchingPairsRaw = values.Count > 3 ? values[3].Trim() : string.Empty;
+            var course = values.Count > 4 ? values[4].Trim() : string.Empty;
+            var topic = values.Count > 5 ? values[5].Trim() : string.Empty;
+            var tagsRaw = values.Count > 6 ? values[6].Trim() : string.Empty;
 
             if (string.IsNullOrWhiteSpace(text))
                 errors.Add("Text is required.");
@@ -76,6 +80,11 @@ public static class CsvPreviewEndpointHandlers
                 Type = questionType,
                 Options = options,
                 MatchingPairs = matchingPairs,
+                Course = course,
+                Topic = topic,
+                Tags = tagsRaw.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList(),
+                Source = QuestionSource.CsvImport,
+                ModerationStatus = QuestionModerationStatus.Approved,
                 ValidationErrors = []
             }, null);
         });
@@ -134,6 +143,11 @@ public sealed class CsvQuestionRow
     public QuestionType Type { get; init; }
     public List<string> Options { get; init; } = [];
     public List<MatchingPair> MatchingPairs { get; init; } = [];
+    public string Course { get; init; } = string.Empty;
+    public string Topic { get; init; } = string.Empty;
+    public List<string> Tags { get; init; } = [];
+    public QuestionSource Source { get; init; } = QuestionSource.CsvImport;
+    public QuestionModerationStatus ModerationStatus { get; init; } = QuestionModerationStatus.Approved;
     public List<string> ValidationErrors { get; init; } = [];
     public bool IsValid => ValidationErrors.Count == 0;
 }

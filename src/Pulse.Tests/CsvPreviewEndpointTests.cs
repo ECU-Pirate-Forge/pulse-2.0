@@ -1,6 +1,7 @@
 using System.Text;
 using Microsoft.AspNetCore.Http;
 using Pulse.Application.Services;
+using Pulse.Shared.Models;
 using Pulse.WebApi;
 
 namespace Pulse.Tests.Tests;
@@ -39,6 +40,23 @@ public class CsvPreviewEndpointTests
         Assert.True(ok.Value.AllRowsValid);
         Assert.Equal("What is 2+2?", ok.Value.Rows[0].Text);
         Assert.Equal(4, ok.Value.Rows[0].Options.Count);
+    }
+
+    [Fact]
+    public async Task PreviewImport_ExtendedSchema_ReturnsTaxonomyAndProvenance()
+    {
+        var csv = "Text,Type,Options,MatchingPairs,Course,Topic,Tags\n" +
+                  "\"Choose one\",MultipleChoice,\"A|B\",,CSCI 3000,Networking,\"web|security\"";
+
+        var result = await CsvPreviewEndpointHandlers.PreviewImport(MakeRequest(csv), new QuestionService());
+
+        var ok = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.Ok<CsvPreviewResponse>>(result);
+        var row = Assert.Single(ok.Value!.Rows);
+        Assert.Equal("CSCI 3000", row.Course);
+        Assert.Equal("Networking", row.Topic);
+        Assert.Equal(["web", "security"], row.Tags);
+        Assert.Equal(QuestionSource.CsvImport, row.Source);
+        Assert.Equal(QuestionModerationStatus.Approved, row.ModerationStatus);
     }
 
     [Fact]

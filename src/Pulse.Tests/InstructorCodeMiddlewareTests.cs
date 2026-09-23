@@ -152,6 +152,7 @@ public class InstructorCodeMiddlewareTests
     [InlineData("PUT", "/api/questions/reorder")]
     [InlineData("POST", "/api/questionbank")]
     [InlineData("POST", "/api/questionbank/import/preview")]
+    [InlineData("PUT", "/api/questionbank/11111111-1111-1111-1111-111111111111")]
     public void IsInstructorOnlyReturnsTrueForQuestionAuthoringRoutes(string method, string path)
     {
         var context = new DefaultHttpContext();
@@ -159,6 +160,16 @@ public class InstructorCodeMiddlewareTests
         context.Request.Path = path;
 
         Assert.True(InstructorOnlyEndpointMatcher.IsInstructorOnly(context.Request));
+    }
+
+    [Fact]
+    public void IsInstructorOnlyReturnsFalseForAnonymousSuggestion()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Method = "POST";
+        context.Request.Path = "/api/questionbank/suggestions";
+
+        Assert.False(InstructorOnlyEndpointMatcher.IsInstructorOnly(context.Request));
     }
 
     [Fact]

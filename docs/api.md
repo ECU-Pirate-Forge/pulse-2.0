@@ -257,6 +257,27 @@ WebSocket interruption does not leave the classroom view stale.
 
 ## Questions
 
+## Moderated question bank
+
+Question-bank items include `course`, `topic`, `tags`, `type`,
+`moderationStatus`, `source`, `contributorAttribution`, `createdAt`, and
+`updatedAt`. Existing bank records remain approved for compatibility.
+
+- `POST /api/questionbank` creates an approved instructor-authored item.
+- `POST /api/questionbank/suggestions` accepts an anonymous student suggestion
+  and always stores it as `Pending`.
+- `PUT /api/questionbank/{id}` lets an instructor edit and approve or reject an
+  item.
+- `GET /api/questionbank` supports `text`, `type`, `course`, `topic`, `tag`,
+  `moderationStatus`, `source`, `sort`, `page`, and `pageSize`.
+
+Only approved items can be imported into a draft survey. Student suggestions
+cannot update or publish existing records.
+
+CSV preview accepts the columns `Text`, `Type`, `Options`, `MatchingPairs`,
+`Course`, `Topic`, and `Tags`. Use `|` between options and tags and encode
+matching pairs as `Prompt=>Match`.
+
 ### GET /api/sessions/{sessionId}/questions
 
 Get ordered questions for a specific session.
