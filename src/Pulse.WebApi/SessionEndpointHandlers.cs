@@ -117,6 +117,27 @@ public static class SessionEndpointHandlers
             created.InstructorCode));
     }
 
+    public static async Task<IResult> DeleteSession(
+        Guid id,
+        HttpContext context,
+        ISessionRepository repo)
+    {
+        var instructorCode = context.Items[InstructorCodeMiddleware.HeaderName]?.ToString()
+            ?? throw new InvalidOperationException(
+                "InstructorCode was not set by InstructorCodeMiddleware.");
+
+        var session = await repo.GetByIdAsync(id);
+        if (session is null)
+            return Results.NotFound();
+
+        if (!string.Equals(session.InstructorCode, instructorCode, StringComparison.Ordinal))
+            return Results.StatusCode(StatusCodes.Status403Forbidden);
+
+        return await repo.DeleteAsync(id)
+            ? Results.NoContent()
+            : Results.NotFound();
+    }
+
     public static async Task<IResult> UnblindSession(
         Guid id,
         HttpContext context,

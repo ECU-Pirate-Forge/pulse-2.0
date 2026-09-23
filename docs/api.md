@@ -77,6 +77,20 @@ Protected: Yes (InstructorCode required)
 
 Response 200: array of session objects.
 
+### DELETE /api/sessions/{id}
+
+Permanently delete a session owned by the current instructor. The session's
+questions and submitted responses are deleted in the same transaction.
+
+Protected: Yes (InstructorCode required)
+
+Response codes:
+
+- 204 No Content
+- 401 Unauthorized
+- 403 Forbidden
+- 404 Not Found
+
 ### GET /api/sessions/join/{joinCode}
 
 Public student join lookup by join code.
