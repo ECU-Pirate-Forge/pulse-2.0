@@ -32,9 +32,6 @@ Typical classroom usage flow:
 9. Instructors can run separate individual or instructor-defined team trivia
    games with server-timed scoring and live leaderboards.
 
-Activation, closure, live instructor updates, and student-side result reveal are planned work rather than completed behavior.
-
-
 ## Fully Implemented Features
 
 The following are currently implemented in this repository (and covered by project tests):
@@ -50,33 +47,24 @@ The following are currently implemented in this repository (and covered by proje
 - Response aggregation service logic for instructor tally/result retrieval
 - QR endpoint support for session join flows (by join code and by session id)
 - Survey-first student landing/join experience and dedicated instructor workspace navigation
+- Atomic whole-survey submission, lifecycle transitions, SignalR progress updates with polling fallback, and instructor-controlled result reveal
+- Individual and instructor-defined team trivia with server-side timing, scoring, polling, and leaderboards
 - Shared accessible ECU purple-and-gold design tokens used by both Blazor apps
 - Global exception middleware for consistent API error handling
-- Structured logging behavior coverage
+- Privacy-safe structured logging that omits student response content and persistent device identifiers
 - Admin DB export endpoint behavior
+- Repeatable Windows dev-tunnel workflow for real-device testing
+- bUnit functional coverage for student survey submission/reveal, student trivia,
+  and instructor live-survey/trivia controls
 
 ## Roadmap
 
 Planned and in-progress future work is tracked in the sprint backlog and implementation notes.
 
-Near-term roadmap:
+Current future-work themes:
 
-- Reframe Pulse around anonymous surveys rather than quiz administration
-- Establish an accessible ECU purple-and-gold design system
-- Separate student workflows into `Pulse.WebApp` and instructor workflows into `Pulse.Admin`
-- Add multiple-answer, true/false, and matching survey questions
-- Complete activate/close lifecycle behavior and atomic survey submission
-- Expand the moderated question bank and add individual/team trivia competition flows
-- Add a repeatable devtunnel workflow for real-device testing
-- Improve API documentation depth with request/response examples per endpoint
-- Add broader integration and end-to-end test coverage for critical classroom flows
-
-Mid-term roadmap:
-
-- Add a moderated question bank with student suggestions
-- Add separate individual and instructor-defined team trivia experiences
 - Enhanced analytics/reporting views for post-session review
-- Operational hardening (telemetry, diagnostics, reliability, and deployment readiness)
+- Deployment readiness beyond the documented local/Aspire development environment
 
 ## Project Structure
 
@@ -141,7 +129,24 @@ dotnet test .\Pulse.slnx
 dotnet run --project src/Pulse.AppHost/Pulse.AppHost.csproj
 ```
 
-### 6. Run Individual Services (Optional)
+### 6. Test on a Phone through a Dev Tunnel
+
+Create a named anonymous HTTPS tunnel once, then use the checked-in launcher:
+
+```powershell
+devtunnel user login
+devtunnel create pulse-student-yourname --allow-anonymous
+devtunnel port create pulse-student-yourname -p 7004 --protocol https
+.\tools\Start-MobileTest.ps1 -TunnelId pulse-student-yourname
+```
+
+The script hosts the tunnel, discovers its validated public student URL, starts
+Aspire with that URL explicitly configured for QR links, and stops both
+processes when testing ends. See the
+[onboarding guide](docs/onboarding.md) for QR checks, cleanup, and named-tunnel
+safety checks, and use the [mobile acceptance matrix](docs/mobile-acceptance.md).
+
+### 7. Run Individual Services (Optional)
 
 ```bash
 dotnet run --project src/Pulse.WebApi/Pulse.WebApi.csproj
@@ -151,12 +156,10 @@ dotnet run --project src/Pulse.Admin/Pulse.Admin.csproj
 
 ## Getting Started Validation
 
-Instruction validation was performed by a non-author reviewer (GitHub Copilot agent) on 2026-04-26 in a Windows environment:
+Latest Windows validation (2026-09-23):
 
-- `dotnet --version` -> 10.0.201
-- `dotnet restore Pulse.slnx` -> success
-- `dotnet build .\Pulse.slnx -c Debug` -> success
-- `dotnet test .\Pulse.slnx` -> 181 passed, 0 failed
+- `dotnet build Pulse.slnx --no-restore` -> success
+- `dotnet test Pulse.slnx --no-build --no-restore` -> 271 passed, 0 failed
 
 ## Documentation
 
@@ -165,6 +168,7 @@ Instruction validation was performed by a non-author reviewer (GitHub Copilot ag
 - [Architecture](docs/architecture.md)
 - [API reference](docs/api.md)
 - [Troubleshooting](docs/troubleshooting.md)
+- [Mobile acceptance matrix](docs/mobile-acceptance.md)
 - [Sprint backlog](docs/sprint-backlog.md)
 
 ## Contributing

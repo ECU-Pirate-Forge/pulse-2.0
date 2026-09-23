@@ -115,6 +115,12 @@ Response 200:
 
 - Content-Type: image/png
 
+The encoded target is
+`{App:JoinBaseUrl}/join/{joinCode}` when `App:JoinBaseUrl` is configured;
+otherwise it uses the API request origin. Aspire mobile testing sets this from
+`Pulse:PublicJoinBaseUrl`. Use an absolute public HTTPS student-app URL—never
+the API/Admin URL or a localhost URL—before generating a QR for another device.
+
 ### GET /sessions/{id}/qr
 
 Generate a PNG QR code for a session id.
@@ -124,6 +130,8 @@ Protected: Yes (InstructorCode required)
 Response 200:
 
 - Content-Type: image/png
+
+This endpoint uses the same `App:JoinBaseUrl` behavior as the join-code route.
 
 ### PUT /api/sessions/{id}/unblind
 

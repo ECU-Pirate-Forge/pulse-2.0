@@ -25,6 +25,7 @@ Solution file: Pulse.slnx
 Optional but recommended:
 
 - Visual Studio 2022 or VS Code with C# Dev Kit.
+- Microsoft Dev Tunnels CLI for real-device testing (`winget install Microsoft.devtunnel`).
 
 ## 3. First-Time Setup
 
@@ -54,20 +55,79 @@ Run individual projects if needed:
 Current development URLs from launch settings:
 
 - Web API: http://localhost:5062 and https://localhost:7081
-- Web App: http://pulse-webapp.dev.localhost:5243 and https://pulse-webapp.dev.localhost:7004
+- Web App mobile-test endpoint: https://localhost:7004
 - Admin App: http://pulse-admin.dev.localhost:5049 and https://pulse-admin.dev.localhost:7019
 
-### Mobile UI smoke test with devtunnel
+### Mobile testing with a public dev tunnel
 
-With AppHost running, expose the student app's HTTPS port:
+The student endpoint is local HTTPS port `7004`. Never tunnel the Admin endpoint
+(`7019`) or put developer credentials in configuration. Anonymous tunnel access
+is only for a temporary test session.
+
+#### Recommended: reusable named tunnel
+
+A named tunnel keeps the same public URL while it exists, which lets Aspire
+receive the URL before QR codes are generated. Create it once:
 
 ```powershell
-devtunnel host -p 7004 --protocol https --allow-anonymous
+devtunnel user login
+devtunnel create pulse-student-yourname --allow-anonymous
+devtunnel port create pulse-student-yourname -p 7004 --protocol https
 ```
 
-Open the reported public HTTPS URL on the test device, accept the one-time developer-tunnel warning, and verify the student home and join-code form at phone width. The explicit `https` protocol is required; automatic protocol detection can forward HTTP to the local TLS endpoint and return 502.
+Run from the repository root:
 
-Anonymous access is intended only for temporary classroom-device testing. Stop the tunnel after the smoke test. QR testing also requires `App:JoinBaseUrl` to be set to the reported public student URL before QR generation; a repeatable scripted workflow will be added in the release-hardening phase.
+```powershell
+.\tools\Start-MobileTest.ps1 -TunnelId pulse-student-yourname
+```
+
+`TunnelId` is mandatory. The launcher validates port 7004, HTTPS, and
+`Anonymous` `connect` access before hosting. It starts the named tunnel first,
+polls `devtunnel show --json` until the hosted port exposes `portUri`, and uses
+that discovered URL for Aspire and QR generation. An optional
+`-PublicJoinBaseUrl https://...` may be supplied only as an additional
+exact-match check against the discovered `portUri`.
+
+The launcher also refuses to reuse an already-listening local port, waits for
+the new student app's `https://localhost:7004/health` response, and verifies the
+discovered public `/health` response is exactly `Healthy` without credentials.
+Its public probe sends `X-Tunnel-Skip-AntiPhishing-Page: true` so a tunnel
+interstitial cannot be mistaken for application readiness. This prevents an
+old process or unrelated tunnel from making a stale QR URL appear valid.
+
+The launcher sets `Pulse__PublicJoinBaseUrl` from the discovered `portUri` only
+for its Aspire process.
+AppHost forwards it as `App__JoinBaseUrl` to the API (QR encoding) and
+`StudentApp__BaseUrl` to Admin (displayed join URL). The script rejects
+non-HTTPS URLs. It then hosts the named tunnel and cleans up Aspire when the
+tunnel exits. It attempts graceful shutdown first, falls back to stopping only
+the exact tracked process IDs, and checks whether port 7004 was released. Do
+not store the generated URL or any login token in source.
+
+The setup deliberately does not support an ephemeral/random tunnel: its URL
+cannot be safely known before Aspire configures QR generation. The explicit
+HTTPS port on the named tunnel also avoids protocol auto-detection forwarding
+HTTP to the local TLS endpoint and returning 502. Dev tunnels support HTTPS and
+WebSockets, so the Blazor Server circuit and survey SignalR hub can connect;
+survey polling remains the fallback and trivia uses polling.
+
+#### Validate and clean up
+
+1. Create and activate a survey in Admin.
+2. Confirm the displayed join URL begins with the configured public URL.
+3. Scan its QR with a physical phone; verify the browser opens
+   `https://<public-host>/join/<code>` and not localhost, the API, or Admin.
+   A one-time Microsoft Dev Tunnels anti-phishing/trust screen can still appear
+   for a physical browser; review it and continue to the student page.
+4. Submit the survey, then run the relevant rows in the
+   [mobile acceptance matrix](mobile-acceptance.md).
+5. Press Ctrl+C in the launcher window. It stops the exact tunnel and Aspire
+   process IDs it started, restores its environment, and checks port release.
+   If an Aspire child does not exit with its tracked parent, the script warns
+   that port 7004 remains occupied; close that process from its Aspire
+   dashboard/terminal before restarting rather than killing processes by name.
+6. Delete a named tunnel when it is no longer needed:
+   `devtunnel delete pulse-student-yourname`.
 
 ## 5. Current Dependency Injection Snapshot
 
@@ -129,9 +189,17 @@ Current smoke coverage includes a DI registration test that verifies ISessionRep
 
 - SessionRepositorySmokeTests.AddPulseWebApiCoreServices_RegistersSessionRepository
 
+The bUnit suite also drives the critical student survey submit/reveal flow,
+student trivia join/answer flow, instructor live results/reveal action, and
+instructor trivia question-open action. API/repository tests cover atomic
+survey persistence, reconnect identity, server scoring, and event publication.
+
 Run it with:
 
 - dotnet test src/Pulse.Tests/Pulse.Tests.csproj
+- `.\tests\Validate-DevTunnelMetadata.ps1` for deterministic validation of the
+  current wrapped `devtunnel show --json` metadata shape and legacy top-level
+  shape; the fixture contains no real URL, credentials, or access tokens.
 
 ## 7. Where to Look Next
 

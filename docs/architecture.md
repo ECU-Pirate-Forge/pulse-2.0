@@ -100,8 +100,26 @@ The application split must preserve existing links while establishing clear owne
 - `Pulse.WebApp` owns the canonical student route `/join/{joinCode}`.
 - Existing `/quiz/{joinCode}` links redirect to `/join/{joinCode}` during the transition.
 - Existing `/instructor` and `/instructor/*` WebApp routes redirect to their `Pulse.Admin` equivalents after those pages move.
-- QR codes always use the configured public WebApp base URL, never the API or Admin URL.
+- QR codes use the configured public WebApp base URL when present. Without it,
+  the API falls back to the incoming QR request origin, which is suitable for
+  same-host use but must not be used for cross-device testing unless that
+  origin is publicly reachable.
 - Redirects remain until usage data and release notes support their removal.
+
+For local mobile testing, the launcher hosts a configured named tunnel, reads
+its published port 7004 `portUri`, and supplies that value to AppHost as
+`Pulse:PublicJoinBaseUrl` (environment form:
+`Pulse__PublicJoinBaseUrl`). AppHost accepts only an absolute HTTPS URL and
+forwards it to the API as `App__JoinBaseUrl` and Admin as
+`StudentApp__BaseUrl`. The public tunnel terminates HTTPS and forwards port
+7004, including WebSocket traffic, to the student Blazor Server app. API and
+Admin endpoints are not directly exposed by this workflow.
+
+Telemetry records session/question correlation, counts, status, request method,
+path, exception type, a message-free stack trace, and correlation ID. Student
+answer values and persistent device IDs are deliberately excluded. Unhandled
+exceptions are logged by type and sanitized stack trace without attaching the
+exception object because exception messages can contain repository input.
 
 ## Persistence compatibility
 

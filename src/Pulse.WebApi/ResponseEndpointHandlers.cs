@@ -51,8 +51,11 @@ public static class ResponseEndpointHandlers
 
         responseRepo.Upsert(response);
 
-        logger.LogInformation("Response submitted SessionId={SessionId} QuestionId={QuestionId} DeviceId={DeviceId} CorrelationId={CorrelationId}",
-            sessionId, questionId, request.DeviceId, context.TraceIdentifier);
+        logger.LogInformation(
+            "Response submitted SessionId={SessionId} QuestionId={QuestionId} CorrelationId={CorrelationId}",
+            sessionId,
+            questionId,
+            context.TraceIdentifier);
 
         return Results.Ok(new RespondResult(response.SubmittedAt));
     }
