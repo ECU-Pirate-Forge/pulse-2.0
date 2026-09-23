@@ -137,6 +137,18 @@ public class InstructorCodeMiddlewareTests
     }
 
     [Fact]
+    public void IsInstructorOnlyReturnsTrueForApiSessionDeleteRoute()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Method = HttpMethods.Delete;
+        context.Request.Path = "/api/sessions/00000000-0000-0000-0000-000000000001";
+
+        var isProtected = InstructorOnlyEndpointMatcher.IsInstructorOnly(context.Request);
+
+        Assert.True(isProtected);
+    }
+
+    [Fact]
     public void IsInstructorOnlyReturnsFalseForPublicStudentRoute()
     {
         var context = new DefaultHttpContext();

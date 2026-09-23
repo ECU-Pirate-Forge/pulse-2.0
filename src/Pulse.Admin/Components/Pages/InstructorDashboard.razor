@@ -240,6 +240,11 @@
         <!-- Sessions List -->
         <MudText Typo="Typo.h5" Style="font-weight: 700; margin-bottom: 20px;">Your surveys</MudText>
 
+        @if (!string.IsNullOrEmpty(DeleteError))
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">@DeleteError</MudAlert>
+        }
+
         @if (IsLoading)
         {
             <MudProgressLinear Indeterminate="true" Class="mb-4" />
@@ -337,7 +342,8 @@
                                            Size="Size.Small"
                                            Color="Color.Error"
                                            Class="action-button"
-                                           @onclick="@(() => DeleteSession(session.Id))">
+                                           Disabled="@IsDeletingSessionId.HasValue"
+                                           @onclick="@(() => DeleteSessionAsync(session.Id))">
                                     Delete
                                 </MudButton>
                             </div>
@@ -356,8 +362,10 @@
     private string NewSessionTitle = string.Empty;
     private string? CreateError = null;
     private string? LoadError = null;
+    private string? DeleteError = null;
     private bool IsCreating = false;
     private bool IsLoading = false;
+    private Guid? IsDeletingSessionId;
     private List<SessionModel> Sessions = new();
 
     private bool IsAuthenticated => !string.IsNullOrEmpty(_instructorCode);
@@ -542,8 +550,42 @@
         NavManager.NavigateTo($"/instructor/qr/{sessionId}?joinCode={joinCode}");
     }
 
-    private void DeleteSession(Guid sessionId) =>
-        Sessions.RemoveAll(s => s.Id == sessionId);
+    private async Task DeleteSessionAsync(Guid sessionId)
+    {
+        if (IsDeletingSessionId.HasValue)
+            return;
+
+        IsDeletingSessionId = sessionId;
+        DeleteError = null;
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Delete, $"/api/sessions/{sessionId}");
+            request.Headers.TryAddWithoutValidation("InstructorCode", _instructorCode);
+            using var response = await Http.SendAsync(request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                Sessions.RemoveAll(s => s.Id == sessionId);
+            }
+            else
+            {
+                DeleteError = "Failed to delete session. Please try again.";
+            }
+        }
+        catch (HttpRequestException)
+        {
+            DeleteError = "Unable to connect to the server.";
+        }
+        catch (TaskCanceledException)
+        {
+            DeleteError = "Unable to connect to the server.";
+        }
+        finally
+        {
+            IsDeletingSessionId = null;
+        }
+    }
 
     private async Task TransitionSessionAsync(SessionModel session, string transition)
     {

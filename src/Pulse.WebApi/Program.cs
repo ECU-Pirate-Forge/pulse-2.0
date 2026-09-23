@@ -76,6 +76,7 @@ app.MapPost("/api/questionbank/suggestions", QuestionBankEndpointHandlers.Submit
 app.MapPut("/api/questionbank/{id:guid}", QuestionBankEndpointHandlers.ModerateQuestionBankItem);
 app.MapGet("/sessions", SessionEndpointHandlers.GetSessions);
 app.MapPost("/api/sessions", SessionEndpointHandlers.CreateSession);
+app.MapDelete("/api/sessions/{id:guid}", SessionEndpointHandlers.DeleteSession);
 app.MapGet("/api/sessions/join/{joinCode}", SessionEndpointHandlers.JoinSessionByCode);
 app.MapGet("/api/sessions/qr/{joinCode}", SessionEndpointHandlers.GetSessionQrByCode);
 app.MapGet("/sessions/{id:guid}/qr", SessionEndpointHandlers.GetSessionQr);
