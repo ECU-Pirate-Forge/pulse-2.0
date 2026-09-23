@@ -124,7 +124,8 @@ public static class SessionEndpointHandlers
     public static async Task<IResult> UnblindSession(
         Guid id,
         HttpContext context,
-        ISessionRepository repo)
+        ISessionRepository repo,
+        ISessionEventPublisher? eventPublisher = null)
     {
         var instructorCode = context.Items[InstructorCodeMiddleware.HeaderName]?.ToString();
 
@@ -144,7 +145,8 @@ public static class SessionEndpointHandlers
         if (!updated)
             return Results.Problem("Failed to persist session update.", statusCode: StatusCodes.Status500InternalServerError);
 
-        // TODO: Emit ResultsUnblinded SignalR event when hub is implemented
+        if (eventPublisher is not null)
+            await eventPublisher.PublishResultsRevealedAsync(id, context.RequestAborted);
 
         return Results.Ok(session);
     }
@@ -155,11 +157,21 @@ public static class SessionEndpointHandlers
         ISessionRepository repo) =>
         TransitionSession(id, SessionStatus.Active, context, repo);
 
-    public static Task<IResult> CloseSession(
+    public static async Task<IResult> CloseSession(
         Guid id,
         HttpContext context,
-        ISessionRepository repo) =>
-        TransitionSession(id, SessionStatus.Closed, context, repo);
+        ISessionRepository repo,
+        ISessionEventPublisher? eventPublisher = null)
+    {
+        var result = await TransitionSession(id, SessionStatus.Closed, context, repo);
+        if (eventPublisher is not null &&
+            result is Microsoft.AspNetCore.Http.HttpResults.Ok<Session>)
+        {
+            await eventPublisher.PublishSessionClosedAsync(id, context.RequestAborted);
+        }
+
+        return result;
+    }
 
     private static async Task<IResult> TransitionSession(
         Guid id,

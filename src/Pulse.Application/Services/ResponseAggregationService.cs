@@ -1,4 +1,6 @@
 using Pulse.Common.Services;
+using Pulse.Domain.Entities;
+using System.Text.Json;
 
 namespace Pulse.Application.Services;
 
@@ -39,5 +41,46 @@ public class ResponseAggregationService
             .ToList();
 
         return AggregationResult.Success(tallies);
+    }
+
+    public AggregationResult GetResponseCounts(Question question)
+    {
+        if (question.Id == Guid.Empty)
+            return AggregationResult.Failure("Question ID is invalid.");
+
+        var values = _repo.GetByQuestionId(question.Id)
+            .SelectMany(response => DecodeValues(response.Value))
+            .ToList();
+
+        if (question.Type == QuestionType.Matching)
+        {
+            var responses = _repo.GetByQuestionId(question.Id).ToList();
+            values = responses.SelectMany(response =>
+            {
+                var matches = DecodeValues(response.Value);
+                return question.MatchingPairs.Select((pair, index) =>
+                    $"{pair.Prompt}: {matches.ElementAtOrDefault(index) ?? string.Empty}");
+            }).Where(value => !value.EndsWith(": ", StringComparison.Ordinal)).ToList();
+        }
+
+        return AggregationResult.Success(values
+            .GroupBy(value => value)
+            .Select(group => new QuestionTally(group.Key, group.Count()))
+            .ToList());
+    }
+
+    private static IReadOnlyList<string> DecodeValues(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return [];
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<string>>(value) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [value];
+        }
     }
 }

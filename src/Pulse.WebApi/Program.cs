@@ -16,6 +16,7 @@ var connectionString = builder.Configuration.GetConnectionString("pulse-db") ?? 
 builder.Services.AddPulseWebApiCoreServices(connectionString);
 
 builder.Services.AddOpenApi();
+builder.Services.AddSignalR();
 
 var app = builder.Build();
 
@@ -78,6 +79,7 @@ app.MapGet("/api/sessions/qr/{joinCode}", SessionEndpointHandlers.GetSessionQrBy
 app.MapGet("/sessions/{id:guid}/qr", SessionEndpointHandlers.GetSessionQr);
 app.MapPost("/api/sessions/{sessionId:guid}/submit", SurveySubmissionEndpointHandlers.SubmitSurvey);
 app.MapGet("/api/sessions/{id:guid}/results", SessionResultsEndpointHandlers.GetSessionResults);
+app.MapGet("/api/sessions/{id:guid}/results/student", SessionResultsEndpointHandlers.GetStudentResults);
 
 app.MapPut("/api/sessions/{id:guid}/unblind", SessionEndpointHandlers.UnblindSession);
 app.MapPut("/api/sessions/{id:guid}/activate", SessionEndpointHandlers.ActivateSession);
@@ -85,6 +87,7 @@ app.MapPut("/api/sessions/{id:guid}/close", SessionEndpointHandlers.CloseSession
 app.MapGet("/api/admin/export-db", AdminEndpointHandlers.ExportDb);
 app.MapPost("/api/questionbank/import/preview", CsvPreviewEndpointHandlers.PreviewImport).DisableAntiforgery();
 app.MapPost("/api/sessions/{sessionId:guid}/questions/import", QuestionBankImportEndpointHandlers.ImportQuestions);
+app.MapHub<SessionHub>("/hubs/session");
 app.MapDefaultEndpoints();
 
 app.Run();

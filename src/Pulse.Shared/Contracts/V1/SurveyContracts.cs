@@ -46,3 +46,7 @@ public sealed record StudentSurveyResultsResponse(
     [property: JsonPropertyName("sessionId")] Guid SessionId,
     [property: JsonPropertyName("title")] string Title,
     [property: JsonPropertyName("questions")] IReadOnlyList<SurveyQuestionResultsResponse> Questions);
+
+public sealed record SessionProgressUpdate(
+    [property: JsonPropertyName("participantCount")] int ParticipantCount,
+    [property: JsonPropertyName("completedCount")] int CompletedCount);

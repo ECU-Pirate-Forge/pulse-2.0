@@ -303,10 +303,27 @@
                                 {
                                 <MudButton Variant="Variant.Filled"
                                            Size="Size.Small"
+                                           Color="Color.Primary"
+                                           Class="action-button"
+                                           @onclick="@(() => MonitorSession(session.Id))">
+                                    Monitor
+                                </MudButton>
+                                <MudButton Variant="Variant.Filled"
+                                           Size="Size.Small"
                                            Color="Color.Warning"
                                            Class="action-button"
                                            @onclick="@(() => TransitionSessionAsync(session, "close"))">
                                     Close
+                                </MudButton>
+                                }
+                                else if (session.Status == SessionStatus.Closed)
+                                {
+                                <MudButton Variant="Variant.Filled"
+                                           Size="Size.Small"
+                                           Color="Color.Primary"
+                                           Class="action-button"
+                                           @onclick="@(() => MonitorSession(session.Id))">
+                                    Results
                                 </MudButton>
                                 }
                                 <MudButton Variant="Variant.Outlined"
@@ -511,6 +528,12 @@
 
     private void ManageQuestions(Guid sessionId) =>
         NavManager.NavigateTo($"/instructor/questions/{sessionId}");
+
+    private void MonitorSession(Guid sessionId)
+    {
+        var joinCode = Sessions.FirstOrDefault(s => s.Id == sessionId)?.JoinCode ?? string.Empty;
+        NavManager.NavigateTo($"/surveys/{sessionId}/live?joinCode={Uri.EscapeDataString(joinCode)}");
+    }
 
     private void ShowQR(Guid sessionId)
     {

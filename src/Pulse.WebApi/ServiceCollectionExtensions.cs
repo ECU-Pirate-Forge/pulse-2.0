@@ -17,6 +17,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IQuestionBankRepository, QuestionBankRepository>();
         services.AddSingleton<IResponseRepository, ResponseRepository>();
         services.AddSingleton<DeviceIdValidationService>();
+        services.AddSingleton<ISessionEventPublisher, SignalRSessionEventPublisher>();
 
         return services;
     }

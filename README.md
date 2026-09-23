@@ -3,7 +3,7 @@
 
 Pulse is a classroom pulse and feedback platform built to help instructors check understanding while class is in progress. Instructors create sessions, students join with a code or QR flow, and responses are aggregated for instructor review. Real-time updates are part of the approved redesign work.
 
-The solution is implemented as a multi-project .NET 10 application with Blazor frontends, minimal APIs, and LiteDB for local persistence. SignalR-based real-time updates are part of the approved redesign plan but are not implemented yet.
+The solution is implemented as a multi-project .NET 10 application with Blazor frontends, minimal APIs, LiteDB for local persistence, and SignalR for live classroom updates.
 
 ## Project Background
 
@@ -62,7 +62,7 @@ Near-term roadmap:
 - Separate student workflows into `Pulse.WebApp` and instructor workflows into `Pulse.Admin`
 - Add multiple-answer, true/false, and matching survey questions
 - Complete activate/close lifecycle behavior and atomic survey submission
-- Add SignalR instructor monitoring and server-enforced student result blinding
+- Expand the moderated question bank and add individual/team trivia competition flows
 - Add a repeatable devtunnel workflow for real-device testing
 - Improve API documentation depth with request/response examples per endpoint
 - Add broader integration and end-to-end test coverage for critical classroom flows
