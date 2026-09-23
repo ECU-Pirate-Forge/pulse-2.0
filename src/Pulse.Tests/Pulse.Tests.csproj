@@ -21,6 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\Pulse.AppHost\PublicJoinUrl.cs" Link="AppHost\PublicJoinUrl.cs" />
     <ProjectReference Include="..\Pulse.WebApi\Pulse.WebApi.csproj" />
     <ProjectReference Include="..\Pulse.WebApp\Pulse.WebApp.csproj" />
     <ProjectReference Include="..\Pulse.Admin\Pulse.Admin.csproj" />

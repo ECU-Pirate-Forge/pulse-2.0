@@ -46,7 +46,8 @@ public class StructuredLoggingTests
     public async Task Respond_ValidRequest_EmitsInformationLog()
     {
         var session = new Session { Id = _sessionId, InstructorCode = "INST", Status = SessionStatus.Active };
-        var request = new RespondRequest { DeviceId = _validDeviceId, Value = "A" };
+        const string responseContent = "private student response";
+        var request = new RespondRequest { DeviceId = _validDeviceId, Value = responseContent };
 
         var loggerMock = new Mock<ILogger>();
         var loggerFactory = new Mock<ILoggerFactory>();
@@ -69,6 +70,27 @@ public class StructuredLoggingTests
                 null,
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);
+
+        loggerMock.Verify(
+            l => l.Log(
+                It.IsAny<LogLevel>(),
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) =>
+                    !v.ToString()!.Contains(_validDeviceId, StringComparison.Ordinal) &&
+                    !v.ToString()!.Contains(responseContent, StringComparison.Ordinal)),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.AtLeastOnce);
+        loggerMock.Verify(
+            l => l.Log(
+                It.IsAny<LogLevel>(),
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) =>
+                    v.ToString()!.Contains(_validDeviceId, StringComparison.Ordinal) ||
+                    v.ToString()!.Contains(responseContent, StringComparison.Ordinal)),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Never);
     }
 
     [Fact]

@@ -156,6 +156,48 @@ Fix:
 2. Restart IDE after SDK installs/updates.
 3. Clear stale IDE state by reloading the workspace/solution.
 
+### 10. Dev tunnel returns 502 or the Blazor app keeps reconnecting
+
+1. Confirm `https://localhost:7004/health` returns exactly `Healthy`. If TLS
+   validation fails, run `dotnet dev-certs https --trust`, restart Aspire, and
+   retry.
+2. Confirm the named tunnel has explicit HTTPS forwarding:
+   `devtunnel port create <tunnel-id> -p 7004 --protocol https`.
+3. Trust the local certificate with `dotnet dev-certs https --trust`, restart
+   Aspire, and retry.
+4. Do not expose port `7019`; that is the local Admin app.
+5. Check that VPN, firewall, or managed-device policy permits WebSockets.
+   Survey updates can fall back to polling, but the Blazor Server UI itself
+   still needs a reliable circuit.
+6. The launcher's automated public health request skips the anti-phishing page
+   and requires the exact `Healthy` body. A physical browser may still show the
+   one-time Microsoft Dev Tunnels trust screen; continue after reviewing it.
+
+### 11. QR opens localhost, the API, or an old tunnel
+
+The QR target is fixed when the API generates the image. Stop the current
+launcher and restart through the checked-in launcher, which discovers the URL
+only after hosting begins:
+
+```powershell
+.\tools\Start-MobileTest.ps1 -TunnelId <tunnel-id>
+```
+
+Prefer the named tunnel workflow in [Onboarding](onboarding.md) to avoid URL
+changes. If the optional `PublicJoinBaseUrl` check is used, the URL must be
+absolute HTTPS with no credentials, query, or fragment and must exactly match
+the hosted tunnel's port 7004 `portUri`.
+
+### 12. Named tunnel is unavailable or unexpectedly prompts for sign-in
+
+Inspect it with `devtunnel show <tunnel-id> --json`. Before hosting, confirm
+port `7004` uses protocol `https` and the `tunnel.accessControl` array contains
+an entry with type `Anonymous` and scope `connect`; `portUri` appears only
+after hosting starts. Recreate the tunnel with `--allow-anonymous` if
+necessary. Anonymous mode exposes the student UI to anyone with the URL; stop
+hosting after testing and delete obsolete tunnels with
+`devtunnel delete <tunnel-id>`.
+
 ## Still Stuck?
 
 When asking for help, include:
