@@ -2,20 +2,20 @@
 @inject HttpClient Http
 @inject NavigationManager Navigation
 
-<PageTitle>Joining survey | Pulse</PageTitle>
+<PageTitle>Joining | Pulse</PageTitle>
 
 <main id="main-content" class="pulse-page join-status-page">
     <section class="pulse-card join-status-card" aria-live="polite">
         @if (isLoading)
         {
-            <p class="pulse-eyebrow">Survey code @JoinCode</p>
-            <h1>Opening your survey</h1>
-            <p>Confirming that the survey is available.</p>
+            <p class="pulse-eyebrow">Join code @JoinCode</p>
+            <h1>Checking your code</h1>
+            <p>Confirming that the survey or trivia game is available.</p>
         }
         else
         {
             <p class="pulse-eyebrow">Unable to join</p>
-            <h1>We could not open that survey</h1>
+            <h1>We could not join with that code</h1>
             <p>@errorMessage</p>
             <a class="pulse-button pulse-button-primary" href="/">Try another code</a>
         }
@@ -29,12 +29,13 @@
     private bool isLoading = true;
     private string errorMessage = "Check the code with your instructor and try again.";
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
+        isLoading = true;
         try
         {
             var normalizedCode = JoinCode.Trim().ToUpperInvariant();
-            var response = await Http.GetAsync($"/api/sessions/join/{normalizedCode}");
+            using var response = await Http.GetAsync($"/api/sessions/join/{Uri.EscapeDataString(normalizedCode)}");
 
             if (response.IsSuccessStatusCode)
             {
@@ -42,10 +43,23 @@
                 return;
             }
 
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                using var triviaResponse = await Http.GetAsync($"/api/trivia/join/{Uri.EscapeDataString(normalizedCode)}");
+                if (triviaResponse.IsSuccessStatusCode)
+                {
+                    Navigation.NavigateTo($"/trivia/{Uri.EscapeDataString(normalizedCode)}");
+                    return;
+                }
+
+                errorMessage = triviaResponse.StatusCode == System.Net.HttpStatusCode.NotFound
+                    ? "That survey or trivia code was not found. Check the code with your instructor."
+                    : "Pulse could not check that trivia game right now. Please try again.";
+                return;
+            }
+
             errorMessage = response.StatusCode switch
             {
-                System.Net.HttpStatusCode.NotFound =>
-                    "That survey code was not found. Check the code with your instructor.",
                 System.Net.HttpStatusCode.Conflict =>
                     "This survey is not currently accepting responses.",
                 _ => "Pulse could not check that survey right now. Please try again."

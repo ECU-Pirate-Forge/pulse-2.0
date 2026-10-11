@@ -32,6 +32,11 @@ Typical classroom usage flow:
 9. Instructors can run separate individual or instructor-defined team trivia
    games with server-timed scoring and live leaderboards.
 
+The shared `/join/{code}` path checks surveys first, then trivia games if no
+survey matches. Trivia codes continue to `/trivia/{code}` with the game already
+loaded; students enter a display name and, for team games, select a team.
+Students can also enter their game code directly on `/trivia`.
+
 ## Fully Implemented Features
 
 The following are currently implemented in this repository (and covered by project tests):

@@ -21,6 +21,23 @@ public class TriviaPlayPageTests : BunitContext
     }
 
     [Fact]
+    public void SharedJoinRoute_OpensGameWithoutReenteringCode()
+    {
+        Assert.Contains(typeof(TriviaPlay).GetCustomAttributes(
+            typeof(Microsoft.AspNetCore.Components.RouteAttribute), false),
+            attribute => ((Microsoft.AspNetCore.Components.RouteAttribute)attribute).Template == "/trivia/{JoinCode}");
+
+        var handler = new TriviaHandler();
+        Services.AddSingleton(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+        var cut = Render<TriviaPlay>(parameters => parameters.Add(p => p.JoinCode, " abc123 "));
+
+        cut.WaitForElement("input[maxlength='30']").Change("Ada");
+        Assert.Equal("ABC123", cut.Find("input[maxlength='6']").GetAttribute("value"));
+        cut.FindAll("button").Single().Click();
+        cut.WaitForAssertion(() => Assert.Contains("Which option?", cut.Markup));
+    }
+
+    [Fact]
     public void IndividualGame_JoinAndSubmitAnswer_CompletesCriticalStudentPath()
     {
         var handler = new TriviaHandler();
@@ -38,6 +55,35 @@ public class TriviaPlayPageTests : BunitContext
 
         cut.WaitForAssertion(() => Assert.Contains("Answer submitted · 125 points", cut.Markup));
         Assert.Equal(["A"], handler.SubmittedAnswer?.Values);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.NotFound, false, "That trivia code was not found.")]
+    [InlineData(HttpStatusCode.InternalServerError, false, "could not check that trivia game")]
+    [InlineData(HttpStatusCode.OK, true, "could not connect")]
+    public void SharedJoinRoute_LookupFailureShowsActionableError(
+        HttpStatusCode status, bool connectionFailure, string expectedMessage)
+    {
+        Services.AddSingleton(new HttpClient(new FailedLookupHandler(status, connectionFailure))
+        {
+            BaseAddress = new Uri("http://localhost")
+        });
+
+        var cut = Render<TriviaPlay>(parameters => parameters.Add(p => p.JoinCode, "ABC123"));
+
+        cut.WaitForAssertion(() => Assert.Contains(expectedMessage, cut.Find("[role='alert']").TextContent));
+        Assert.Empty(cut.FindAll("input[maxlength='30']"));
+        Assert.Contains("Find game", cut.Markup);
+    }
+
+    private sealed class FailedLookupHandler(HttpStatusCode status, bool connectionFailure)
+        : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken) =>
+            connectionFailure
+                ? Task.FromException<HttpResponseMessage>(new HttpRequestException("Connection failed"))
+                : Task.FromResult(new HttpResponseMessage(status));
     }
 
     private sealed class StubDeviceIdService(string deviceId) : IDeviceIdService
