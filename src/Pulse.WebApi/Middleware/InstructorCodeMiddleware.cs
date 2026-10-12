@@ -143,6 +143,15 @@ public static class InstructorOnlyEndpointMatcher
             return true;
         }
 
+        if (path.StartsWith("/api/sessions/", StringComparison.OrdinalIgnoreCase) &&
+            (path.Contains("/grounding", StringComparison.OrdinalIgnoreCase) ||
+             path.EndsWith("/questions/instructor", StringComparison.OrdinalIgnoreCase) ||
+             path.EndsWith("/questions/generate", StringComparison.OrdinalIgnoreCase) ||
+             path.Contains("/questions/generated/", StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
         if ((HttpMethods.IsPut(method) || HttpMethods.IsDelete(method))
             && SessionIdRouteRegex.IsMatch(path))
         {

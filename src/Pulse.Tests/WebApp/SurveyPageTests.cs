@@ -173,7 +173,7 @@ public class SurveyPageTests : BunitContext
             if (request.Method == HttpMethod.Get &&
                 request.RequestUri?.AbsolutePath == $"/api/sessions/{sessionId}/questions")
             {
-                return JsonResponse(HttpStatusCode.OK, questions);
+                return JsonResponse(HttpStatusCode.OK, questions.Select(StudentQuestionResponse.FromQuestion));
             }
 
             if (request.Method == HttpMethod.Post &&

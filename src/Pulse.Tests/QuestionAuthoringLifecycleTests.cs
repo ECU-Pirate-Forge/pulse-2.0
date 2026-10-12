@@ -88,6 +88,46 @@ public class QuestionAuthoringLifecycleTests
         Assert.NotNull(questions.GetById(question.Id));
     }
 
+    [Fact]
+    public async Task EditGeneratedQuestion_PreservesAnswerKeyAndCitation()
+    {
+        using var database = new LiteDatabase("Filename=:memory:");
+        var questions = new QuestionRepository(database);
+        var session = CreateSession(SessionStatus.Draft);
+        var question = questions.Insert(new Question
+        {
+            SessionId = session.Id, Text = "Original question", Type = QuestionType.MultipleChoice,
+            Options = ["A", "B"], CorrectAnswers = ["A"], Explanation = "Supporting explanation",
+            SourceId = "context:1", SourceQuote = "Source quote"
+        });
+        var result = await QuestionEndpointHandlers.UpdateQuestionForInstructor(question.Id,
+            new UpdateQuestionRequest { Text = "Edited question", Type = question.Type, Options = ["A", "B"] },
+            questions, new QuestionService(), CreateSessionRepository(session).Object, CreateContext("INST"));
+        Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.Ok<Question>>(result);
+        var stored = questions.GetById(question.Id)!;
+        Assert.Equal(["A"], stored.CorrectAnswers);
+        Assert.Equal("Source quote", stored.SourceQuote);
+        Assert.Equal("Supporting explanation", stored.Explanation);
+    }
+
+    [Fact]
+    public async Task EditGeneratedQuestion_RemovingCorrectChoiceRequiresUpdatingAnswerKey()
+    {
+        using var database = new LiteDatabase("Filename=:memory:");
+        var questions = new QuestionRepository(database);
+        var session = CreateSession(SessionStatus.Draft);
+        var question = questions.Insert(new Question
+        {
+            SessionId = session.Id, Text = "Original question", Type = QuestionType.MultipleChoice,
+            Options = ["A", "B"], CorrectAnswers = ["A"]
+        });
+        var result = await QuestionEndpointHandlers.UpdateQuestionForInstructor(question.Id,
+            new UpdateQuestionRequest { Text = "Edited question", Type = question.Type, Options = ["B", "C"] },
+            questions, new QuestionService(), CreateSessionRepository(session).Object, CreateContext("INST"));
+        Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.BadRequest<string>>(result);
+        Assert.Equal(["A", "B"], questions.GetById(question.Id)!.Options);
+    }
+
     private static Session CreateSession(SessionStatus status) => new()
     {
         Id = Guid.NewGuid(),

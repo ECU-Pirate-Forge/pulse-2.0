@@ -88,7 +88,8 @@ Response 200: array of session objects.
 ### DELETE /api/sessions/{id}
 
 Permanently delete a session owned by the current instructor. The session's
-questions and submitted responses are deleted in the same transaction.
+questions, submitted responses, attached grounding documents, and generation
+previews are deleted in the same transaction.
 
 Protected: Yes (InstructorCode required)
 
@@ -279,6 +280,74 @@ WebSocket interruption does not leave the classroom view stale.
 
 ## Questions
 
+### Student and instructor question contracts
+
+`GET /questions` and `GET /api/sessions/{sessionId}/questions` return
+student-safe projections without answer keys, explanations, or source quotes.
+For matching questions, `matchingPairs` contains prompts with empty `match`
+values; `options` contains independently sorted match choices. Clients must
+not interpret array alignment as the correct pairing.
+
+`GET /api/sessions/{sessionId}/questions/instructor` requires the owning
+instructor's code and returns full questions, including optional
+`correctAnswers`, `explanation`, `sourceId`, and `sourceQuote`.
+Question creation and updates accept optional answer keys; keys must match
+the options. Single-choice and True/False questions have one correct answer
+when an answer key is supplied. Feedback-only questions can omit the key.
+
+## Document-grounded question generation
+
+All routes below require `InstructorCode` and ownership of the survey.
+Writes and generation additionally require Draft status.
+
+| Method | Route suffix under `/api/sessions/{sessionId}` | Purpose |
+|---|---|---|
+| GET | `/grounding` | Return revision, additional context, and document metadata (not document contents). |
+| PUT | `/grounding/context` | Save `{ "additionalContext": "..." }`, up to 10,000 characters. |
+| POST | `/grounding/documents` | Append multipart document files; maximum five attachments total. |
+| DELETE | `/grounding/documents/{documentId}` | Remove one attachment and invalidate previews. |
+| POST | `/questions/generate` | Generate `{ "count": 5 }` using local Ollama; count must be 1-20. |
+| POST | `/questions/generated/{previewId}/accept` | Approve the server-stored preview and atomically append its questions. |
+
+Uploads support TXT/MD (UTF-8), text PDFs (maximum 100 pages), and DOCX body
+paragraphs. Each file is limited to 5 MB and 50,000 extracted characters.
+Invalid files reject the entire upload batch. Original bytes and extracted
+text are stored in LiteDB; embeddings are computed locally at generation time.
+
+Generation returns:
+
+```json
+{
+  "id": "11111111-1111-1111-1111-111111111111",
+  "questions": [
+    {
+      "text": "Which pigment absorbs light during photosynthesis?",
+      "options": ["Chlorophyll", "Hemoglobin", "Melanin", "Keratin"],
+      "correctAnswer": "Chlorophyll",
+      "explanation": "The source identifies chlorophyll as the light-absorbing pigment.",
+      "sourceId": "context:1",
+      "sourceQuote": "Chlorophyll absorbs light."
+    }
+  ]
+}
+```
+
+Document source IDs use `{documentId without hyphens}:{chunkNumber}`; free-text
+sources use `context:{chunkNumber}`. The model must supply four distinct
+choices, one matching correct answer, and an exact quote from a retrieved
+passage. The application rejects invalid citations and wrong question counts.
+No survey questions are inserted by generation itself.
+
+Approval returns an array of saved questions. Previews expire after one hour,
+are replaced by a newer preview for the same survey, and are invalidated when
+saved grounding changes. A second approval of the same preview returns 409.
+
+Errors: 400 invalid document/input; 401 missing instructor code; 403 invalid
+code or ownership; 404 missing survey/document; 409 non-Draft survey or stale
+preview/grounding; 502 local inference failure, malformed model output, or
+inference timeout. Request aborts cancel inference. No automatic inference
+POST retries are configured.
+
 ## Moderated question bank
 
 Question-bank items include `course`, `topic`, `tags`, `type`,
@@ -330,11 +399,11 @@ without trusting client clocks or previously cached leaderboard values.
 
 Get ordered questions for a specific session.
 
-Protected: No (current implementation)
+Protected: No (student-safe projection)
 
 Response codes:
 
-- 200 OK (array of question objects ordered by sortOrder)
+- 200 OK (array of student-safe questions ordered by sortOrder)
 
 ### POST /api/sessions/{sessionId}/questions
 
@@ -365,7 +434,7 @@ Response codes:
 
 ### GET /questions
 
-Get all questions.
+Get all questions using the student-safe contract described above.
 
 Protected: No
 

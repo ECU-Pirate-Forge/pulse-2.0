@@ -145,6 +145,8 @@ public class SessionRepository : ISessionRepository
 
             _db.GetCollection<Question>("questions").DeleteMany(q => q.SessionId == id);
             _db.GetCollection<Response>("responses").DeleteMany(r => r.SessionId == id);
+            _db.GetCollection("survey_grounding").Delete(id);
+            _db.GetCollection("survey_generation_previews").DeleteMany(Query.EQ("SessionId", id));
 
             if (!_db.Commit())
                 throw new InvalidOperationException("Could not commit the session deletion transaction.");

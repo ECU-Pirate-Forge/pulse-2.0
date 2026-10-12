@@ -62,7 +62,11 @@ public static class QuestionEndpointHandlers
             Options = request.Options ?? [],
             MatchingPairs = request.MatchingPairs ?? [],
             SortOrder = existing.SortOrder,
-            CreatedAt = existing.CreatedAt
+            CreatedAt = existing.CreatedAt,
+            CorrectAnswers = request.CorrectAnswers ?? existing.CorrectAnswers,
+            Explanation = request.Explanation ?? existing.Explanation,
+            SourceId = existing.SourceId,
+            SourceQuote = existing.SourceQuote
         };
 
         var validationError = NormalizeAndValidate(candidate, questionService);
@@ -185,6 +189,11 @@ public static class QuestionEndpointHandlers
         existing.Type = request.Type.Value;
         existing.Options = normalizedOptions;
         existing.MatchingPairs = NormalizeMatchingPairs(request.MatchingPairs ?? []);
+        existing.CorrectAnswers = request.CorrectAnswers ?? existing.CorrectAnswers;
+        existing.Explanation = request.Explanation ?? existing.Explanation;
+        var answerKeyError = ValidateAnswerKey(existing);
+        if (answerKeyError is not null)
+            return TypedResults.BadRequest(answerKeyError);
 
         var updateSucceeded = repo.Update(existing);
         if (!updateSucceeded)
@@ -241,7 +250,20 @@ public static class QuestionEndpointHandlers
             MatchingPairs = question.MatchingPairs
         });
 
-        return validation.IsValid ? null : validation.ErrorMessage;
+        return validation.IsValid ? ValidateAnswerKey(question) : validation.ErrorMessage;
+    }
+
+    private static string? ValidateAnswerKey(Question question)
+    {
+        question.CorrectAnswers = (question.CorrectAnswers ?? []).Select(answer => answer?.Trim() ?? string.Empty).ToList();
+        if (question.CorrectAnswers.Count == 0)
+            return null;
+        var allowed = question.Type == QuestionType.TrueFalse ? new List<string> { "True", "False" } : question.Options;
+        if (question.CorrectAnswers.Distinct(StringComparer.OrdinalIgnoreCase).Count() != question.CorrectAnswers.Count ||
+            question.CorrectAnswers.Any(answer => !allowed.Contains(answer, StringComparer.Ordinal)) ||
+            question.Type is QuestionType.MultipleChoice or QuestionType.TrueFalse && question.CorrectAnswers.Count != 1)
+            return "Correct answers must match the choices and single-choice questions must have one correct answer.";
+        return null;
     }
 
     private static List<MatchingPair> NormalizeMatchingPairs(IEnumerable<MatchingPair> pairs) =>
@@ -284,6 +306,8 @@ public sealed class UpdateQuestionRequest
     public QuestionType? Type { get; init; }
     public List<string>? Options { get; init; }
     public List<MatchingPair>? MatchingPairs { get; init; }
+    public List<string>? CorrectAnswers { get; init; }
+    public string? Explanation { get; init; }
 }
 
 public sealed class ReorderQuestionsRequest

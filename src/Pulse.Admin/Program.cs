@@ -19,6 +19,13 @@ builder.Services.AddHttpClient("webapi", client =>
 });
 builder.Services.AddScoped(sp =>
     sp.GetRequiredService<IHttpClientFactory>().CreateClient("webapi"));
+#pragma warning disable EXTEXP0001 // Generation must not inherit the 30-second timeout or retry non-idempotent requests.
+builder.Services.AddHttpClient("survey-generation", client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["WebApi:BaseUrl"] ?? "https+http://webapi");
+    client.Timeout = TimeSpan.FromMinutes(6);
+}).RemoveAllResilienceHandlers();
+#pragma warning restore EXTEXP0001
 builder.Services.AddScoped(sp => new SessionRealtimeConnectionFactory(
     builder.Configuration["WebApi:HubBaseUrl"]
         ?? builder.Configuration["WebApi:BaseUrl"]

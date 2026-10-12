@@ -139,7 +139,7 @@
                                         <select value="@GetMatchingAnswer(question.Id, pair.Prompt)"
                                                 @onchange="@(args => SetMatchingAnswer(question.Id, pair.Prompt, args.Value?.ToString()))">
                                             <option value="">Select a match</option>
-                                            @foreach (var choice in question.MatchingPairs.Select(item => item.Match))
+                                            @foreach (var choice in question.Options)
                                             {
                                                 <option value="@choice">@choice</option>
                                             }
@@ -171,7 +171,7 @@
     private readonly Dictionary<Guid, string> singleAnswers = [];
     private readonly Dictionary<Guid, HashSet<string>> multipleAnswers = [];
     private readonly Dictionary<(Guid QuestionId, string Prompt), string> matchingAnswers = [];
-    private List<Question> questions = [];
+    private List<StudentQuestionResponse> questions = [];
     private Guid sessionId;
     private string surveyTitle = "Survey";
     private string? loadError;
@@ -221,7 +221,7 @@
                 return;
             }
 
-            questions = (await questionsResponse.Content.ReadFromJsonAsync<List<Question>>() ?? [])
+            questions = (await questionsResponse.Content.ReadFromJsonAsync<List<StudentQuestionResponse>>() ?? [])
                 .OrderBy(question => question.SortOrder)
                 .ToList();
             if (questions.Count == 0)
@@ -317,7 +317,7 @@
         }
     }
 
-    private IReadOnlyList<string> GetValues(Question question) =>
+    private IReadOnlyList<string> GetValues(StudentQuestionResponse question) =>
         question.Type switch
         {
             QuestionType.MultipleChoice or QuestionType.TrueFalse =>

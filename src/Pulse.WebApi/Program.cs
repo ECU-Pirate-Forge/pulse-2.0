@@ -6,6 +6,8 @@ using Pulse.WebApi.Middleware;
 using Pulse.Common.Services;
 using Pulse.WebApi;
 using Scalar.AspNetCore;
+using Pulse.Shared.Contracts.V1;
+using Pulse.WebApi.Features.SurveyGeneration;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,7 +39,7 @@ app.MapGet("/", () =>
 
 app.MapGet("/questions", (QuestionRepository repo) =>
 {
-    return repo.GetAll();
+    return repo.GetAll().Select(StudentQuestionResponse.FromQuestion);
 });
 
 app.MapGet("/api/sessions/{id:guid}", (ISessionRepository repo, Guid id, HttpContext ctx) =>
@@ -65,10 +67,11 @@ app.MapPut("/api/questions/reorder", QuestionEndpointHandlers.ReorderQuestionsFo
 app.MapGet("/api/sessions/{sessionId:guid}/questions", (Guid sessionId, QuestionRepository questionRepo) =>
 {
     var questions = questionRepo.GetBySessionId(sessionId).OrderBy(q => q.SortOrder).ToList();
-    return Results.Ok(questions);
+    return Results.Ok(questions.Select(StudentQuestionResponse.FromQuestion));
 });
 
 app.MapPost("/api/sessions/{sessionId:guid}/questions", QuestionEndpointHandlers.CreateQuestionForSession);
+app.MapSurveyGeneration();
 
 app.MapPost("/api/questionbank", QuestionBankEndpointHandlers.CreateQuestionBankItem);
 app.MapGet("/api/questionbank", QuestionBankEndpointHandlers.GetQuestionBankItems);

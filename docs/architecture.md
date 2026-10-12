@@ -51,8 +51,8 @@ graph TD
             QRCoder["📦 QRCoder library"]
         end
 
-        FoundryLocal["🤖 Foundry Local\n(AI Inference Service — separate process)"]
     end
+    Ollama["Local Ollama\nlocalhost:11434\nSeparate server process"]
 
     %% Client <-> Web
     IB -- "HTTPS + WebSocket (SignalR)" --> Web
@@ -86,9 +86,9 @@ graph TD
     %% QrCodeService -> QRCoder
     QrSvc --> QRCoder
 
-    %% Aspire Dashboard monitors Web & Foundry
+    API -- "local embeddings and chat" --> Ollama
+    %% Aspire Dashboard monitors Web
     Dashboard -. "telemetry / health" .-> Web
-    Dashboard -. "telemetry / health" .-> FoundryLocal
 ```
 
 ---
@@ -216,32 +216,50 @@ sequenceDiagram
 
 ---
 
-## Deferred AI Question Generation
+## Local document-grounded question generation
 
-This sequence captures an earlier AI-assisted question-generation concept. It is deferred behind the approved survey redesign, moderated question bank, and trivia phases; Foundry Local is not currently registered in the AppHost.
+Ollama runs independently on the API host at `http://localhost:11434`.
+`gemma4:latest` generates structured multiple-choice questions and
+`all-minilm:latest` embeds grounding passages. No new Aspire resource or cloud
+service is required. The feature is grouped under
+`src/Pulse.WebApi/Features/SurveyGeneration` and reuses existing survey
+ownership, draft lifecycle, question persistence, and instructor UI.
+
+Original documents and extracted text are stored with a grounding revision in
+LiteDB. Generation embeds overlapping chunks, ranks them by cosine similarity,
+and selects at most 12 passages, reserving coverage for every document.
+Question count, choices, answer keys, and exact source quotes are validated.
+Previews are server-stored and expire after one hour; approval is transactional.
+Student APIs project questions without answer keys, explanations, or citations.
 
 ```mermaid
 sequenceDiagram
     actor IB as Instructor Browser
     participant API as ASP.NET Core API
-    participant AiSvc as AiQuestionService
-    participant FL as Foundry Local (AI)
+    participant AiSvc as OllamaSurveyGenerator
+    participant OL as Local Ollama
     participant DB as LiteDB
 
     rect rgb(245, 235, 255)
-        Note over IB,DB: Phase 2 — AI Question Generation
-        IB->>API: POST /api/sessions/{id}/questions/generate\n{topic, count}
-        API->>AiSvc: GenerateQuestions(topic, count)
-        AiSvc->>FL: HTTP POST inference request\n(structured prompt with topic)
-        FL-->>AiSvc: Raw model response (JSON / text)
-        AiSvc-->>API: List<QuestionDto> (not yet persisted)
-        API-->>IB: 200 [suggested questions]
+        IB->>API: Upload documents and save additional context
+        API->>DB: Persist original documents, extracted text, revision
+        IB->>API: POST /api/sessions/{id}/questions/generate\n{count}
+        API->>AiSvc: GenerateAsync(material, title, count)
+        AiSvc->>OL: POST /api/embed (chunks and query)
+        OL-->>AiSvc: Local embeddings
+        Note over AiSvc: Retrieve relevant passages
+        AiSvc->>OL: POST /api/chat (gemma4:latest, JSON schema)
+        OL-->>AiSvc: Questions, choices, answer keys, citations
+        Note over AiSvc: Validate exact count and source quotes
+        AiSvc-->>API: Validated questions
+        API->>DB: Store preview with grounding revision
+        API-->>IB: 200 preview ID and questions
 
-        Note over IB: Instructor reviews, edits, approves or rejects each question
+        Note over IB: Instructor reviews and approves or discards batch
 
-        IB->>API: POST /api/sessions/{id}/questions\n(approved questions, one by one or bulk)
-        API->>DB: Insert approved Question(s)
+        IB->>API: POST /api/sessions/{id}/questions/generated/{previewId}/accept
+        API->>DB: Verify revision, append questions, consume preview
         DB-->>API: ok
-        API-->>IB: 201 questions persisted
+        API-->>IB: 200 questions persisted
     end
 ```

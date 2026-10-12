@@ -1,0 +1,258 @@
+@using System.Net.Http.Json
+@using System.Text.Json
+@using Microsoft.AspNetCore.Components.Forms
+@using Pulse.Shared.Contracts.V1
+@implements IDisposable
+@inject IHttpClientFactory Clients
+@inject ILogger<SurveyQuestionGenerator> Logger
+
+<section class="form-section" aria-labelledby="generation-title">
+    <h2 id="generation-title">Generate questions from documents</h2>
+    <p>Optional: attach up to five TXT, MD, PDF, or DOCX files (5 MB and 50,000 extracted characters each).
+        Documents and inference stay on this server. Scanned PDFs need OCR before upload.</p>
+    @if (!string.IsNullOrWhiteSpace(error))
+    {
+        <div class="pulse-alert pulse-alert-error" role="alert">@error</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(notice))
+    {
+        <p role="status">@notice</p>
+    }
+    <fieldset disabled="@(!IsDraft || busy)">
+        <label for="grounding-files">Grounding documents</label>
+        <InputFile id="grounding-files" OnChange="UploadAsync" multiple accept=".txt,.md,.pdf,.docx" />
+        <ul>
+            @foreach (var document in documents)
+            {
+                <li>@document.FileName (@document.CharacterCount characters)
+                    <button type="button" @onclick="() => RemoveAsync(document.Id)">Remove document</button>
+                </li>
+            }
+        </ul>
+        <label for="grounding-context">Additional grounding information or instructor focus</label>
+        <textarea id="grounding-context" @bind="additionalContext" maxlength="10000" rows="4"
+                  style="display: block; width: 100%;"></textarea>
+        <button type="button" class="pulse-button pulse-button-secondary" @onclick="SaveContextAsync">Save information</button>
+        <label for="generation-count">Number of questions (1-20)</label>
+        <input id="generation-count" type="number" @bind="count" min="1" max="20" />
+        <button type="button" class="pulse-button pulse-button-primary" @onclick="GenerateAsync">
+            Generate question preview
+        </button>
+    </fieldset>
+    @if (!IsDraft)
+    {
+        <p>Grounding and questions can only be changed while the survey is in Draft.</p>
+    }
+    @if (busy)
+    {
+        <p role="status">Processing locally. Generation may take several minutes.</p>
+    }
+    @if (preview is not null)
+    {
+        <section aria-label="Generated question preview">
+            <h3>Review before adding to the survey</h3>
+            <p>Check correctness and source support. AI output can be wrong. Nothing is saved as a survey question until you approve.</p>
+            @foreach (var question in preview.Questions)
+            {
+                <article class="question-card">
+                    <h4>@question.Text</h4>
+                    <ul>
+                        @foreach (var choice in question.Options)
+                        {
+                            <li>@choice @(choice == question.CorrectAnswer ? "(Correct answer)" : "")</li>
+                        }
+                    </ul>
+                    <p>@question.Explanation</p>
+                    <p>Source: @SourceName(question.SourceId)</p>
+                    <blockquote>@question.SourceQuote</blockquote>
+                </article>
+            }
+            <button type="button" class="pulse-button pulse-button-primary" disabled="@(busy || !IsDraft)" @onclick="AcceptAsync">
+                Approve and add @preview.Questions.Count questions
+            </button>
+            <button type="button" disabled="@busy" @onclick="() => preview = null">Discard preview</button>
+        </section>
+    }
+</section>
+
+@code {
+    [Parameter] public Guid SessionId { get; set; }
+    [Parameter] public string InstructorCode { get; set; } = string.Empty;
+    [Parameter] public bool IsDraft { get; set; }
+    [Parameter] public EventCallback QuestionsSaved { get; set; }
+    private readonly CancellationTokenSource lifetime = new();
+    private List<GroundingDocumentResponse> documents = [];
+    private string additionalContext = string.Empty;
+    private int count = 5;
+    private bool busy;
+    private string? error;
+    private string? notice;
+    private GeneratedSurveyPreviewResponse? preview;
+    private Guid loadedSession;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedSession == SessionId)
+            return;
+        loadedSession = SessionId;
+        await PerformAsync(async () =>
+        {
+            using var response = await SendAsync(HttpMethod.Get, "grounding");
+            if (await CheckResponseAsync(response))
+                await ReadMaterialAsync(response);
+        });
+    }
+
+    private async Task UploadAsync(InputFileChangeEventArgs args) => await PerformAsync(async () =>
+    {
+        if (args.FileCount + documents.Count > 5)
+        {
+            error = "Attach at most five documents in total.";
+            return;
+        }
+        using var form = new MultipartFormDataContent();
+        foreach (var file in args.GetMultipleFiles(5))
+        {
+            if (file.Size is < 1 or > 5 * 1024 * 1024)
+            {
+                error = "Each document must contain between 1 byte and 5 MB.";
+                return;
+            }
+            form.Add(new StreamContent(file.OpenReadStream(5 * 1024 * 1024, lifetime.Token)), "files", file.Name);
+        }
+        using var response = await SendAsync(HttpMethod.Post, "grounding/documents", form);
+        if (await CheckResponseAsync(response))
+        {
+            await ReadMaterialAsync(response, false);
+            preview = null;
+            notice = "Documents saved.";
+        }
+    });
+
+    private Task SaveContextAsync() => PerformAsync(async () => { await SaveContextCoreAsync(); });
+
+    private async Task<bool> SaveContextCoreAsync()
+    {
+        using var response = await SendAsync(HttpMethod.Put, "grounding/context",
+            JsonContent.Create(new SaveGroundingContextRequest(additionalContext)));
+        if (!await CheckResponseAsync(response))
+            return false;
+        notice = "Grounding information saved.";
+        return true;
+    }
+
+    private Task RemoveAsync(Guid id) => PerformAsync(async () =>
+    {
+        using var response = await SendAsync(HttpMethod.Delete, $"grounding/documents/{id}");
+        if (await CheckResponseAsync(response))
+        {
+            await ReadMaterialAsync(response, false);
+            preview = null;
+            notice = "Document removed.";
+        }
+    });
+
+    private Task GenerateAsync() => PerformAsync(async () =>
+    {
+        preview = null;
+        if (count is < 1 or > 20)
+        {
+            error = "Generate between 1 and 20 questions.";
+            return;
+        }
+        if (!await SaveContextCoreAsync())
+            return;
+        using var response = await SendAsync(HttpMethod.Post, "questions/generate",
+            JsonContent.Create(new GenerateSurveyQuestionsRequest(count)));
+        if (await CheckResponseAsync(response))
+        {
+            preview = await response.Content.ReadFromJsonAsync<GeneratedSurveyPreviewResponse>(cancellationToken: lifetime.Token);
+            if (preview is null)
+                error = "Pulse returned an invalid preview.";
+            notice = null;
+        }
+    });
+
+    private Task AcceptAsync() => PerformAsync(async () =>
+    {
+        if (preview is null)
+            return;
+        if (!await SaveContextCoreAsync())
+            return;
+        using var response = await SendAsync(HttpMethod.Post, $"questions/generated/{preview.Id}/accept");
+        if (await CheckResponseAsync(response))
+        {
+            preview = null;
+            notice = "Generated questions added. You can edit their choices and answer keys below.";
+            await QuestionsSaved.InvokeAsync();
+        }
+    });
+
+    private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string suffix, HttpContent? content = null)
+    {
+        using var client = Clients.CreateClient("survey-generation");
+        using var request = new HttpRequestMessage(method, $"/api/sessions/{SessionId}/{suffix}") { Content = content };
+        request.Headers.TryAddWithoutValidation("InstructorCode", InstructorCode);
+        return await client.SendAsync(request, lifetime.Token);
+    }
+
+    private async Task<bool> CheckResponseAsync(HttpResponseMessage response)
+    {
+        if (response.IsSuccessStatusCode)
+            return true;
+        var body = await response.Content.ReadAsStringAsync(lifetime.Token);
+        try
+        {
+            using var json = JsonDocument.Parse(body);
+            error = json.RootElement.ValueKind == JsonValueKind.String
+                ? json.RootElement.GetString()
+                : json.RootElement.TryGetProperty("detail", out var detail) ? detail.GetString()
+                : json.RootElement.TryGetProperty("error", out var message) ? message.GetString()
+                : $"Pulse could not process this request (HTTP {(int)response.StatusCode}).";
+        }
+        catch (JsonException)
+        {
+            error = $"Pulse could not process this request (HTTP {(int)response.StatusCode}).";
+        }
+        return false;
+    }
+
+    private async Task ReadMaterialAsync(HttpResponseMessage response, bool includeContext = true)
+    {
+        var material = await response.Content.ReadFromJsonAsync<SurveyGroundingResponse>(cancellationToken: lifetime.Token)
+            ?? throw new JsonException("Missing grounding response.");
+        documents = material.Documents.ToList();
+        if (includeContext)
+            additionalContext = material.AdditionalContext;
+    }
+
+    private string SourceName(string id) => id.StartsWith("context:", StringComparison.Ordinal)
+        ? "Additional information"
+        : documents.FirstOrDefault(document => id.StartsWith(document.Id.ToString("N") + ":", StringComparison.Ordinal))?.FileName ?? id;
+
+    private async Task PerformAsync(Func<Task> action)
+    {
+        if (busy)
+            return;
+        busy = true;
+        error = null;
+        notice = null;
+        try { await action(); }
+        catch (Exception ex) when (ex is HttpRequestException or JsonException or IOException ||
+                                   ex is OperationCanceledException && !lifetime.IsCancellationRequested)
+        {
+            Logger.LogWarning("Survey generation request failed SessionId={SessionId} FailureType={FailureType}", SessionId, ex.GetType().Name);
+            error = ex is OperationCanceledException
+                ? "Generation timed out. Try fewer questions."
+                : "Pulse could not process this request. Check the server connection and try again.";
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        finally { busy = false; }
+    }
+
+    public void Dispose()
+    {
+        lifetime.Cancel();
+        lifetime.Dispose();
+    }
+}

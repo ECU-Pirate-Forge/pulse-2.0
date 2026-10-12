@@ -21,7 +21,7 @@ Current architecture highlights:
 Typical classroom usage flow:
 
 1. Instructor creates a session using the current instructor workflow.
-2. Instructor adds questions (manually, from question bank content, or via CSV import workflows).
+2. Instructor adds questions manually, from the question bank/CSV, or by reviewing locally generated document-grounded questions.
 3. Instructor activates the session and shares the join path using a join code or QR code.
 4. Students join from the web app and submit responses from their own devices.
 5. Pulse validates and records responses.
@@ -48,6 +48,8 @@ The following are currently implemented in this repository (and covered by proje
 - Question ordering/reorder endpoint support
 - Question bank APIs and repository support for reusable question content
 - Question bank CSV preview/import workflow with parser validation
+- Optional draft-survey document grounding with local Ollama retrieval and instructor-reviewed multiple-choice generation
+- Persisted survey answer keys and citations with separate student-safe question projections
 - Student response submission with validation and upsert-by-device behavior
 - Response aggregation service logic for instructor tally/result retrieval
 - QR endpoint support for session join flows (by join code and by session id)
@@ -70,6 +72,70 @@ Current future-work themes:
 
 - Enhanced analytics/reporting views for post-session review
 - Deployment readiness beyond the documented local/Aspire development environment
+- Per-question reveal with correct-answer indicators (survey-wide aggregate reveal already exists)
+
+## Local document-grounded question generation
+
+Ollama runs separately from Aspire on the same machine as Pulse.WebApi.
+The defaults are `http://localhost:11434`, `gemma4:latest` for generation,
+and `all-minilm:latest` for embeddings. Install Ollama, then prepare both models:
+
+```powershell
+ollama pull gemma4:latest
+ollama pull all-minilm:latest
+ollama serve
+```
+
+If the Ollama desktop service is already running, do not start a second server.
+Settings are in `src/Pulse.WebApi/appsettings.json`; environment overrides are
+`Ollama__BaseUrl`, `Ollama__Model`, and `Ollama__EmbeddingModel`.
+Only loopback HTTP/HTTPS inference endpoints are accepted. No cloud inference
+or embedding service is used.
+
+1. Create a survey, then open **Manage Questions** while it is in Draft.
+2. In **Generate questions from documents**, attach up to five TXT, Markdown,
+   PDF, or DOCX files. Each file is limited to 5 MB and 50,000 extracted
+   characters. Scanned PDFs need OCR before upload; password-protected PDFs
+   are not supported. DOCX extraction reads body paragraphs, not embedded files.
+3. Optionally enter additional grounding information/instructor focus
+   (10,000 characters maximum). Free text alone is also supported.
+4. Request 1-20 multiple-choice questions and generate a preview.
+5. Review all choices, correct answers, explanations, and quoted source
+   passages. Approve the batch to add it to the survey, or discard/regenerate.
+   Saved questions can be edited using the existing question editor.
+
+Documents, original bytes, and extracted text are persisted in local LiteDB.
+Embeddings are computed locally during generation. Retrieval selects up to
+12 relevant overlapping passages, including material from every attachment;
+it does not promise exhaustive coverage of every document. Changing saved
+grounding invalidates previews; previews expire after one hour. Approving a
+preview is transactional and cannot insert that batch twice.
+
+Generation has a five-minute inference timeout and does not automatically
+retry POST requests. Missing models, invalid output, unsupported documents,
+and insufficient generated question counts are reported rather than silently
+substituted. Quoted-source validation does not prove factual correctness:
+instructor review remains mandatory. Answer keys are stored for later
+correct-answer reveal; the student results UI currently still shows aggregates
+only.
+
+The PDF text extractor adds the `PdfPig` dependency. DOCX, text, and Ollama HTTP
+handling use existing .NET libraries.
+
+Run deterministic feature tests:
+
+```powershell
+dotnet test .\src\Pulse.Tests\Pulse.Tests.csproj -c Release --filter "FullyQualifiedName~SurveyGeneration|FullyQualifiedName~SurveyGrounding|FullyQualifiedName~OllamaSurveyGenerator" '-bl:rag-tests-{}.binlog'
+```
+
+The real-inference smoke test is skipped by default. To run it against local
+Ollama using synthetic biology material:
+
+```powershell
+$env:PULSE_OLLAMA_SMOKE = "1"
+dotnet test .\src\Pulse.Tests\Pulse.Tests.csproj -c Release --filter "FullyQualifiedName~LocalOllamaSmoke" '-bl:rag-smoke-{}.binlog'
+Remove-Item Env:\PULSE_OLLAMA_SMOKE
+```
 
 ## Project Structure
 

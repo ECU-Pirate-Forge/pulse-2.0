@@ -81,6 +81,7 @@ public static class QuestionBankImportEndpointHandlers
                     .Select(pair => new MatchingPair { Prompt = pair.Prompt, Match = pair.Match })
                     .ToList(),
                 SortOrder = existingMaxSortOrder + 1 + i,
+                CorrectAnswers = [.. item.CorrectAnswers],
                 CreatedAt = DateTime.UtcNow
             };
             questionRepo.Insert(question);

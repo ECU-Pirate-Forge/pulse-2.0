@@ -159,6 +159,11 @@
     }
     else
     {
+    <SurveyQuestionGenerator SessionId="@Guid.Parse(SessionId)"
+                             InstructorCode="@_instructorCode"
+                             IsDraft="@(SessionStatus == SessionStatus.Draft)"
+                             QuestionsSaved="LoadQuestionsAsync" />
+
     <!-- Add Question Form -->
     <div class="form-section">
         <div class="form-title">@(EditingQuestionId.HasValue ? "Edit Question" : "Create New Question")</div>
@@ -208,6 +213,22 @@
                     <MatchingPairEditor Pairs="NewQuestion.MatchingPairs"
                                         PairsChanged="OnMatchingPairsChanged" />
                 </div>
+            }
+
+            @if (NewQuestion.Type is 0 or 3 or 4)
+            {
+                <div>
+                    <p>Correct answers (optional for feedback-only questions)</p>
+                    @foreach (var choice in NewQuestion.Type == 4 ? new List<string> { "True", "False" } : NewQuestion.Options.Where(option => !string.IsNullOrWhiteSpace(option)).ToList())
+                    {
+                        <label style="display: block;">
+                            <input type="checkbox" checked="@NewQuestion.CorrectAnswers.Contains(choice)"
+                                   @onchange="_ => ToggleCorrectAnswer(choice)" />
+                            @choice
+                        </label>
+                    }
+                </div>
+                <MudTextField @bind-Value="NewQuestion.Explanation" Label="Answer explanation" Lines="2" />
             }
 
             <div class="button-row">
@@ -279,6 +300,11 @@
                 <div class="question-card">
                     <div class="question-type">@GetTypeName(q.Type)</div>
                     <div class="question-text">@q.Text</div>
+                    @if (q.CorrectAnswers.Count > 0)
+                    {
+                        <p>Correct: @string.Join(", ", q.CorrectAnswers)</p>
+                        <p>@q.Explanation</p>
+                    }
 
                     @if (q.Type is 0 or 3 && q.Options?.Count > 0)
                     {
@@ -462,7 +488,8 @@
                 return;
             }
 
-            var response = await Http.GetAsync($"/api/sessions/{SessionId}/questions");
+            using var request = CreateInstructorRequest(HttpMethod.Get, $"/api/sessions/{SessionId}/questions/instructor");
+            var response = await Http.SendAsync(request);
             if (response.IsSuccessStatusCode)
             {
                 var questions = await response.Content.ReadFromJsonAsync<List<Question>>();
@@ -472,7 +499,9 @@
                     Text = q.Text,
                     Type = (int)q.Type,
                     Options = q.Options,
-                    MatchingPairs = q.MatchingPairs
+                    MatchingPairs = q.MatchingPairs,
+                    CorrectAnswers = q.CorrectAnswers,
+                    Explanation = q.Explanation
                 }).ToList() ?? [];
             }
             else
@@ -594,6 +623,8 @@
                 Type = (QuestionType)NewQuestion.Type,
                 Options = nonEmptyOptions,
                 MatchingPairs = NewQuestion.MatchingPairs,
+                CorrectAnswers = NewQuestion.CorrectAnswers,
+                Explanation = NewQuestion.Explanation,
                 SortOrder = Questions.Count
             };
 
@@ -603,7 +634,9 @@
                     question.Text,
                     question.Type,
                     question.Options,
-                    question.MatchingPairs
+                    question.MatchingPairs,
+                    question.CorrectAnswers,
+                    question.Explanation
                 })
                 : CreateInstructorRequest(HttpMethod.Post, $"/api/sessions/{SessionId}/questions", question);
             var response = await Http.SendAsync(request);
@@ -619,7 +652,9 @@
                         Text = createdQuestion.Text,
                         Type = (int)createdQuestion.Type,
                         Options = createdQuestion.Options,
-                        MatchingPairs = createdQuestion.MatchingPairs
+                        MatchingPairs = createdQuestion.MatchingPairs,
+                        CorrectAnswers = createdQuestion.CorrectAnswers,
+                        Explanation = createdQuestion.Explanation
                     };
 
                     if (EditingQuestionId.HasValue)
@@ -692,7 +727,9 @@
                 Text = q.Text,
                 Type = (int)q.Type,
                 Options = q.Options,
-                MatchingPairs = q.MatchingPairs
+                MatchingPairs = q.MatchingPairs,
+                CorrectAnswers = q.CorrectAnswers,
+                Explanation = q.Explanation
             }).ToList();
 
             ReorderError = null;
@@ -726,6 +763,8 @@
             Type = (QuestionType)model.Type,
             Options = model.Options,
             MatchingPairs = model.MatchingPairs,
+            CorrectAnswers = model.CorrectAnswers,
+            Explanation = model.Explanation,
             SortOrder = index
         }).ToList();
     }
@@ -748,6 +787,8 @@
             Text = question.Text,
             Type = question.Type,
             Options = question.Options.ToList(),
+            CorrectAnswers = [.. question.CorrectAnswers],
+            Explanation = question.Explanation,
             MatchingPairs = question.MatchingPairs
                 .Select(pair => new MatchingPair { Prompt = pair.Prompt, Match = pair.Match })
                 .ToList()
@@ -758,6 +799,15 @@
     {
         EditingQuestionId = null;
         NewQuestion = new QuestionModel { Options = ["", ""], MatchingPairs = [], Type = 0 };
+    }
+
+    private void ToggleCorrectAnswer(string answer)
+    {
+        if (NewQuestion.CorrectAnswers.Remove(answer))
+            return;
+        if (NewQuestion.Type is 0 or 4)
+            NewQuestion.CorrectAnswers.Clear();
+        NewQuestion.CorrectAnswers.Add(answer);
     }
 
     private HttpRequestMessage CreateInstructorRequest(HttpMethod method, string uri, object? content = null)
@@ -781,6 +831,8 @@
         public int Type { get; set; }
         public List<string> Options { get; set; } = new();
         public List<MatchingPair> MatchingPairs { get; set; } = new();
+        public List<string> CorrectAnswers { get; set; } = [];
+        public string Explanation { get; set; } = string.Empty;
     }
 
     private class QuestionBankResponse
