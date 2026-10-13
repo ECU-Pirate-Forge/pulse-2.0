@@ -106,14 +106,23 @@ The application split must preserve existing links while establishing clear owne
   origin is publicly reachable.
 - Redirects remain until usage data and release notes support their removal.
 
-For local mobile testing, the launcher hosts a configured named tunnel, reads
+For local mobile testing, AppHost normally orchestrates a persistent anonymous
+`pulse-devtunnel` exposing the API and student HTTPS endpoints. The public
+student endpoint reference is injected as `App__JoinBaseUrl` (API QR encoding)
+and `StudentApp__BaseUrl` (Admin displayed link) before consumers start.
+Admin is never tunneled; internal service calls retain local service discovery.
+The tunnel identity survives host shutdown, while hosting lasts only for the
+AppHost session. This is run-mode-only infrastructure, not a deployment.
+
+Alternatively, the manual launcher hosts a configured named tunnel, reads
 its published port 7004 `portUri`, and supplies that value to AppHost as
 `Pulse:PublicJoinBaseUrl` (environment form:
 `Pulse__PublicJoinBaseUrl`). AppHost accepts only an absolute HTTPS URL and
 forwards it to the API as `App__JoinBaseUrl` and Admin as
 `StudentApp__BaseUrl`. The public tunnel terminates HTTPS and forwards port
 7004, including WebSocket traffic, to the student Blazor Server app. API and
-Admin endpoints are not directly exposed by this workflow.
+Admin endpoints are not directly exposed by the manual workflow. An explicit
+`Pulse:PublicJoinBaseUrl` disables the Aspire-managed tunnel.
 
 Telemetry records session/question correlation, counts, status, request method,
 path, exception type, a message-free stack trace, and correlation ID. Student

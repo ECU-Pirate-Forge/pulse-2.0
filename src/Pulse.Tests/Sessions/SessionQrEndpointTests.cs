@@ -6,11 +6,53 @@ using Pulse.Common.Services;
 using Pulse.Shared.Models;
 using Pulse.Shared.Services;
 using Pulse.WebApi;
+using QRCoder;
 
 namespace Pulse.Tests.Sessions;
 
 public class SessionQrEndpointTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task QrEndpointsEncodePublicStudentUrlInsteadOfLocalApiOrigin(bool byJoinCode)
+    {
+        using var db = new LiteDatabase("Filename=:memory:");
+        var repo = new SessionRepository(db, new JoinCodeGenerator());
+        var session = new Session
+        {
+            Id = Guid.NewGuid(),
+            Title = "Public QR Session",
+            InstructorCode = "INST001",
+            JoinCode = "JOIN42",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+        db.GetCollection<Session>("sessions").Insert(session);
+
+        var context = new DefaultHttpContext();
+        context.Request.Scheme = "https";
+        context.Request.Host = new HostString("localhost", 7081);
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["App:JoinBaseUrl"] = "https://pulse-student-7004.use2.devtunnels.ms/"
+            })
+            .Build();
+
+        var result = byJoinCode
+            ? await SessionEndpointHandlers.GetSessionQrByCode(session.JoinCode, context.Request, repo, configuration)
+            : await SessionEndpointHandlers.GetSessionQr(session.Id, context.Request, repo, configuration);
+        var file = Assert.IsType<FileContentHttpResult>(result);
+
+        using var generator = new QRCodeGenerator();
+        using var data = generator.CreateQrCode(
+            "https://pulse-student-7004.use2.devtunnels.ms/join/JOIN42", QRCodeGenerator.ECCLevel.Q);
+        using var expected = new PngByteQRCode(data);
+        Assert.Equal("image/png", file.ContentType);
+        Assert.Equal(expected.GetGraphic(20), file.FileContents.ToArray());
+    }
+
     [Fact]
     public async Task GetSessionQrReturnsPngWhenSessionExists()
     {

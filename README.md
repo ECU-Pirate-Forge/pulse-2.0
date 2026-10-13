@@ -202,20 +202,22 @@ dotnet run --project src/Pulse.AppHost/Pulse.AppHost.csproj
 
 ### 6. Test on a Phone through a Dev Tunnel
 
-Create a named anonymous HTTPS tunnel once, then use the checked-in launcher:
+AppHost orchestrates a persistent anonymous dev tunnel for the API and student
+app. Sign in once, then start AppHost normally:
 
 ```powershell
 devtunnel user login
-devtunnel create pulse-student-yourname --allow-anonymous
-devtunnel port create pulse-student-yourname -p 7004 --protocol https
-.\tools\Start-MobileTest.ps1 -TunnelId pulse-student-yourname
+aspire start --apphost .\src\Pulse.AppHost\Pulse.AppHost.csproj
 ```
 
-The script hosts the tunnel, discovers its validated public student URL, starts
-Aspire with that URL explicitly configured for QR links, and stops both
-processes when testing ends. See the
-[onboarding guide](docs/onboarding.md) for QR checks, cleanup, and named-tunnel
-safety checks, and use the [mobile acceptance matrix](docs/mobile-acceptance.md).
+In the dashboard, confirm `pulse-devtunnel` and its two HTTPS port resources
+are running/healthy. QR codes and Admin's displayed join links use the public
+**student** URL, not the API URL. Admin itself is not tunneled.
+Stopping AppHost stops hosting but retains the tunnel identity for the next run.
+Anonymous access exposes both services to the internet: use test data only and
+stop hosting after testing. See the [onboarding guide](docs/onboarding.md) for
+verification, optional tunnel ID configuration, and the alternative manual
+launcher, and use the [mobile acceptance matrix](docs/mobile-acceptance.md).
 
 ### 7. Run Individual Services (Optional)
 

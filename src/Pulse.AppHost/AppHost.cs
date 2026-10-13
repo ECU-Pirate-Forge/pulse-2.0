@@ -31,6 +31,18 @@ var webapp = builder.AddProject<Projects.Pulse_WebApp>("webapp")
     .WithExternalHttpEndpoints()
     .WithHttpHealthCheck("/health");
 
+if (builder.ExecutionContext.IsRunMode && string.IsNullOrWhiteSpace(publicJoinBaseUrl))
+{
+    var tunnel = builder.AddDevTunnel("pulse-devtunnel",
+            tunnelId: builder.Configuration["Pulse:DevTunnelId"])
+        .WithAnonymousAccess()
+        .WithReference(webapi.GetEndpoint("https"))
+        .WithReference(webapp.GetEndpoint("https"));
+
+    var publicStudentEndpoint = tunnel.GetEndpoint(webapp, "https");
+    webapi.WithEnvironment("App__JoinBaseUrl", publicStudentEndpoint);
+    webadmin.WithEnvironment("StudentApp__BaseUrl", publicStudentEndpoint);
+}
 
 var scalar = builder.AddScalarApiReference();
 

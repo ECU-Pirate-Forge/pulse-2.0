@@ -60,14 +60,62 @@ Current development URLs from launch settings:
 
 ### Mobile testing with a public dev tunnel
 
-The student endpoint is local HTTPS port `7004`. Never tunnel the Admin endpoint
-(`7019`) or put developer credentials in configuration. Anonymous tunnel access
-is only for a temporary test session.
+AppHost uses `Aspire.Hosting.DevTunnels` to host `pulse-devtunnel` automatically
+in run mode when `Pulse:PublicJoinBaseUrl` is not supplied. It exposes only
+the HTTPS endpoints of `webapi` and `webapp` as separate public URLs. Never
+tunnel Admin or put developer credentials in configuration. Anonymous access
+exposes API management routes as well as student routes; use synthetic test
+data, keep instructor codes private, and stop hosting after testing.
 
-#### Recommended: reusable named tunnel
+#### Recommended: Aspire-managed persistent tunnel
+
+Sign in once and start AppHost from the repository root:
+
+```powershell
+devtunnel user login
+aspire start --apphost .\src\Pulse.AppHost\Pulse.AppHost.csproj
+```
+
+The default tunnel ID is derived from `pulse-devtunnel` and Aspire's AppHost
+identity, and is reused on subsequent starts from the same checkout. For a
+custom stable ID, set `Pulse__DevTunnelId` before starting (lowercase letters,
+numbers, and hyphens; 1-58 characters; start/end with a letter or number).
+Choose a unique ID belonging to this AppHost: Aspire manages its ports and
+removes ports not modeled here. Do not reuse a tunnel belonging to another app.
+Do not run two hosts against the same tunnel ID simultaneously.
+
+AppHost obtains the public student HTTPS endpoint through
+`tunnel.GetEndpoint(webapp, "https")`. Aspire allocates this endpoint before
+starting consumers; it supplies `App__JoinBaseUrl` to WebApi for both QR
+endpoints and `StudentApp__BaseUrl` to Admin for the displayed join link.
+Internal service calls still use local Aspire service discovery. The API
+public URL is for API clients, not student QR navigation. Tunnels are not
+included in published deployments.
+
+Verify in the Aspire dashboard:
+
+1. `pulse-devtunnel` and both HTTPS port resources are running/healthy.
+2. Each port shows its public tunnel URL and the correct local target.
+3. Both public `/health` URLs return HTTP 200 with exactly `Healthy` without
+   credentials. For automated probes, send
+   `X-Tunnel-Skip-AntiPhishing-Page: true`; a trust/interstitial page is not a
+   successful health check.
+4. Create and activate a test survey in Admin. Its displayed link and decoded
+   QR must both use the student tunnel host with `/join/{code}`.
+5. Open that link on a phone and submit a response. A one-time Dev Tunnels
+   trust page may appear; review it before continuing.
+6. Stop AppHost from the editor or with
+   `aspire stop --apphost .\src\Pulse.AppHost\Pulse.AppHost.csproj`.
+   Hosting stops, but the tunnel is retained. Restart and verify the same public
+   URLs. By default a tunnel expires after 30 days without hosting; persistence
+   does not mean an always-running service or permanent reservation.
+
+#### Alternative: manually hosted reusable named tunnel
 
 A named tunnel keeps the same public URL while it exists, which lets Aspire
-receive the URL before QR codes are generated. Create it once:
+receive the URL before QR codes are generated. This student-only legacy
+launcher sets `Pulse:PublicJoinBaseUrl`, disabling the Aspire-managed tunnel
+so the two hosts do not compete. Create it once:
 
 ```powershell
 devtunnel user login
