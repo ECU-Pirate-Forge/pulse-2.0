@@ -110,22 +110,48 @@ public class SurveyFirstNavigationTests : BunitContext
         Assert.Equal(["/api/sessions/join/ABC123"], handler.Paths);
     }
 
-    [Theory]
-    [InlineData(HttpStatusCode.NotFound, "That survey or trivia code was not found")]
-    [InlineData(HttpStatusCode.InternalServerError, "could not check")]
-    public void UnknownCodeOrTriviaServerError_ShowsAppropriateError(
-        HttpStatusCode triviaStatus, string expectedMessage)
+    [Fact]
+    public void UnknownCode_ChecksFormsThenShowsNotFound()
     {
-        var handler = new JoinLookupHandler(HttpStatusCode.NotFound, triviaStatus);
+        var handler = new JoinLookupHandler(HttpStatusCode.NotFound, HttpStatusCode.NotFound);
         Services.AddSingleton(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
 
         var cut = Render<JoinSessionPage>(parameters => parameters.Add(p => p.JoinCode, "ABC123"));
 
-        cut.WaitForAssertion(() => Assert.Contains(expectedMessage, cut.Markup));
+        cut.WaitForAssertion(() => Assert.Contains("That survey, trivia, or form code was not found", cut.Markup));
+        Assert.Equal(["/api/sessions/join/ABC123", "/api/trivia/join/ABC123", "/api/forms/join/ABC123"], handler.Paths);
+    }
+
+    [Fact]
+    public void TriviaServerError_ShowsAppropriateError()
+    {
+        var handler = new JoinLookupHandler(HttpStatusCode.NotFound, HttpStatusCode.InternalServerError);
+        Services.AddSingleton(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+
+        var cut = Render<JoinSessionPage>(parameters => parameters.Add(p => p.JoinCode, "ABC123"));
+
+        cut.WaitForAssertion(() => Assert.Contains("could not check", cut.Markup));
         Assert.Equal(["/api/sessions/join/ABC123", "/api/trivia/join/ABC123"], handler.Paths);
     }
 
-    private sealed class JoinLookupHandler(HttpStatusCode surveyStatus, HttpStatusCode triviaStatus)
+    [Theory]
+    [InlineData(HttpStatusCode.OK)]
+    [InlineData(HttpStatusCode.Conflict)]
+    public void FormCode_ContinuesToFormPage(HttpStatusCode formStatus)
+    {
+        var handler = new JoinLookupHandler(HttpStatusCode.NotFound, HttpStatusCode.NotFound, formStatus);
+        Services.AddSingleton(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+
+        var cut = Render<JoinSessionPage>(parameters => parameters.Add(p => p.JoinCode, " frm123 "));
+
+        cut.WaitForAssertion(() =>
+            Assert.EndsWith("/form/FRM123", Services.GetRequiredService<NavigationManager>().Uri));
+    }
+
+    private sealed class JoinLookupHandler(
+        HttpStatusCode surveyStatus,
+        HttpStatusCode triviaStatus,
+        HttpStatusCode formStatus = HttpStatusCode.NotFound)
         : HttpMessageHandler
     {
         public List<string> Paths { get; } = [];
@@ -135,8 +161,10 @@ public class SurveyFirstNavigationTests : BunitContext
         {
             var path = request.RequestUri!.AbsolutePath;
             Paths.Add(path);
-            return Task.FromResult(new HttpResponseMessage(
-                path.StartsWith("/api/sessions/", StringComparison.Ordinal) ? surveyStatus : triviaStatus));
+            var status = path.StartsWith("/api/sessions/", StringComparison.Ordinal) ? surveyStatus
+                : path.StartsWith("/api/trivia/", StringComparison.Ordinal) ? triviaStatus
+                : formStatus;
+            return Task.FromResult(new HttpResponseMessage(status));
         }
     }
 

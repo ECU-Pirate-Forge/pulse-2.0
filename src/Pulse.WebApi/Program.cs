@@ -106,6 +106,19 @@ app.MapPut("/api/trivia/{gameId:guid}/questions/{questionId:guid}/open", TriviaE
 app.MapPut("/api/trivia/{gameId:guid}/question/close", TriviaEndpointHandlers.CloseQuestion);
 app.MapPut("/api/trivia/{gameId:guid}/finish", TriviaEndpointHandlers.FinishGame);
 app.MapPost("/api/trivia/{gameId:guid}/questions/{questionId:guid}/answers", TriviaEndpointHandlers.SubmitAnswer);
+
+app.MapGet("/api/forms", FormEndpointHandlers.GetForms);
+app.MapPost("/api/forms", FormEndpointHandlers.CreateForm);
+app.MapGet("/api/forms/{id:guid}", FormEndpointHandlers.GetForm);
+app.MapPut("/api/forms/{id:guid}", FormEndpointHandlers.UpdateForm);
+app.MapDelete("/api/forms/{id:guid}", FormEndpointHandlers.DeleteForm);
+app.MapPut("/api/forms/{id:guid}/open", FormEndpointHandlers.OpenForm);
+app.MapPut("/api/forms/{id:guid}/close", FormEndpointHandlers.CloseForm);
+app.MapGet("/api/forms/{id:guid}/submissions", FormEndpointHandlers.GetSubmissions);
+app.MapGet("/api/forms/{id:guid}/export", FormEndpointHandlers.ExportSubmissions);
+app.MapGet("/api/forms/{id:guid}/qr", FormEndpointHandlers.GetQrCode);
+app.MapGet("/api/forms/join/{joinCode}", FormEndpointHandlers.GetPublicForm);
+app.MapPost("/api/forms/join/{joinCode}/submit", FormEndpointHandlers.SubmitForm);
 app.MapDefaultEndpoints();
 
 app.Run();

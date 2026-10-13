@@ -1,0 +1,259 @@
+@page "/form/{JoinCode}"
+@using System.Net
+@using System.Net.Http.Json
+@using Pulse.Shared.Contracts.V1
+@using Pulse.Shared.Models
+@rendermode InteractiveServer
+@inject HttpClient Http
+
+<PageTitle>@(form?.Title ?? "Form") | Pulse</PageTitle>
+
+<main id="main-content" class="pulse-page form-fill">
+    <section class="pulse-card">
+        @if (isLoading)
+        {
+            <p class="pulse-eyebrow">Form @JoinCode</p>
+            <h1>Loading form</h1>
+        }
+        else if (submitted)
+        {
+            <p class="pulse-eyebrow">Thank you</p>
+            <h1 data-testid="form-thanks">Your response was submitted</h1>
+            <p>You can close this page.</p>
+        }
+        else if (form is null)
+        {
+            <p class="pulse-eyebrow">Unable to open form</p>
+            <h1>We could not open that form</h1>
+            <p data-testid="form-load-error">@loadError</p>
+            <a class="pulse-button pulse-button-primary" href="/">Try another code</a>
+        }
+        else
+        {
+            <p class="pulse-eyebrow">Pulse form</p>
+            <h1 data-testid="form-title">@form.Title</h1>
+            @if (!string.IsNullOrWhiteSpace(form.Description))
+            {
+                <p>@form.Description</p>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(submitError))
+            {
+                <div class="pulse-alert pulse-alert-error" role="alert" data-testid="submit-error">@submitError</div>
+            }
+
+            <form @onsubmit="SubmitAsync" novalidate>
+                @foreach (var field in form.Fields)
+                {
+                    var key = field.Id.ToString();
+                    var inputId = $"field-{key}";
+                    <div class="form-field" style="display:flex;flex-direction:column;gap:.25rem;margin-bottom:1rem;">
+                        @if (field.FieldType == FormFieldType.Checkbox)
+                        {
+                            <label for="@inputId">
+                                <input id="@inputId" type="checkbox" data-field="@key"
+                                       checked="@(GetValue(key) == "true")"
+                                       @onchange="e => SetCheckbox(key, e.Value)" />
+                                @field.Label @RequiredMark(field)
+                            </label>
+                        }
+                        else
+                        {
+                            <label for="@inputId">@field.Label @RequiredMark(field)</label>
+                            @switch (field.FieldType)
+                            {
+                                case FormFieldType.TextArea:
+                                    <textarea id="@inputId" data-field="@key" rows="4" placeholder="@field.Placeholder"
+                                              value="@GetValue(key)" @onchange="e => SetValue(key, e.Value?.ToString())"></textarea>
+                                    break;
+                                case FormFieldType.Dropdown:
+                                case FormFieldType.YesNo:
+                                    <select id="@inputId" data-field="@key" value="@GetValue(key)"
+                                            @onchange="e => SetValue(key, e.Value?.ToString())">
+                                        <option value="">Select…</option>
+                                        @foreach (var option in field.Options)
+                                        {
+                                            <option value="@option">@option</option>
+                                        }
+                                    </select>
+                                    break;
+                                default:
+                                    <input id="@inputId" data-field="@key" type="@InputType(field.FieldType)"
+                                           placeholder="@field.Placeholder" value="@GetValue(key)"
+                                           @onchange="e => SetValue(key, e.Value?.ToString())" />
+                                    break;
+                            }
+                        }
+                        @if (fieldErrors.TryGetValue(key, out var fieldError))
+                        {
+                            <small class="pulse-alert pulse-alert-error" data-testid="field-error">@fieldError</small>
+                        }
+                    </div>
+                }
+                <button type="submit" class="pulse-button pulse-button-primary" disabled="@isSubmitting" data-testid="submit-form">
+                    @(isSubmitting ? "Submitting…" : "Submit")
+                </button>
+            </form>
+        }
+    </section>
+</main>
+
+@code {
+    [Parameter]
+    public string JoinCode { get; set; } = string.Empty;
+
+    private PublicFormResponse? form;
+    private readonly Dictionary<string, string> values = new();
+    private Dictionary<string, string> fieldErrors = new();
+    private bool isLoading = true;
+    private bool isSubmitting;
+    private bool submitted;
+    private string? loadError;
+    private string? submitError;
+
+    private string Code => JoinCode.Trim().ToUpperInvariant();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        try
+        {
+            using var response = await Http.GetAsync($"/api/forms/join/{Uri.EscapeDataString(Code)}");
+            if (response.IsSuccessStatusCode)
+            {
+                form = await response.Content.ReadFromJsonAsync<PublicFormResponse>();
+                foreach (var field in form?.Fields ?? [])
+                {
+                    if (field.FieldType == FormFieldType.Checkbox)
+                    {
+                        values[field.Id.ToString()] = "false";
+                    }
+                }
+            }
+            else if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                loadError = "That form code was not found. Check the code with your instructor.";
+            }
+            else if (response.StatusCode == HttpStatusCode.Conflict)
+            {
+                loadError = await ReadMessageAsync(response) ?? "This form is not currently accepting responses.";
+            }
+            else
+            {
+                loadError = "Pulse could not load that form right now. Please try again.";
+            }
+        }
+        catch (HttpRequestException)
+        {
+            loadError = "Pulse could not connect. Check your connection and try again.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string GetValue(string key) => values.TryGetValue(key, out var value) ? value : string.Empty;
+
+    private void SetValue(string key, string? value)
+    {
+        values[key] = value ?? string.Empty;
+        fieldErrors.Remove(key);
+    }
+
+    private void SetCheckbox(string key, object? value) =>
+        SetValue(key, value is bool b && b ? "true" : "false");
+
+    private static string RequiredMark(PublicFormField field) => field.Required ? "*" : string.Empty;
+
+    private static string InputType(FormFieldType type) => type switch
+    {
+        FormFieldType.Email => "email",
+        FormFieldType.Phone => "tel",
+        FormFieldType.Number => "number",
+        FormFieldType.Date => "date",
+        _ => "text"
+    };
+
+    private async Task SubmitAsync()
+    {
+        if (isSubmitting)
+        {
+            return;
+        }
+
+        isSubmitting = true;
+        submitError = null;
+        try
+        {
+            using var response = await Http.PostAsJsonAsync(
+                $"/api/forms/join/{Uri.EscapeDataString(Code)}/submit",
+                new SubmitFormRequest(new Dictionary<string, string>(values)));
+
+            if (response.IsSuccessStatusCode)
+            {
+                submitted = true;
+                return;
+            }
+
+            if (response.StatusCode == HttpStatusCode.BadRequest)
+            {
+                var validation = await TryReadValidationAsync(response);
+                fieldErrors = validation?.FieldErrors ?? new();
+                submitError = validation?.Error ?? "Please fix the highlighted fields.";
+                return;
+            }
+
+            submitError = response.StatusCode switch
+            {
+                HttpStatusCode.Conflict => "This form is no longer accepting responses.",
+                HttpStatusCode.NotFound => "This form no longer exists.",
+                _ => "Pulse could not submit your response. Please try again."
+            };
+        }
+        catch (HttpRequestException)
+        {
+            submitError = "Pulse could not connect. Check your connection and try again.";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private static async Task<FormValidationErrorResponse?> TryReadValidationAsync(HttpResponseMessage response)
+    {
+        try
+        {
+            return await response.Content.ReadFromJsonAsync<FormValidationErrorResponse>();
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static async Task<string?> ReadMessageAsync(HttpResponseMessage response)
+    {
+        try
+        {
+            var text = await response.Content.ReadAsStringAsync();
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return null;
+            }
+
+            return text.TrimStart().StartsWith('"')
+                ? System.Text.Json.JsonSerializer.Deserialize<string>(text)
+                : text;
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return null;
+        }
+    }
+}

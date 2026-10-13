@@ -10,7 +10,7 @@
         {
             <p class="pulse-eyebrow">Join code @JoinCode</p>
             <h1>Checking your code</h1>
-            <p>Confirming that the survey or trivia game is available.</p>
+            <p>Confirming that the survey, trivia game, or form is available.</p>
         }
         else
         {
@@ -52,9 +52,20 @@
                     return;
                 }
 
-                errorMessage = triviaResponse.StatusCode == System.Net.HttpStatusCode.NotFound
-                    ? "That survey or trivia code was not found. Check the code with your instructor."
-                    : "Pulse could not check that trivia game right now. Please try again.";
+                if (triviaResponse.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    using var formResponse = await Http.GetAsync($"/api/forms/join/{Uri.EscapeDataString(normalizedCode)}");
+                    if (formResponse.IsSuccessStatusCode || formResponse.StatusCode == System.Net.HttpStatusCode.Conflict)
+                    {
+                        Navigation.NavigateTo($"/form/{Uri.EscapeDataString(normalizedCode)}");
+                        return;
+                    }
+
+                    errorMessage = "That survey, trivia, or form code was not found. Check the code with your instructor.";
+                    return;
+                }
+
+                errorMessage = "Pulse could not check that trivia game right now. Please try again.";
                 return;
             }
 

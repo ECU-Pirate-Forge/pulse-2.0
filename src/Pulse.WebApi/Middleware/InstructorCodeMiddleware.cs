@@ -137,6 +137,13 @@ public static class InstructorOnlyEndpointMatcher
             return true;
         }
 
+        if ((path.Equals("/api/forms", StringComparison.OrdinalIgnoreCase) ||
+             path.StartsWith("/api/forms/", StringComparison.OrdinalIgnoreCase)) &&
+            !path.StartsWith("/api/forms/join/", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
         if ((HttpMethods.IsPost(method) || HttpMethods.IsGet(method))
             && (path.Equals("/sessions", StringComparison.OrdinalIgnoreCase) || path.Equals("/api/sessions", StringComparison.OrdinalIgnoreCase)))
         {

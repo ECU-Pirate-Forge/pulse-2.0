@@ -1,0 +1,57 @@
+@using MudBlazor
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<MudButton Variant="Variant.Outlined"
+           Size="Size.Small"
+           Color="Color.Success"
+           Class="@Class"
+           StartIcon="@Icons.Material.Filled.Download"
+           Disabled="IsExporting"
+           @onclick="ExportAsync">
+    @(IsExporting ? "Exporting..." : "Export CSV")
+</MudButton>
+@if (!string.IsNullOrEmpty(Error))
+{
+    <MudText Typo="Typo.caption" Color="Color.Error" Style="width: 100%;">@Error</MudText>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid FormId { get; set; }
+    [Parameter, EditorRequired] public string InstructorCode { get; set; } = string.Empty;
+    [Parameter] public string? Class { get; set; }
+
+    private bool IsExporting;
+    private string? Error;
+
+    private async Task ExportAsync()
+    {
+        IsExporting = true;
+        Error = null;
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/forms/{FormId}/export");
+            request.Headers.TryAddWithoutValidation("InstructorCode", InstructorCode);
+            using var response = await Http.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+            {
+                Error = "Export failed.";
+                return;
+            }
+
+            var bytes = await response.Content.ReadAsByteArrayAsync();
+            var fileName = response.Content.Headers.ContentDisposition?.FileNameStar
+                ?? response.Content.Headers.ContentDisposition?.FileName?.Trim('"')
+                ?? $"form-{FormId}.csv";
+            await JS.InvokeVoidAsync("pulseDownload.saveBase64", fileName, "text/csv", Convert.ToBase64String(bytes));
+        }
+        catch (Exception ex) when (ex is HttpRequestException or JSException or TaskCanceledException)
+        {
+            Error = "Export failed.";
+        }
+        finally
+        {
+            IsExporting = false;
+        }
+    }
+}

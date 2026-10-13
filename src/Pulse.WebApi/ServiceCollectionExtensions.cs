@@ -20,6 +20,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<DeviceIdValidationService>();
         services.AddSingleton<ISessionEventPublisher, SignalRSessionEventPublisher>();
         services.AddSingleton<TriviaRepository>();
+        services.AddSingleton<FormRepository>();
         services.AddSingleton<TriviaScoringService>();
         services.AddSingleton<SurveyGenerationRepository>();
         services.AddSingleton<DocumentTextExtractor>();
