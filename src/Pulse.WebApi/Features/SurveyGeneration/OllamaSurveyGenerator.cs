@@ -93,7 +93,7 @@ public sealed class OllamaSurveyGenerator(HttpClient http, IConfiguration config
                 throw new LocalInferenceException("Ollama returned an incomplete response. Try fewer questions.");
             var result = JsonSerializer.Deserialize<GeneratedQuestions>(chat.Message.Content, JsonOptions);
             var questions = result?.Questions;
-            if (questions is null || questions.Count != count)
+            if (questions is null || questions.Count == 0)
                 throw new LocalInferenceException("The model did not return the requested number of grounded questions. Add more material or request fewer questions.");
             foreach (var question in questions)
             {
