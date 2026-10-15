@@ -6,6 +6,8 @@ using Pulse.WebApi.Middleware;
 using Pulse.Common.Services;
 using Pulse.WebApi;
 using Scalar.AspNetCore;
+using Pulse.Shared.Contracts.V1;
+using Pulse.WebApi.Features.SurveyGeneration;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,6 +18,7 @@ var connectionString = builder.Configuration.GetConnectionString("pulse-db") ?? 
 builder.Services.AddPulseWebApiCoreServices(connectionString);
 
 builder.Services.AddOpenApi();
+builder.Services.AddSignalR();
 
 var app = builder.Build();
 
@@ -36,10 +39,8 @@ app.MapGet("/", () =>
 
 app.MapGet("/questions", (QuestionRepository repo) =>
 {
-    return repo.GetAll();
+    return repo.GetAll().Select(StudentQuestionResponse.FromQuestion);
 });
-
-app.MapPost("/questions", QuestionEndpointHandlers.CreateQuestion);
 
 app.MapGet("/api/sessions/{id:guid}", (ISessionRepository repo, Guid id, HttpContext ctx) =>
 {
@@ -58,55 +59,66 @@ app.MapGet("/api/sessions/{id:guid}", (ISessionRepository repo, Guid id, HttpCon
     return Results.Ok(session);
 });
 
-app.MapPut("/questions/{id:guid}", QuestionEndpointHandlers.UpdateQuestion);
-app.MapDelete("/questions/{id:guid}", QuestionEndpointHandlers.DeleteQuestion);
-app.MapPut("/api/questions/reorder", QuestionEndpointHandlers.ReorderQuestions);
+app.MapPut("/questions/{id:guid}", QuestionEndpointHandlers.UpdateQuestionForInstructor);
+app.MapDelete("/questions/{id:guid}", QuestionEndpointHandlers.DeleteQuestionForInstructor);
+app.MapPut("/api/questions/reorder", QuestionEndpointHandlers.ReorderQuestionsForInstructor);
 
 // Session-specific question endpoints
 app.MapGet("/api/sessions/{sessionId:guid}/questions", (Guid sessionId, QuestionRepository questionRepo) =>
 {
     var questions = questionRepo.GetBySessionId(sessionId).OrderBy(q => q.SortOrder).ToList();
-    return Results.Ok(questions);
+    return Results.Ok(questions.Select(StudentQuestionResponse.FromQuestion));
 });
 
-app.MapPost("/api/sessions/{sessionId:guid}/questions",
-    (Guid sessionId, Question question, QuestionRepository questionRepo, QuestionService questionService) =>
-    {
-        question.SessionId = sessionId;
-
-        var normalizedOptions = (question.Options ?? Enumerable.Empty<string>())
-            .Where(option => !string.IsNullOrWhiteSpace(option))
-            .Select(option => option.Trim())
-            .ToList();
-
-        var validation = questionService.ValidateQuestion(new QuestionDTO
-        {
-            Type = question.Type,
-            Options = normalizedOptions
-        });
-
-        if (!validation.IsValid)
-            return Results.BadRequest(validation.ErrorMessage);
-
-        question.Options = normalizedOptions;
-        var created = questionRepo.Insert(question);
-        return Results.Created($"/api/sessions/{sessionId}/questions/{created.Id}", created);
-    });
+app.MapPost("/api/sessions/{sessionId:guid}/questions", QuestionEndpointHandlers.CreateQuestionForSession);
+app.MapSurveyGeneration();
 
 app.MapPost("/api/questionbank", QuestionBankEndpointHandlers.CreateQuestionBankItem);
 app.MapGet("/api/questionbank", QuestionBankEndpointHandlers.GetQuestionBankItems);
+app.MapPost("/api/questionbank/suggestions", QuestionBankEndpointHandlers.SubmitQuestionSuggestion);
+app.MapPut("/api/questionbank/{id:guid}", QuestionBankEndpointHandlers.ModerateQuestionBankItem);
 app.MapGet("/sessions", SessionEndpointHandlers.GetSessions);
 app.MapPost("/api/sessions", SessionEndpointHandlers.CreateSession);
+app.MapDelete("/api/sessions/{id:guid}", SessionEndpointHandlers.DeleteSession);
 app.MapGet("/api/sessions/join/{joinCode}", SessionEndpointHandlers.JoinSessionByCode);
 app.MapGet("/api/sessions/qr/{joinCode}", SessionEndpointHandlers.GetSessionQrByCode);
 app.MapGet("/sessions/{id:guid}/qr", SessionEndpointHandlers.GetSessionQr);
-app.MapPost("/api/sessions/{sessionId:guid}/questions/{questionId:guid}/respond", ResponseEndpointHandlers.Respond);
+app.MapPost("/api/sessions/{sessionId:guid}/submit", SurveySubmissionEndpointHandlers.SubmitSurvey);
 app.MapGet("/api/sessions/{id:guid}/results", SessionResultsEndpointHandlers.GetSessionResults);
+app.MapGet("/api/sessions/{id:guid}/results/student", SessionResultsEndpointHandlers.GetStudentResults);
 
 app.MapPut("/api/sessions/{id:guid}/unblind", SessionEndpointHandlers.UnblindSession);
+app.MapPut("/api/sessions/{id:guid}/activate", SessionEndpointHandlers.ActivateSession);
+app.MapPut("/api/sessions/{id:guid}/close", SessionEndpointHandlers.CloseSession);
 app.MapGet("/api/admin/export-db", AdminEndpointHandlers.ExportDb);
 app.MapPost("/api/questionbank/import/preview", CsvPreviewEndpointHandlers.PreviewImport).DisableAntiforgery();
 app.MapPost("/api/sessions/{sessionId:guid}/questions/import", QuestionBankImportEndpointHandlers.ImportQuestions);
+app.MapHub<SessionHub>("/hubs/session");
+app.MapGet("/api/trivia", TriviaEndpointHandlers.GetGames);
+app.MapPost("/api/trivia", TriviaEndpointHandlers.CreateGame);
+app.MapGet("/api/trivia/join/{joinCode}", TriviaEndpointHandlers.GetJoinInfo);
+app.MapPost("/api/trivia/join/{joinCode}", TriviaEndpointHandlers.Join);
+app.MapGet("/api/trivia/{gameId:guid}/state/{participantId:guid}", TriviaEndpointHandlers.GetState);
+app.MapGet("/api/trivia/{gameId:guid}/control", TriviaEndpointHandlers.GetInstructorState);
+app.MapPost("/api/trivia/{gameId:guid}/teams", TriviaEndpointHandlers.AddTeam);
+app.MapPost("/api/trivia/{gameId:guid}/questions", TriviaEndpointHandlers.AddQuestion);
+app.MapPut("/api/trivia/{gameId:guid}/questions/{questionId:guid}/open", TriviaEndpointHandlers.OpenQuestion);
+app.MapPut("/api/trivia/{gameId:guid}/question/close", TriviaEndpointHandlers.CloseQuestion);
+app.MapPut("/api/trivia/{gameId:guid}/finish", TriviaEndpointHandlers.FinishGame);
+app.MapPost("/api/trivia/{gameId:guid}/questions/{questionId:guid}/answers", TriviaEndpointHandlers.SubmitAnswer);
+
+app.MapGet("/api/forms", FormEndpointHandlers.GetForms);
+app.MapPost("/api/forms", FormEndpointHandlers.CreateForm);
+app.MapGet("/api/forms/{id:guid}", FormEndpointHandlers.GetForm);
+app.MapPut("/api/forms/{id:guid}", FormEndpointHandlers.UpdateForm);
+app.MapDelete("/api/forms/{id:guid}", FormEndpointHandlers.DeleteForm);
+app.MapPut("/api/forms/{id:guid}/open", FormEndpointHandlers.OpenForm);
+app.MapPut("/api/forms/{id:guid}/close", FormEndpointHandlers.CloseForm);
+app.MapGet("/api/forms/{id:guid}/submissions", FormEndpointHandlers.GetSubmissions);
+app.MapGet("/api/forms/{id:guid}/export", FormEndpointHandlers.ExportSubmissions);
+app.MapGet("/api/forms/{id:guid}/qr", FormEndpointHandlers.GetQrCode);
+app.MapGet("/api/forms/join/{joinCode}", FormEndpointHandlers.GetPublicForm);
+app.MapPost("/api/forms/join/{joinCode}/submit", FormEndpointHandlers.SubmitForm);
 app.MapDefaultEndpoints();
 
 app.Run();

@@ -1,0 +1,327 @@
+@page "/forms/{Id:guid}/edit"
+@using MudBlazor
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@using System.Net.Http.Json
+@using Pulse.Shared.Contracts.V1
+@using Pulse.Shared.Models
+@using Pulse.Common.Services
+@rendermode InteractiveServer
+@inject NavigationManager NavManager
+@inject HttpClient Http
+@inject ProtectedSessionStorage ProtectedStorage
+
+<PageTitle>Edit Form - Pulse</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-6">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/forms">Back to forms</MudButton>
+        <MudSpacer />
+        @if (_form is not null)
+        {
+            <MudChip T="string" Color="StatusColor(_form.Status)" data-testid="form-status">@_form.Status</MudChip>
+        }
+    </MudStack>
+
+    @if (!_initialized)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else if (string.IsNullOrEmpty(_instructorCode))
+    {
+        <MudAlert Severity="Severity.Warning">
+            Please sign in with your instructor code on the <MudLink Href="/forms">Forms</MudLink> page first.
+        </MudAlert>
+    }
+    else if (_loadError is not null)
+    {
+        <MudAlert Severity="Severity.Error">@_loadError</MudAlert>
+    }
+    else if (_form is not null)
+    {
+        <MudPaper Class="pa-4 mb-4" Elevation="1">
+            <MudText Typo="Typo.h5" Class="mb-3">Form details</MudText>
+            <MudTextField @bind-Value="_title" Label="Title" Variant="Variant.Outlined" Required="true" MaxLength="200" Class="mb-3" data-testid="form-title" />
+            <MudTextField @bind-Value="_description" Label="Description (optional)" Variant="Variant.Outlined" Lines="3" MaxLength="2000" />
+        </MudPaper>
+
+        <MudPaper Class="pa-4 mb-4" Elevation="1">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-3">
+                <MudText Typo="Typo.h5">Fields (@_fields.Count)</MudText>
+                <MudSpacer />
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.PlaylistAdd" OnClick="AddStarterFields" data-testid="add-starter-fields">Add starter fields</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AddField" data-testid="add-field">Add field</MudButton>
+            </MudStack>
+
+            @if (_form.Status != FormStatus.Draft)
+            {
+                <MudAlert Severity="Severity.Info" Class="mb-3">
+                    This form is @_form.Status.ToString().ToLowerInvariant(). Changing fields will not alter responses already collected; removed fields will no longer appear in exports.
+                </MudAlert>
+            }
+
+            @if (_fields.Count == 0)
+            {
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">No fields yet. Add a field or start with the starter set.</MudText>
+            }
+
+            @for (var i = 0; i < _fields.Count; i++)
+            {
+                var index = i;
+                var field = _fields[index];
+                <MudPaper Outlined="true" Class="pa-3 mb-3" data-testid="field-row">
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12" md="4">
+                            <MudTextField @bind-Value="field.Label" Label="Label" Variant="Variant.Outlined" MaxLength="200" />
+                        </MudItem>
+                        <MudItem xs="12" md="3">
+                            <MudSelect T="FormFieldType" @bind-Value="field.FieldType" Label="Type" Variant="Variant.Outlined">
+                                @foreach (var type in Enum.GetValues<FormFieldType>())
+                                {
+                                    <MudSelectItem Value="type">@TypeLabel(type)</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" md="3">
+                            <MudTextField @bind-Value="field.Placeholder" Label="Placeholder" Variant="Variant.Outlined" MaxLength="200" />
+                        </MudItem>
+                        <MudItem xs="12" md="2" Class="d-flex align-center">
+                            <MudCheckBox @bind-Value="field.Required" Label="Required" Color="Color.Primary" />
+                        </MudItem>
+                        @if (field.FieldType == FormFieldType.Dropdown)
+                        {
+                            <MudItem xs="12">
+                                <MudTextField @bind-Value="field.OptionsText" Label="Options (one per line)" Variant="Variant.Outlined" Lines="3" />
+                            </MudItem>
+                        }
+                        <MudItem xs="12" Class="d-flex justify-end">
+                            <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward" Disabled="index == 0" OnClick="() => Move(index, -1)" aria-label="Move up" />
+                            <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward" Disabled="index == _fields.Count - 1" OnClick="() => Move(index, 1)" aria-label="Move down" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="() => _fields.RemoveAt(index)" aria-label="Remove field" />
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+            }
+        </MudPaper>
+
+        @if (_saveError is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-3" data-testid="save-error">@_saveError</MudAlert>
+        }
+        @if (_saveMessage is not null)
+        {
+            <MudAlert Severity="Severity.Success" Class="mb-3">@_saveMessage</MudAlert>
+        }
+
+        <MudStack Row="true" Spacing="2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_isSaving" OnClick="() => SaveAsync(false)" data-testid="save-form">Save</MudButton>
+            @if (_form.Status != FormStatus.Open)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Success" Disabled="_isSaving || _fields.Count == 0" OnClick="() => SaveAsync(true)" data-testid="save-open-form">Save &amp; Open</MudButton>
+            }
+            <MudButton Variant="Variant.Outlined" Href="@($"/forms/{Id}/live")">Monitor</MudButton>
+        </MudStack>
+    }
+</MudContainer>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private sealed class EditableField
+    {
+        public Guid? Id { get; set; }
+        public string Label { get; set; } = string.Empty;
+        public FormFieldType FieldType { get; set; } = FormFieldType.Text;
+        public bool Required { get; set; }
+        public string? Placeholder { get; set; }
+        public string OptionsText { get; set; } = string.Empty;
+    }
+
+    private bool _initialized;
+    private string _instructorCode = string.Empty;
+    private Form? _form;
+    private string _title = string.Empty;
+    private string? _description;
+    private List<EditableField> _fields = [];
+    private string? _loadError;
+    private string? _saveError;
+    private string? _saveMessage;
+    private bool _isSaving;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        try
+        {
+            var result = await ProtectedStorage.GetAsync<string>("instructorCode");
+            if (result.Success && !string.IsNullOrEmpty(result.Value))
+            {
+                _instructorCode = result.Value;
+                await LoadAsync();
+            }
+        }
+        catch (InvalidOperationException)
+        {
+        }
+        catch (JSException)
+        {
+        }
+        catch (System.Security.Cryptography.CryptographicException)
+        {
+        }
+
+        _initialized = true;
+        StateHasChanged();
+    }
+
+    private HttpRequestMessage NewRequest(HttpMethod method, string url)
+    {
+        var request = new HttpRequestMessage(method, url);
+        request.Headers.TryAddWithoutValidation("InstructorCode", _instructorCode);
+        return request;
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            using var request = NewRequest(HttpMethod.Get, $"/api/forms/{Id}");
+            using var response = await Http.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+            {
+                _loadError = "Form not found.";
+                return;
+            }
+
+            var form = await response.Content.ReadFromJsonAsync<Form>();
+            if (form is null)
+            {
+                _loadError = "Form not found.";
+                return;
+            }
+            Apply(form);
+        }
+        catch (HttpRequestException)
+        {
+            _loadError = "Unable to connect to the server.";
+        }
+    }
+
+    private void Apply(Form form)
+    {
+        _form = form;
+        _title = form.Title;
+        _description = form.Description;
+        _fields = form.Fields.OrderBy(f => f.Order).Select(f => new EditableField
+        {
+            Id = f.Id,
+            Label = f.Label,
+            FieldType = f.FieldType,
+            Required = f.Required,
+            Placeholder = f.Placeholder,
+            OptionsText = string.Join(Environment.NewLine, f.Options)
+        }).ToList();
+    }
+
+    private void AddField() => _fields.Add(new EditableField { Label = $"Field {_fields.Count + 1}" });
+
+    private void AddStarterFields()
+    {
+        foreach (var preset in FormFieldPresets.Starter())
+        {
+            if (_fields.Any(f => string.Equals(f.Label.Trim(), preset.Label, StringComparison.OrdinalIgnoreCase)))
+                continue;
+            _fields.Add(new EditableField
+            {
+                Label = preset.Label,
+                FieldType = preset.FieldType,
+                Required = preset.Required,
+                Placeholder = preset.Placeholder
+            });
+        }
+    }
+
+    private void Move(int index, int delta)
+    {
+        var target = index + delta;
+        if (target < 0 || target >= _fields.Count)
+            return;
+        (_fields[index], _fields[target]) = (_fields[target], _fields[index]);
+    }
+
+    private SaveFormRequest BuildRequest() => new(
+        _title.Trim(),
+        string.IsNullOrWhiteSpace(_description) ? null : _description.Trim(),
+        _fields.Select(f => new FormFieldRequest(
+            f.Id,
+            f.Label.Trim(),
+            f.FieldType,
+            f.Required,
+            string.IsNullOrWhiteSpace(f.Placeholder) ? null : f.Placeholder.Trim(),
+            f.FieldType == FormFieldType.Dropdown
+                ? f.OptionsText.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                : null)).ToList());
+
+    private async Task SaveAsync(bool openAfterSave)
+    {
+        _isSaving = true;
+        _saveError = null;
+        _saveMessage = null;
+        try
+        {
+            using var request = NewRequest(HttpMethod.Put, $"/api/forms/{Id}");
+            request.Content = JsonContent.Create(BuildRequest());
+            using var response = await Http.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                _saveError = string.IsNullOrWhiteSpace(body) ? "Failed to save form." : body.Trim('"');
+                return;
+            }
+
+            var saved = await response.Content.ReadFromJsonAsync<Form>();
+            if (saved is not null)
+                Apply(saved);
+
+            if (openAfterSave)
+            {
+                using var openRequest = NewRequest(HttpMethod.Put, $"/api/forms/{Id}/open");
+                using var openResponse = await Http.SendAsync(openRequest);
+                if (!openResponse.IsSuccessStatusCode)
+                {
+                    _saveError = "Saved, but the form could not be opened.";
+                    return;
+                }
+                NavManager.NavigateTo($"/forms/{Id}/live");
+                return;
+            }
+
+            _saveMessage = "Form saved.";
+        }
+        catch (HttpRequestException)
+        {
+            _saveError = "Unable to connect to the server.";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private static Color StatusColor(FormStatus status) => status switch
+    {
+        FormStatus.Open => Color.Success,
+        FormStatus.Closed => Color.Default,
+        _ => Color.Warning
+    };
+
+    private static string TypeLabel(FormFieldType type) => type switch
+    {
+        FormFieldType.TextArea => "Long text",
+        FormFieldType.YesNo => "Yes / No",
+        FormFieldType.Checkbox => "Checkbox",
+        FormFieldType.Dropdown => "Dropdown",
+        _ => type.ToString()
+    };
+}

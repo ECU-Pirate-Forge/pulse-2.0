@@ -1,0 +1,71 @@
+.admin-home {
+    width: min(100%, var(--pulse-content-width));
+    margin-inline: auto;
+}
+
+.admin-page-heading {
+    max-width: 60rem;
+    margin-bottom: 2.5rem;
+}
+
+.admin-page-heading h1 {
+    margin: 0;
+    color: var(--pulse-purple-900);
+    font-size: clamp(2rem, 4vw, 3.25rem);
+    line-height: 1.1;
+}
+
+.admin-page-heading > p:last-child {
+    color: var(--pulse-muted);
+    font-size: 1.125rem;
+}
+
+.workspace-grid {
+    display: grid;
+    gap: 1rem;
+}
+
+.workspace-card {
+    display: grid;
+    gap: 1.5rem;
+    align-content: start;
+    padding: 1.5rem;
+    border-top: 0.25rem solid var(--pulse-border);
+}
+
+.workspace-primary {
+    border-top-color: var(--pulse-gold-500);
+    background: var(--pulse-purple-900);
+}
+
+.workspace-primary h2,
+.workspace-primary p {
+    color: var(--pulse-surface);
+}
+
+.workspace-number {
+    margin: 0;
+    color: var(--pulse-purple-700);
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+}
+
+.workspace-primary .workspace-number {
+    color: var(--pulse-gold-500);
+}
+
+.workspace-card h2 {
+    margin: 0;
+    color: var(--pulse-purple-900);
+}
+
+.workspace-card p {
+    color: var(--pulse-muted);
+}
+
+@media (min-width: 64rem) {
+    .workspace-grid {
+        grid-template-columns: 1.2fr 0.9fr 0.9fr;
+    }
+}

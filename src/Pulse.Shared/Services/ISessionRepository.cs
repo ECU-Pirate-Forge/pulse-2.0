@@ -45,5 +45,6 @@ public interface ISessionRepository
     /// Deletes a session by its id.
     /// </summary>
     /// <param name="id">The session id to delete</param>
-    Task DeleteAsync(Guid id);
+    /// <returns>True when the session was deleted; otherwise false.</returns>
+    Task<bool> DeleteAsync(Guid id);
 }

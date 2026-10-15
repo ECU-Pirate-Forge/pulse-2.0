@@ -1,5 +1,6 @@
 using LiteDB;
 using System.Collections.Concurrent;
+using Pulse.Domain.Entities;
 using Pulse.Shared.Models;
 using Pulse.Common.Services;
 using Pulse.Shared.Services;
@@ -125,10 +126,38 @@ public class SessionRepository : ISessionRepository
         return Task.FromResult(exists);
     }
 
-    public Task DeleteAsync(Guid id)
+    public Task<bool> DeleteAsync(Guid id)
     {
-        _sessions.Delete(id);
+        if (id == Guid.Empty)
+            return Task.FromResult(false);
+
+        if (!_db.BeginTrans())
+            throw new InvalidOperationException("Could not start the session deletion transaction.");
+
+        try
+        {
+            var deleted = _sessions.Delete(id);
+            if (!deleted)
+            {
+                _db.Rollback();
+                return Task.FromResult(false);
+            }
+
+            _db.GetCollection<Question>("questions").DeleteMany(q => q.SessionId == id);
+            _db.GetCollection<Response>("responses").DeleteMany(r => r.SessionId == id);
+            _db.GetCollection("survey_grounding").Delete(id);
+            _db.GetCollection("survey_generation_previews").DeleteMany(Query.EQ("SessionId", id));
+
+            if (!_db.Commit())
+                throw new InvalidOperationException("Could not commit the session deletion transaction.");
+        }
+        catch
+        {
+            _db.Rollback();
+            throw;
+        }
+
         _cache.TryRemove(id, out _);
-        return Task.CompletedTask;
+        return Task.FromResult(true);
     }
 }

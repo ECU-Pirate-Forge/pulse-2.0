@@ -1,9 +1,9 @@
 
 # Pulse 2.0
 
-Pulse is a classroom pulse and feedback platform built to help instructors check understanding in real time while class is in progress. Instructors create and run sessions, students join with a code or QR flow, and responses are aggregated live so teaching can be adjusted immediately.
+Pulse is a classroom pulse and feedback platform built to help instructors check understanding while class is in progress. Instructors create sessions, students join with a code or QR flow, and responses are aggregated for instructor review. Real-time updates are part of the approved redesign work.
 
-The solution is implemented as a multi-project .NET 10 application with Blazor frontends, minimal APIs, SignalR for real-time updates, and LiteDB for local persistence.
+The solution is implemented as a multi-project .NET 10 application with Blazor frontends, minimal APIs, LiteDB for local persistence, and SignalR for live classroom updates.
 
 ## Project Background
 
@@ -11,9 +11,8 @@ Traditional end-of-class surveys are too slow for in-class decision making. Puls
 
 Current architecture highlights:
 
-- ASP.NET Core + Blazor Server apps for instructor and student experiences
+- Separate ASP.NET Core + Blazor Server apps for instructor and student experiences
 - Minimal API endpoints for session, question, response, and results workflows
-- SignalR session groups for near real-time broadcast updates
 - LiteDB repositories for lightweight local data persistence
 - Aspire AppHost for local orchestration and observability
 
@@ -21,49 +20,122 @@ Current architecture highlights:
 
 Typical classroom usage flow:
 
-1. Instructor starts a session in the admin app.
-2. Instructor adds questions (manually, from question bank content, or via CSV import workflows).
+1. Instructor creates a session using the current instructor workflow.
+2. Instructor adds questions manually, from the question bank/CSV, or by reviewing locally generated document-grounded questions.
 3. Instructor activates the session and shares the join path using a join code or QR code.
 4. Students join from the web app and submit responses from their own devices.
-5. Pulse validates and records responses, then updates live aggregates for the active session.
-6. Instructor monitors real-time results to adjust teaching during class.
-7. Instructor can unblind results when appropriate and close the session when complete.
+5. Pulse validates and records responses.
+6. Instructor can retrieve aggregate results.
+7. Instructor can persist the unblinded-results setting.
+8. Students can anonymously suggest questions; instructors review, edit,
+   approve, reject, search, and filter the reusable question bank.
+9. Instructors can run separate individual or instructor-defined team trivia
+   games with server-timed scoring and live leaderboards.
 
+The shared `/join/{code}` path checks surveys first, then trivia games if no
+survey matches. Trivia codes continue to `/trivia/{code}` with the game already
+loaded; students enter a display name and, for team games, select a team.
+Students can also enter their game code directly on `/trivia`.
 
 ## Fully Implemented Features
 
 The following are currently implemented in this repository (and covered by project tests):
 
-- Session lifecycle management: create, retrieve, activate, close, and unblind session state
+- Session creation, retrieval, instructor-scoped listing, and unblind-state persistence
 - Instructor access protection on management endpoints via instructor code middleware
 - Instructor-scoped session listing via `GET /sessions`
 - Question authoring workflow: create, fetch, update, and delete question data
 - Question ordering/reorder endpoint support
 - Question bank APIs and repository support for reusable question content
 - Question bank CSV preview/import workflow with parser validation
+- Optional draft-survey document grounding with local Ollama retrieval and instructor-reviewed multiple-choice generation
+- Persisted survey answer keys and citations with separate student-safe question projections
 - Student response submission with validation and upsert-by-device behavior
-- Response aggregation service logic for live tally/result views
+- Response aggregation service logic for instructor tally/result retrieval
 - QR endpoint support for session join flows (by join code and by session id)
+- Survey-first student landing/join experience and dedicated instructor workspace navigation
+- Atomic whole-survey submission, lifecycle transitions, SignalR progress updates with polling fallback, and instructor-controlled result reveal
+- Individual and instructor-defined team trivia with server-side timing, scoring, polling, and leaderboards
+- Shared accessible ECU purple-and-gold design tokens used by both Blazor apps
 - Global exception middleware for consistent API error handling
-- Structured logging behavior coverage
+- Privacy-safe structured logging that omits student response content and persistent device identifiers
 - Admin DB export endpoint behavior
+- Repeatable Windows dev-tunnel workflow for real-device testing
+- bUnit functional coverage for student survey submission/reveal, student trivia,
+  and instructor live-survey/trivia controls
 
 ## Roadmap
 
 Planned and in-progress future work is tracked in the sprint backlog and implementation notes.
 
-Near-term roadmap:
+Current future-work themes:
 
-- Complete and refine instructor UI workflows for session and question management
-- Continue expanding student experience and responsiveness across devices
-- Improve API documentation depth with request/response examples per endpoint
-- Add broader integration and end-to-end test coverage for critical classroom flows
-
-Mid-term roadmap:
-
-- AI-assisted question generation workflow refinement and UX hardening
 - Enhanced analytics/reporting views for post-session review
-- Operational hardening (telemetry, diagnostics, reliability, and deployment readiness)
+- Deployment readiness beyond the documented local/Aspire development environment
+- Per-question reveal with correct-answer indicators (survey-wide aggregate reveal already exists)
+
+## Local document-grounded question generation
+
+Ollama runs separately from Aspire on the same machine as Pulse.WebApi.
+The defaults are `http://localhost:11434`, `gemma4:latest` for generation,
+and `all-minilm:latest` for embeddings. Install Ollama, then prepare both models:
+
+```powershell
+ollama pull gemma4:latest
+ollama pull all-minilm:latest
+ollama serve
+```
+
+If the Ollama desktop service is already running, do not start a second server.
+Settings are in `src/Pulse.WebApi/appsettings.json`; environment overrides are
+`Ollama__BaseUrl`, `Ollama__Model`, and `Ollama__EmbeddingModel`.
+Only loopback HTTP/HTTPS inference endpoints are accepted. No cloud inference
+or embedding service is used.
+
+1. Create a survey, then open **Manage Questions** while it is in Draft.
+2. In **Generate questions from documents**, attach up to five TXT, Markdown,
+   PDF, or DOCX files. Each file is limited to 5 MB and 50,000 extracted
+   characters. Scanned PDFs need OCR before upload; password-protected PDFs
+   are not supported. DOCX extraction reads body paragraphs, not embedded files.
+3. Optionally enter additional grounding information/instructor focus
+   (10,000 characters maximum). Free text alone is also supported.
+4. Request 1-20 multiple-choice questions and generate a preview.
+5. Review all choices, correct answers, explanations, and quoted source
+   passages. Approve the batch to add it to the survey, or discard/regenerate.
+   Saved questions can be edited using the existing question editor.
+
+Documents, original bytes, and extracted text are persisted in local LiteDB.
+Embeddings are computed locally during generation. Retrieval selects up to
+12 relevant overlapping passages, including material from every attachment;
+it does not promise exhaustive coverage of every document. Changing saved
+grounding invalidates previews; previews expire after one hour. Approving a
+preview is transactional and cannot insert that batch twice.
+
+Generation has a five-minute inference timeout and does not automatically
+retry POST requests. Missing models, invalid output, unsupported documents,
+and insufficient generated question counts are reported rather than silently
+substituted. Quoted-source validation does not prove factual correctness:
+instructor review remains mandatory. Answer keys are stored for later
+correct-answer reveal; the student results UI currently still shows aggregates
+only.
+
+The PDF text extractor adds the `PdfPig` dependency. DOCX, text, and Ollama HTTP
+handling use existing .NET libraries.
+
+Run deterministic feature tests:
+
+```powershell
+dotnet test .\src\Pulse.Tests\Pulse.Tests.csproj -c Release --filter "FullyQualifiedName~SurveyGeneration|FullyQualifiedName~SurveyGrounding|FullyQualifiedName~OllamaSurveyGenerator" '-bl:rag-tests-{}.binlog'
+```
+
+The real-inference smoke test is skipped by default. To run it against local
+Ollama using synthetic biology material:
+
+```powershell
+$env:PULSE_OLLAMA_SMOKE = "1"
+dotnet test .\src\Pulse.Tests\Pulse.Tests.csproj -c Release --filter "FullyQualifiedName~LocalOllamaSmoke" '-bl:rag-smoke-{}.binlog'
+Remove-Item Env:\PULSE_OLLAMA_SMOKE
+```
 
 ## Project Structure
 
@@ -128,7 +200,26 @@ dotnet test .\Pulse.slnx
 dotnet run --project src/Pulse.AppHost/Pulse.AppHost.csproj
 ```
 
-### 6. Run Individual Services (Optional)
+### 6. Test on a Phone through a Dev Tunnel
+
+AppHost orchestrates a persistent anonymous dev tunnel for the API and student
+app. Sign in once, then start AppHost normally:
+
+```powershell
+devtunnel user login
+aspire start --apphost .\src\Pulse.AppHost\Pulse.AppHost.csproj
+```
+
+In the dashboard, confirm `pulse-devtunnel` and its two HTTPS port resources
+are running/healthy. QR codes and Admin's displayed join links use the public
+**student** URL, not the API URL. Admin itself is not tunneled.
+Stopping AppHost stops hosting but retains the tunnel identity for the next run.
+Anonymous access exposes both services to the internet: use test data only and
+stop hosting after testing. See the [onboarding guide](docs/onboarding.md) for
+verification, optional tunnel ID configuration, and the alternative manual
+launcher, and use the [mobile acceptance matrix](docs/mobile-acceptance.md).
+
+### 7. Run Individual Services (Optional)
 
 ```bash
 dotnet run --project src/Pulse.WebApi/Pulse.WebApi.csproj
@@ -138,12 +229,10 @@ dotnet run --project src/Pulse.Admin/Pulse.Admin.csproj
 
 ## Getting Started Validation
 
-Instruction validation was performed by a non-author reviewer (GitHub Copilot agent) on 2026-04-26 in a Windows environment:
+Latest Windows validation (2026-09-23):
 
-- `dotnet --version` -> 10.0.201
-- `dotnet restore Pulse.slnx` -> success
-- `dotnet build .\Pulse.slnx -c Debug` -> success
-- `dotnet test .\Pulse.slnx` -> 181 passed, 0 failed
+- `dotnet build Pulse.slnx --no-restore` -> success
+- `dotnet test Pulse.slnx --no-build --no-restore` -> 271 passed, 0 failed
 
 ## Documentation
 
@@ -152,6 +241,7 @@ Instruction validation was performed by a non-author reviewer (GitHub Copilot ag
 - [Architecture](docs/architecture.md)
 - [API reference](docs/api.md)
 - [Troubleshooting](docs/troubleshooting.md)
+- [Mobile acceptance matrix](docs/mobile-acceptance.md)
 - [Sprint backlog](docs/sprint-backlog.md)
 
 ## Contributing

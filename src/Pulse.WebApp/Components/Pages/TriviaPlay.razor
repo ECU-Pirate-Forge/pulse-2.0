@@ -1,0 +1,231 @@
+@page "/trivia"
+@page "/trivia/{JoinCode}"
+@using System.Net.Http.Json
+@using Pulse.Shared.Contracts.V1
+@using Pulse.Shared.Models
+@using Pulse.WebApp.Services
+@implements IDisposable
+@rendermode InteractiveServer
+@inject HttpClient Http
+@inject IDeviceIdService DeviceIds
+
+<PageTitle>Play trivia | Pulse</PageTitle>
+
+<main id="main-content" class="pulse-page trivia-play">
+    <header class="trivia-play-header">
+        <p class="pulse-eyebrow">Pulse trivia</p>
+        <h1>@(joinInfo?.Title ?? state?.Title ?? "Join a trivia game")</h1>
+        <p>Compete individually or with an instructor-defined team.</p>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(error))
+    {
+        <div class="pulse-alert pulse-alert-error" role="alert">@error</div>
+    }
+
+    @if (participantId == Guid.Empty)
+    {
+        <section class="pulse-card trivia-join">
+            <label>Game code <input @bind="joinCode" maxlength="6" /></label>
+            @if (joinInfo is null)
+            {
+                <button class="pulse-button pulse-button-secondary" @onclick="FindGameAsync">Find game</button>
+            }
+            else
+            {
+                <label>Display name <input @bind="displayName" maxlength="30" /></label>
+                @if (joinInfo.CompetitionMode == TriviaCompetitionMode.Team)
+                {
+                    <label>Team
+                        <select @bind="teamId">
+                            <option value="">Select a team</option>
+                            @foreach (var team in joinInfo.Teams)
+                            {
+                                <option value="@team.Id">@team.Name</option>
+                            }
+                        </select>
+                    </label>
+                }
+                <button class="pulse-button pulse-button-primary" @onclick="JoinAsync">Join game</button>
+            }
+        </section>
+    }
+    else if (state is not null)
+    {
+        @if (state.Status == TriviaGameStatus.QuestionOpen && state.CurrentQuestion is not null)
+        {
+            <section class="pulse-card trivia-question">
+                <p class="pulse-eyebrow">Question open</p>
+                <h2>@state.CurrentQuestion.Text</h2>
+                @foreach (var option in state.CurrentQuestion.Options)
+                {
+                    <label class="trivia-option">
+                        <input type="checkbox"
+                               checked="@selectedAnswers.Contains(option)"
+                               disabled="@answerSubmitted"
+                               @onchange="_ => ToggleAnswer(option)" />
+                        <span>@option</span>
+                    </label>
+                }
+                <button class="pulse-button pulse-button-primary" disabled="@(selectedAnswers.Count == 0 || answerSubmitted)" @onclick="SubmitAnswerAsync">
+                    @(answerSubmitted ? $"Answer submitted · {lastPoints} points" : "Submit answer")
+                </button>
+            </section>
+        }
+        else
+        {
+            <section class="pulse-card trivia-wait" aria-live="polite">
+                <h2>@(state.Status == TriviaGameStatus.Finished ? "Game complete" : "Waiting for the next question")</h2>
+                <p>Your instructor controls when each round begins.</p>
+            </section>
+        }
+
+        <section class="pulse-card trivia-leaderboard">
+            <h2>Leaderboard</h2>
+            <ol>
+                @foreach (var entry in state.Leaderboard)
+                {
+                    <li><span>@entry.Rank. @entry.Name</span><strong>@entry.Score</strong></li>
+                }
+            </ol>
+        </section>
+    }
+</main>
+
+@code {
+    [Parameter]
+    public string? JoinCode { get; set; }
+
+    private readonly CancellationTokenSource lifetime = new();
+    private readonly HashSet<string> selectedAnswers = [];
+    private string joinCode = string.Empty;
+    private string displayName = string.Empty;
+    private Guid? teamId;
+    private Guid participantId;
+    private Guid lastQuestionId;
+    private bool answerSubmitted;
+    private int lastPoints;
+    private string? error;
+    private TriviaJoinInfo? joinInfo;
+    private TriviaGameStateResponse? state;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(JoinCode) && participantId == Guid.Empty)
+        {
+            joinCode = JoinCode.Trim().ToUpperInvariant();
+            await FindGameAsync();
+        }
+    }
+
+    private async Task FindGameAsync()
+    {
+        joinInfo = null;
+        try
+        {
+            using var response = await Http.GetAsync($"/api/trivia/join/{Uri.EscapeDataString(joinCode.Trim().ToUpperInvariant())}");
+            if (!response.IsSuccessStatusCode)
+            {
+                error = response.StatusCode == System.Net.HttpStatusCode.NotFound
+                    ? "That trivia code was not found."
+                    : "Pulse could not check that trivia game right now. Please try again.";
+                return;
+            }
+            joinInfo = await response.Content.ReadFromJsonAsync<TriviaJoinInfo>();
+            error = joinInfo is null ? "Pulse could not open that trivia game. Please try again." : null;
+        }
+        catch (HttpRequestException)
+        {
+            error = "Pulse could not connect. Check your connection and try again.";
+        }
+    }
+
+    private async Task JoinAsync()
+    {
+        var deviceId = await DeviceIds.GetDeviceIdAsync();
+        var response = await Http.PostAsJsonAsync(
+            $"/api/trivia/join/{Uri.EscapeDataString(joinCode.Trim().ToUpperInvariant())}",
+            new JoinTriviaRequest(deviceId, displayName, teamId));
+        if (!response.IsSuccessStatusCode)
+        {
+            error = await response.Content.ReadAsStringAsync();
+            return;
+        }
+        var joined = await response.Content.ReadFromJsonAsync<JoinTriviaResponse>();
+        participantId = joined?.ParticipantId ?? Guid.Empty;
+        await RefreshAsync();
+        _ = PollAsync();
+    }
+
+    private async Task RefreshAsync()
+    {
+        if (participantId == Guid.Empty || joinInfo is null)
+            return;
+        var response = await Http.GetAsync(
+            $"/api/trivia/{joinInfo.Id}/state/{participantId}",
+            lifetime.Token);
+        if (!response.IsSuccessStatusCode)
+            return;
+        var updated = await response.Content.ReadFromJsonAsync<TriviaGameStateResponse>(
+            cancellationToken: lifetime.Token);
+        if (updated?.CurrentQuestion?.Id != lastQuestionId)
+        {
+            selectedAnswers.Clear();
+            answerSubmitted = false;
+            lastPoints = 0;
+            lastQuestionId = updated?.CurrentQuestion?.Id ?? Guid.Empty;
+        }
+        state = updated;
+        StateHasChanged();
+    }
+
+    private void ToggleAnswer(string option)
+    {
+        if (!selectedAnswers.Add(option))
+            selectedAnswers.Remove(option);
+    }
+
+    private async Task SubmitAnswerAsync()
+    {
+        if (state?.CurrentQuestion is null || joinInfo is null)
+            return;
+        var response = await Http.PostAsJsonAsync(
+            $"/api/trivia/{joinInfo.Id}/questions/{state.CurrentQuestion.Id}/answers",
+            new SubmitTriviaAnswerRequest(participantId, selectedAnswers.ToList()),
+            lifetime.Token);
+        if (!response.IsSuccessStatusCode)
+        {
+            error = await response.Content.ReadAsStringAsync(lifetime.Token);
+            return;
+        }
+        var result = await response.Content.ReadFromJsonAsync<SubmitTriviaAnswerResponse>(
+            cancellationToken: lifetime.Token);
+        answerSubmitted = true;
+        lastPoints = result?.AwardedPoints ?? 0;
+    }
+
+    private async Task PollAsync()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(lifetime.Token))
+                await InvokeAsync(RefreshAsync);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
+        {
+        }
+    }
+
+    public void Dispose()
+    {
+        lifetime.Cancel();
+        lifetime.Dispose();
+    }
+
+    private sealed record TriviaJoinInfo(
+        Guid Id,
+        string Title,
+        TriviaCompetitionMode CompetitionMode,
+        List<TriviaTeam> Teams);
+}

@@ -70,7 +70,7 @@ public sealed class InstructorCodeMiddleware
 
 public static class InstructorOnlyEndpointMatcher
 {
-    private static readonly Regex SessionIdRouteRegex = new("^/sessions/[^/]+$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex SessionIdRouteRegex = new("^(/api)?/sessions/[^/]+$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex SessionResultsRouteRegex = new("^(/api)?/sessions/[^/]+/results$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex SessionQrRouteRegex = new("^/sessions/[^/]+/(qr|qr-code)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex PublicStudentSessionRouteRegex = new("^/sessions/[^/]+/(join|responses)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -105,8 +105,56 @@ public static class InstructorOnlyEndpointMatcher
             return true;
         }
 
+        if (HttpMethods.IsPut(method) && path.Equals("/api/questions/reorder", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (HttpMethods.IsPost(method) &&
+            (path.Equals("/api/questionbank", StringComparison.OrdinalIgnoreCase) ||
+             path.Equals("/api/questionbank/import/preview", StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        if (HttpMethods.IsGet(method) &&
+            path.Equals("/api/questionbank", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (HttpMethods.IsPut(method) &&
+            path.StartsWith("/api/questionbank/", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (path.StartsWith("/api/trivia", StringComparison.OrdinalIgnoreCase) &&
+            !path.StartsWith("/api/trivia/join/", StringComparison.OrdinalIgnoreCase) &&
+            !path.Contains("/state/", StringComparison.OrdinalIgnoreCase) &&
+            !path.EndsWith("/answers", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if ((path.Equals("/api/forms", StringComparison.OrdinalIgnoreCase) ||
+             path.StartsWith("/api/forms/", StringComparison.OrdinalIgnoreCase)) &&
+            !path.StartsWith("/api/forms/join/", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
         if ((HttpMethods.IsPost(method) || HttpMethods.IsGet(method))
             && (path.Equals("/sessions", StringComparison.OrdinalIgnoreCase) || path.Equals("/api/sessions", StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        if (path.StartsWith("/api/sessions/", StringComparison.OrdinalIgnoreCase) &&
+            (path.Contains("/grounding", StringComparison.OrdinalIgnoreCase) ||
+             path.EndsWith("/questions/instructor", StringComparison.OrdinalIgnoreCase) ||
+             path.EndsWith("/questions/generate", StringComparison.OrdinalIgnoreCase) ||
+             path.Contains("/questions/generated/", StringComparison.OrdinalIgnoreCase)))
         {
             return true;
         }
@@ -116,7 +164,11 @@ public static class InstructorOnlyEndpointMatcher
         {
             return true;
         }
-        if (HttpMethods.IsPut(method) && path.StartsWith("/api/sessions/", StringComparison.OrdinalIgnoreCase) && path.EndsWith("/unblind", StringComparison.OrdinalIgnoreCase))
+        if (HttpMethods.IsPut(method) &&
+            path.StartsWith("/api/sessions/", StringComparison.OrdinalIgnoreCase) &&
+            (path.EndsWith("/unblind", StringComparison.OrdinalIgnoreCase) ||
+             path.EndsWith("/activate", StringComparison.OrdinalIgnoreCase) ||
+             path.EndsWith("/close", StringComparison.OrdinalIgnoreCase)))
         {
             return true;
         }

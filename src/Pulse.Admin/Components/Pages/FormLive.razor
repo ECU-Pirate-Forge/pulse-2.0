@@ -1,0 +1,273 @@
+@page "/forms/{Id:guid}/live"
+@using MudBlazor
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@using System.Net.Http.Json
+@using Pulse.Shared.Contracts.V1
+@using Pulse.Shared.Models
+@rendermode InteractiveServer
+@implements IDisposable
+@inject NavigationManager NavManager
+@inject HttpClient Http
+@inject ProtectedSessionStorage ProtectedStorage
+@inject IConfiguration Configuration
+
+<PageTitle>Monitor Form - Pulse</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-6">
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/forms" Class="mb-3">Back to forms</MudButton>
+
+    @if (!_initialized)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else if (string.IsNullOrEmpty(_instructorCode))
+    {
+        <MudAlert Severity="Severity.Warning">
+            Please sign in with your instructor code on the <MudLink Href="/forms">Forms</MudLink> page first.
+        </MudAlert>
+    }
+    else if (_loadError is not null)
+    {
+        <MudAlert Severity="Severity.Error">@_loadError</MudAlert>
+    }
+    else if (_form is not null)
+    {
+        <MudGrid>
+            <MudItem xs="12" md="8">
+                <MudPaper Class="pa-4 mb-4" Elevation="1">
+                    <MudStack Row="true" AlignItems="AlignItems.Center">
+                        <div>
+                            <MudText Typo="Typo.h4" data-testid="live-title">@_form.Title</MudText>
+                            @if (!string.IsNullOrWhiteSpace(_form.Description))
+                            {
+                                <MudText Typo="Typo.body2" Class="mud-text-secondary">@_form.Description</MudText>
+                            }
+                        </div>
+                        <MudSpacer />
+                        <MudChip T="string" Color="@(_form.Status == FormStatus.Open ? Color.Success : _form.Status == FormStatus.Closed ? Color.Default : Color.Warning)" data-testid="live-status">@_form.Status</MudChip>
+                    </MudStack>
+                    <MudStack Row="true" Spacing="2" Class="mt-3" Wrap="Wrap.Wrap">
+                        <MudText Typo="Typo.h6" data-testid="submission-count">@_submissions.Count response@(_submissions.Count == 1 ? "" : "s")</MudText>
+                        <MudSpacer />
+                        <MudButton Variant="Variant.Outlined" Href="@($"/forms/{Id}/edit")" StartIcon="@Icons.Material.Filled.Edit">Edit</MudButton>
+                        @if (_form.Status == FormStatus.Open)
+                        {
+                            <MudButton Variant="Variant.Filled" Color="Color.Warning" Disabled="_busy" OnClick="@(() => SetStatusAsync("close"))" data-testid="close-form">Close form</MudButton>
+                        }
+                        else
+                        {
+                            <MudButton Variant="Variant.Filled" Color="Color.Success" Disabled="@(_busy || _form.Fields.Count == 0)" OnClick="@(() => SetStatusAsync("open"))" data-testid="open-form">@(_form.Status == FormStatus.Closed ? "Reopen form" : "Open form")</MudButton>
+                        }
+                        <FormExportButton FormId="Id" InstructorCode="@_instructorCode" />
+                    </MudStack>
+                    @if (_actionError is not null)
+                    {
+                        <MudAlert Severity="Severity.Error" Class="mt-3">@_actionError</MudAlert>
+                    }
+                </MudPaper>
+
+                <MudPaper Class="pa-4" Elevation="1">
+                    <MudText Typo="Typo.h6" Class="mb-2">Responses</MudText>
+                    @if (_submissions.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary" data-testid="no-responses">No responses yet.</MudText>
+                    }
+                    else
+                    {
+                        <MudSimpleTable Dense="true" Hover="true" Striped="true" Style="overflow-x:auto">
+                            <thead>
+                                <tr>
+                                    <th>Submitted</th>
+                                    @foreach (var field in OrderedFields)
+                                    {
+                                        <th>@field.Label</th>
+                                    }
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var submission in _submissions.OrderByDescending(s => s.SubmittedAt))
+                                {
+                                    <tr data-testid="response-row">
+                                        <td>@submission.SubmittedAt.ToLocalTime().ToString("g")</td>
+                                        @foreach (var field in OrderedFields)
+                                        {
+                                            <td>@(submission.Values.TryGetValue(field.Id.ToString(), out var value) ? value : string.Empty)</td>
+                                        }
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    }
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="4">
+                <MudPaper Class="pa-4" Elevation="1" id="qr">
+                    <MudText Typo="Typo.h6" Class="mb-2">Share this form</MudText>
+                    @if (_qrDataUrl is not null)
+                    {
+                        <img src="@_qrDataUrl" alt="QR code for @_form.Title" style="width:100%;max-width:320px;" data-testid="form-qr" />
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">QR code unavailable.</MudText>
+                    }
+                    <MudText Typo="Typo.body2" Class="mt-3">Join code</MudText>
+                    <MudText Typo="Typo.h4" Style="letter-spacing:4px;font-weight:700" data-testid="form-join-code">@_form.JoinCode</MudText>
+                    <MudText Typo="Typo.body2" Class="mt-2" Style="word-break:break-all">
+                        <MudLink Href="@JoinUrl" Target="_blank">@JoinUrl</MudLink>
+                    </MudText>
+                    @if (_form.Status != FormStatus.Open)
+                    {
+                        <MudAlert Severity="Severity.Info" Dense="true" Class="mt-3">Participants can't submit until the form is open.</MudAlert>
+                    }
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+</MudContainer>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private bool _initialized;
+    private string _instructorCode = string.Empty;
+    private Form? _form;
+    private List<FormSubmission> _submissions = [];
+    private string? _qrDataUrl;
+    private string? _loadError;
+    private string? _actionError;
+    private bool _busy;
+    private Timer? _timer;
+
+    private IEnumerable<FormField> OrderedFields => _form?.Fields.OrderBy(f => f.Order) ?? Enumerable.Empty<FormField>();
+
+    private string JoinUrl =>
+        $"{(Configuration["StudentApp:BaseUrl"] ?? NavManager.BaseUri).TrimEnd('/')}/form/{_form?.JoinCode}";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        try
+        {
+            var result = await ProtectedStorage.GetAsync<string>("instructorCode");
+            if (result.Success && !string.IsNullOrEmpty(result.Value))
+            {
+                _instructorCode = result.Value;
+                await LoadFormAsync();
+                if (_form is not null)
+                {
+                    await LoadSubmissionsAsync();
+                    await LoadQrAsync();
+                    _timer = new Timer(_ => _ = InvokeAsync(PollAsync), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
+                }
+            }
+        }
+        catch (InvalidOperationException)
+        {
+        }
+        catch (JSException)
+        {
+        }
+        catch (System.Security.Cryptography.CryptographicException)
+        {
+        }
+
+        _initialized = true;
+        StateHasChanged();
+    }
+
+    private HttpRequestMessage NewRequest(HttpMethod method, string url)
+    {
+        var request = new HttpRequestMessage(method, url);
+        request.Headers.TryAddWithoutValidation("InstructorCode", _instructorCode);
+        return request;
+    }
+
+    private async Task PollAsync()
+    {
+        try
+        {
+            await LoadSubmissionsAsync();
+            StateHasChanged();
+        }
+        catch
+        {
+            // Polling is best-effort; the next tick will retry.
+        }
+    }
+
+    private async Task LoadFormAsync()
+    {
+        try
+        {
+            using var request = NewRequest(HttpMethod.Get, $"/api/forms/{Id}");
+            using var response = await Http.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+            {
+                _loadError = "Form not found.";
+                return;
+            }
+            _form = await response.Content.ReadFromJsonAsync<Form>();
+            if (_form is null)
+                _loadError = "Form not found.";
+        }
+        catch (HttpRequestException)
+        {
+            _loadError = "Unable to connect to the server.";
+        }
+    }
+
+    private async Task LoadSubmissionsAsync()
+    {
+        using var request = NewRequest(HttpMethod.Get, $"/api/forms/{Id}/submissions");
+        using var response = await Http.SendAsync(request);
+        if (response.IsSuccessStatusCode)
+            _submissions = await response.Content.ReadFromJsonAsync<List<FormSubmission>>() ?? [];
+    }
+
+    private async Task LoadQrAsync()
+    {
+        try
+        {
+            using var request = NewRequest(HttpMethod.Get, $"/api/forms/{Id}/qr");
+            using var response = await Http.SendAsync(request);
+            if (response.IsSuccessStatusCode)
+            {
+                var bytes = await response.Content.ReadAsByteArrayAsync();
+                _qrDataUrl = $"data:image/png;base64,{Convert.ToBase64String(bytes)}";
+            }
+        }
+        catch (HttpRequestException)
+        {
+            _qrDataUrl = null;
+        }
+    }
+
+    private async Task SetStatusAsync(string action)
+    {
+        _busy = true;
+        _actionError = null;
+        try
+        {
+            using var request = NewRequest(HttpMethod.Put, $"/api/forms/{Id}/{action}");
+            using var response = await Http.SendAsync(request);
+            if (response.IsSuccessStatusCode)
+                _form = await response.Content.ReadFromJsonAsync<Form>() ?? _form;
+            else
+                _actionError = $"Failed to {action} form.";
+        }
+        catch (HttpRequestException)
+        {
+            _actionError = "Unable to connect to the server.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    public void Dispose() => _timer?.Dispose();
+}

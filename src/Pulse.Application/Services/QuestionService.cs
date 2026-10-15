@@ -6,6 +6,7 @@ public sealed record QuestionDTO
 {
     public QuestionType Type { get; init; }
     public IReadOnlyList<string> Options { get; init; } = [];
+    public IReadOnlyList<MatchingPair> MatchingPairs { get; init; } = [];
 }
 
 public sealed record QuestionValidationResult
@@ -24,7 +25,13 @@ public class QuestionService
 {
     public QuestionValidationResult ValidateQuestion(QuestionDTO question)
     {
-        if (question.Type == QuestionType.MultipleChoice)
+        if (question.Type is QuestionType.LegacyLikertScale or QuestionType.LegacyOpenEnded)
+        {
+            return QuestionValidationResult.Failure(
+                "This legacy question type can no longer be authored.");
+        }
+
+        if (question.Type is QuestionType.MultipleChoice or QuestionType.MultipleAnswer)
         {
             var validOptions = question.Options
                 .Where(o => !string.IsNullOrWhiteSpace(o))
@@ -33,8 +40,42 @@ public class QuestionService
             if (validOptions.Count < 2)
             {
                 return QuestionValidationResult.Failure(
-                    "Multiple-choice questions must include at least 2 options.");
+                    question.Type == QuestionType.MultipleChoice
+                        ? "Multiple-choice questions must include at least 2 options."
+                        : "Multiple-answer questions must include at least 2 options.");
             }
+        }
+
+        if (question.Type == QuestionType.Matching)
+        {
+            var completePairs = question.MatchingPairs
+                .Where(pair =>
+                    !string.IsNullOrWhiteSpace(pair.Prompt) &&
+                    !string.IsNullOrWhiteSpace(pair.Match))
+                .ToList();
+
+            if (completePairs.Count < 2 || completePairs.Count != question.MatchingPairs.Count)
+            {
+                return QuestionValidationResult.Failure(
+                    "Matching questions must include at least 2 complete prompt-and-match pairs.");
+            }
+
+            if (completePairs.Select(pair => pair.Prompt.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count() != completePairs.Count)
+            {
+                return QuestionValidationResult.Failure(
+                    "Matching question prompts must be unique.");
+            }
+        }
+
+        if (question.Type is not (
+            QuestionType.MultipleChoice or
+            QuestionType.MultipleAnswer or
+            QuestionType.TrueFalse or
+            QuestionType.Matching))
+        {
+            return QuestionValidationResult.Failure("Question type is invalid.");
         }
 
         return QuestionValidationResult.Success();

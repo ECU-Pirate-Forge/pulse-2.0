@@ -2,9 +2,10 @@ using Xunit;
 using Bunit;
 using Moq;
 using Moq.Protected;
-using Pulse.WebApp.Components;
+using Pulse.Admin.Components;
 using FluentAssertions;
 using System.Net;
+using Microsoft.Extensions.Configuration;
 using MudBlazor.Services;
 
 namespace Pulse.Tests.WebApp;
@@ -16,6 +17,7 @@ public class SessionQRCodeComponentTests : Bunit.TestContext
     {
         // Register MudBlazor services required by components
         Services.AddMudServices();
+        Services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
     }
 
     /// <summary>
