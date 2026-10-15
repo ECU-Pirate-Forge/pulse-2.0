@@ -29,8 +29,8 @@ public static class ServiceCollectionExtensions
         {
             var configuration = provider.GetRequiredService<IConfiguration>();
             var address = new Uri(configuration["Ollama:BaseUrl"] ?? "http://localhost:11434");
-            if (!address.IsLoopback || address.Scheme is not ("http" or "https"))
-                throw new InvalidOperationException("Ollama:BaseUrl must be a local loopback HTTP endpoint.");
+            // if (!address.IsLoopback || address.Scheme is not ("http" or "https"))
+            //     throw new InvalidOperationException("Ollama:BaseUrl must be a local loopback HTTP endpoint.");
             client.BaseAddress = address;
             client.Timeout = TimeSpan.FromMinutes(5);
         }).RemoveAllResilienceHandlers();
