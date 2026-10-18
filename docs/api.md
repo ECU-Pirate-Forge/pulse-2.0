@@ -7,6 +7,14 @@ Base URL (local, default):
 - http://localhost:5062
 - https://localhost:7081
 
+When AppHost dev tunnels are enabled, use the **WebApi public HTTPS tunnel URL**
+shown by AppHost as the base instead. Routes and existing instructor authorization
+are unchanged. See [tunnel configuration](onboarding.md#7-persistent-anonymous-dev-tunnels).
+OpenAPI server URLs also use that public API origin in tunnel mode.
+The separate Scalar application fetches documents and executes requests directly
+against that origin. Only its configured tunnel origin receives CORS permission,
+and only in Development tunnel mode; instructor authorization remains required.
+
 ## Authentication and Headers
 
 Some endpoints are protected by instructor middleware and require this header:
@@ -100,6 +108,10 @@ Response errors:
 
 Generate a PNG QR code for a join code.
 
+The payload is `<App:JoinBaseUrl>/join/<joinCode>`. AppHost supplies the public
+**WebApp** tunnel origin in tunnel mode, not the API tunnel origin. With no
+configured join base, the API retains its request-origin fallback.
+
 Protected: No
 
 Response 200:
@@ -109,6 +121,10 @@ Response 200:
 ### GET /sessions/{id}/qr
 
 Generate a PNG QR code for a session id.
+
+This route uses the same configured join origin as the join-code QR route. The
+WebApp QR component displays that origin too and fetches the PNG through its
+API client; it renders a data URI rather than exposing a separate image host.
 
 Protected: Yes (InstructorCode required)
 

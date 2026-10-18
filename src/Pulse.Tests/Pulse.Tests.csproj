@@ -21,6 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Pulse.AppHost\Pulse.AppHost.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\Pulse.WebApi\Pulse.WebApi.csproj" />
     <ProjectReference Include="..\Pulse.WebApp\Pulse.WebApp.csproj" />
     <ProjectReference Include="..\Pulse.Application\Pulse.Application.csproj" />

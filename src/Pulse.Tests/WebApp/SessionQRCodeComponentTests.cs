@@ -6,16 +6,48 @@ using Pulse.WebApp.Components;
 using FluentAssertions;
 using System.Net;
 using MudBlazor.Services;
+using Microsoft.Extensions.Configuration;
 
 namespace Pulse.Tests.WebApp;
 
 #pragma warning disable CS0618
 public class SessionQRCodeComponentTests : Bunit.TestContext
 {
+    [Theory]
+    [InlineData("https://pulse-student-5243.use2.devtunnels.ms/", "https://pulse-student-5243.use2.devtunnels.ms/join/ABC123")]
+    [InlineData(null, "http://localhost/join/ABC123")]
+    public void SessionQRCode_DisplaysConfiguredJoinOriginAndFetchesFromApiTunnel(string? joinOrigin, string expectedJoinUrl)
+    {
+        Services.AddSingleton<IConfiguration>(new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["App:JoinBaseUrl"] = joinOrigin }).Build());
+        var handler = new Mock<HttpMessageHandler>();
+        Uri? requested = null;
+        handler.Protected().Setup<Task<HttpResponseMessage>>("SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>())
+            .Callback<HttpRequestMessage, CancellationToken>((request, _) => requested = request.RequestUri)
+            .ReturnsAsync(() => new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent([0x89, 0x50, 0x4e, 0x47])
+            });
+        Services.AddSingleton(new HttpClient(handler.Object)
+        {
+            BaseAddress = new Uri("https://pulse-api-5062.use2.devtunnels.ms")
+        });
+
+        var cut = Render<SessionQRCode>(parameters => parameters.Add(p => p.JoinCode, "ABC123"));
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains(expectedJoinUrl, cut.Markup);
+            Assert.Equal("https://pulse-api-5062.use2.devtunnels.ms/api/sessions/qr/ABC123", requested!.AbsoluteUri);
+            Assert.StartsWith("data:image/png;base64,", cut.Find("img").GetAttribute("src"));
+        });
+    }
+
     public SessionQRCodeComponentTests()
     {
         // Register MudBlazor services required by components
         Services.AddMudServices();
+        Services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
     }
 
     /// <summary>

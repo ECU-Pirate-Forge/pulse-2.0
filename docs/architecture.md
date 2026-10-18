@@ -4,6 +4,36 @@
 
 ## Solution Architecture
 
+### Optional development tunnel topology
+
+The current AppHost runs separate WebApi, WebApp, Admin, MigrationManager, and
+Scalar resources. For remote-device testing, `DevTunnels:Enabled` adds one named
+persistent anonymous tunnel per HTTP application (WebApi, WebApp, Admin, Scalar).
+The dashboard, telemetry, management endpoints, and MigrationManager stay private.
+This mode is for Development only and is disabled by default.
+
+AppHost provisions and checks tunnel definitions through the devtunnel CLI,
+preserves fixed forwarding ports, reads service-reported HTTPS addresses, reuses
+verified running hosts, and owns only the processes it starts. Public readiness
+is checked against a per-launch application marker and configured HTTPS origin.
+Persistent definitions survive shutdown; prolonged public outages fail the run.
+
+API clients use the API tunnel. Both QR handlers encode the WebApp tunnel's
+`/join/<code>` URL, and the component displays the same configured join origin.
+Scalar reaches the public API directly for OpenAPI documents and requests.
+Development tunnel mode enables CORS only for the configured Scalar tunnel
+origin, with no credentialed CORS. Its built-in 0.8.63 proxy is disabled in this
+mode because forwarding the incoming Scalar Host header misroutes cross-tunnel
+requests. Aspire health checks and forwarding transport still use local
+endpoints. Public TLS terminates at the tunnel; the applications normalize
+scheme/host only for the configured public host arriving through a loopback
+proxy, retaining antiforgery and application authorization.
+
+See [setup/lifecycle](onboarding.md#7-persistent-anonymous-dev-tunnels) and
+[troubleshooting](troubleshooting.md#persistent-dev-tunnel-issues).
+
+The diagrams below describe the broader conceptual architecture and workflows.
+
 This diagram shows the full deployment topology of Pulse: how the Aspire AppHost orchestrates the Web server and Foundry Local, what lives inside the Web process, and how instructor and student browsers interact with it.
 
 ```mermaid

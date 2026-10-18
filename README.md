@@ -94,6 +94,7 @@ High-level repository layout:
 ### Prerequisites
 
 - .NET SDK 10.0+
+- Aspire CLI 13.1.x (matching this repository's AppHost; see [onboarding](docs/onboarding.md#7-persistent-anonymous-dev-tunnels))
 - Git
 - (Optional) Visual Studio 2022 or VS Code with C# Dev Kit
 
@@ -124,9 +125,16 @@ dotnet test .\Pulse.slnx
 
 ### 5. Run the Full Local Stack (Recommended)
 
-```bash
-dotnet run --project src/Pulse.AppHost/Pulse.AppHost.csproj
+```powershell
+aspire run --project .\src\Pulse.AppHost\Pulse.AppHost.csproj
 ```
+
+For testing from phones or other machines, AppHost can create/start named persistent
+anonymous dev tunnels for WebApp, Admin, WebApi, and Scalar. This is **disabled by
+default**. See [configuration and lifecycle instructions](docs/onboarding.md#7-persistent-anonymous-dev-tunnels).
+In tunnel mode, API requests and QR join links use public HTTPS tunnel addresses;
+the Aspire dashboard stays private. Anonymous tunnels expose the selected services
+to the internet: use test data and retain application authorization.
 
 ### 6. Run Individual Services (Optional)
 

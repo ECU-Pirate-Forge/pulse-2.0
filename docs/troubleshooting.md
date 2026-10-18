@@ -75,7 +75,9 @@ dotnet clean Pulse.slnx
 dotnet build Pulse.slnx -c Debug
 ```
 
-3. Make sure no stale long-running process is locking files from a previous run.
+3. If an Aspire resource holds build outputs, stop that exact AppHost through the
+   IDE or Ctrl+C in its launching CLI before rebuilding. Do not delete output
+   folders or kill all dotnet processes.
 
 ### 5. Tests fail locally but passed earlier
 
@@ -134,7 +136,7 @@ Fix:
 1. Confirm the AppHost run command was used from repo root:
 
 ```bash
-dotnet run --project src/Pulse.AppHost/Pulse.AppHost.csproj
+aspire run --project .\src\Pulse.AppHost\Pulse.AppHost.csproj
 ```
 
 2. Watch startup logs for project-specific failures (for example, API project did not start).
@@ -155,6 +157,32 @@ Fix:
 1. Ensure IDE is using the same SDK as terminal (`dotnet --info`).
 2. Restart IDE after SDK installs/updates.
 3. Clear stale IDE state by reloading the workspace/solution.
+
+## Persistent Dev Tunnel Issues
+
+Start with the [tunnel setup and configuration guide](onboarding.md#7-persistent-anonymous-dev-tunnels).
+
+| Symptom | Action |
+| --- | --- |
+| CLI cannot start | Install the Microsoft devtunnel CLI; check PATH or AppHost `DevTunnels:CliPath`. AppHost deliberately does not install it. |
+| Cached login missing/expired or access denied | Run `devtunnel user login` (or `-g`) manually under the account that owns the configured tunnels. Authentication/network errors are not treated as missing definitions. |
+| Invalid/duplicate ID or port | Set all four personal IDs; use 3-60 lowercase letters/digits/hyphens and distinct ports in `1..65535`. Do not include a URL or cluster suffix in `TunnelId`. |
+| Local management lock conflict | Stop the other AppHost managing that ID, or choose a different personal ID. Lock files under `%LOCALAPPDATA%\Pulse\DevTunnels` are harmless when no process holds them; deleting a file is not a way to take over an active host. |
+| Existing tunnel has other ports, a non-HTTP mapping, or deny rules | Use dedicated one-port Pulse tunnels, or explicitly fix their configuration while stopped. AppHost will not delete unrelated ports, reset access lists, or remove deny rules. |
+| Existing active host fails verification | Ensure it forwards this machine's configured port and preserves Host/Origin (`--host-header unchanged --origin-header unchanged`). A host elsewhere cannot be safely reused; stop it yourself or choose another ID. |
+| Startup/public verification timeout | Check host logs, CLI login, network access, fixed local port availability, and resource health. Increase `StartupTimeoutSeconds` for slow provisioning or initial Scalar image pulls. No local fallback occurs. |
+| WebApi exits with `DirectoryNotFoundException` for an old static-assets directory | Stop AppHost, then run `dotnet clean .\Pulse.slnx` and rebuild. Stale static-web-assets manifests from an earlier project layout can reference directories that no longer exist. Do not create dummy source directories or disable static assets to mask this. |
+| Aspire starts a dashboard but no resources are discoverable, or `NotifyAppHostReadyAsync` fails | Use an Aspire CLI matching this project's 13.1 release family. See the session-local installation example in onboarding. Newer global CLI discovery/stop commands may not interoperate with 13.1. Use the launching compatible CLI's Ctrl+C or your IDE for shutdown. |
+| Public HTTPS request redirects to localhost, or Blazor/antiforgery fails | Confirm the endpoint has the AppHost-provided public origin and receives preserved Host/Origin through a loopback proxy. Do not enable arbitrary forwarded headers, disable certificate validation, or disable antiforgery. |
+| First browser visit shows a tunnel warning | Anonymous dev tunnels can display a service anti-phishing interstitial. Continue only for your own trusted test tunnel. AppHost probes skip the warning with the supported `X-Tunnel-Skip-AntiPhishing-Page` header; anonymity does not mean the warning never appears. |
+| QR opens the API or localhost | Both API QR handlers must receive `App:JoinBaseUrl` pointing to the public **WebApp** origin. The component's displayed URL uses the same configuration. Restart via AppHost to apply overrides; old printed QR codes cannot be changed retroactively. |
+| Scalar cannot fetch documents or execute requests | Confirm Scalar's document/server URLs use the public API, its built-in proxy is disabled in tunnel mode, and the API receives the matching AppHost `DevTunnels:ScalarOrigin`. Only that origin gets CORS permission; do not enable wildcard/credentialed CORS or use localhost browser URLs. |
+| Public connectivity drops | AppHost logs the failure, allows bounded recovery, and restarts only an exited host it owns. A prolonged outage fails the enabled run. Check network/login and restart AppHost rather than silently substituting local addresses. |
+| Friendly name is unchanged but public hostname changed | The service can expire/recreate the underlying tunnel. Keep IDs and ports stable; use the actual metadata URL, and regenerate QR codes after a service-side recreation. |
+| Host connection remains after a forced termination | Inspect the exact validation/developer tunnel ID and the corresponding host command before stopping that specific process. Do not stop hosts by executable name or delete persisted definitions to stop hosting. |
+
+To disable tunnels, set AppHost `DevTunnels:Enabled=false`, remove any overriding
+environment value, and restart. This does not delete persisted tunnel definitions.
 
 ## Still Stuck?
 
