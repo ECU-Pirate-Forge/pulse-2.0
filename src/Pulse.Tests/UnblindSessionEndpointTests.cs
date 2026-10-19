@@ -28,7 +28,7 @@ public class UnblindSessionEndpointTests
     }
 
     [Fact]
-    public async Task UnblindSession_ValidRequest_Returns200AndSetsIsUnblinded()
+    public async Task UnblindSession_ValidRequest_Returns200AndRevealsResults()
     {
         var sessionId = Guid.NewGuid();
         var session = new Session { Id = sessionId, Title = "Test", InstructorCode = "INST001" };
@@ -38,8 +38,9 @@ public class UnblindSessionEndpointTests
         var result = await SessionEndpointHandlers.UnblindSession(sessionId, context, repo.Object);
 
         var ok = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.Ok<Session>>(result);
-        Assert.True(ok.Value!.IsUnblinded);
-        repo.Verify(r => r.Update(It.Is<Session>(s => s.IsUnblinded == true)), Times.Once);
+        Assert.Equal(ResultsVisibility.Revealed, ok.Value!.ResultsVisibility);
+        repo.Verify(r => r.Update(It.Is<Session>(
+            s => s.ResultsVisibility == ResultsVisibility.Revealed)), Times.Once);
     }
 
     [Fact]

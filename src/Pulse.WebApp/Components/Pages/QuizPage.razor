@@ -1,440 +1,490 @@
 @page "/quiz/{JoinCode}"
-@using MudBlazor
-@using Microsoft.AspNetCore.Components
-@using Pulse.Shared.Models
+@using System.Net
+@using System.Net.Http.Json
+@using System.Text.Json
 @using Pulse.Domain.Entities
+@using Pulse.Shared.Contracts.V1
+@using Pulse.Shared.Resources
+@using Pulse.Shared.Services
+@using Pulse.WebApp.Services
+@implements IAsyncDisposable
 @rendermode InteractiveServer
-@inject NavigationManager NavManager
-@inject HttpClient HttpClient
+@inject NavigationManager Navigation
+@inject HttpClient Http
+@inject IDeviceIdService DeviceIdService
 @inject ILogger<QuizPage> Logger
+@inject IServiceProvider Services
 
-<PageTitle>Quiz - Pulse</PageTitle>
+<PageTitle>Anonymous survey | Pulse</PageTitle>
 
-<style>
-    .quiz-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 20px;
-        margin: -20px -20px 24px -20px;
-        border-radius: 8px;
-    }
-
-    .progress-bar {
-        height: 8px;
-        background: rgba(255, 255, 255, 0.2);
-        border-radius: 4px;
-        overflow: hidden;
-        margin-top: 12px;
-    }
-
-    .progress-fill {
-        height: 100%;
-        background: #10b981;
-        transition: width 0.3s ease;
-    }
-
-    .question-container {
-        background: white;
-        border-radius: 12px;
-        padding: 32px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-        margin-bottom: 24px;
-    }
-
-    .question-text {
-        font-size: 1.5rem;
-        font-weight: 600;
-        color: #1f2937;
-        margin-bottom: 24px;
-    }
-
-    .mc-option {
-        display: grid;
-        grid-template-columns: 1fr;
-        gap: 12px;
-    }
-
-    .mc-button {
-        padding: 16px;
-        border: 2px solid #e5e7eb;
-        border-radius: 8px;
-        background: white;
-        cursor: pointer;
-        transition: all 0.2s;
-        text-align: left;
-        font-weight: 500;
-    }
-
-    .mc-button:hover {
-        border-color: #667eea;
-        background: #f3f4ff;
-    }
-
-    .mc-button.selected {
-        border-color: #667eea;
-        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
-    }
-
-    .likert-scale {
-        display: flex;
-        justify-content: space-between;
-        gap: 8px;
-        margin: 32px 0;
-    }
-
-    .likert-option {
-        flex: 1;
-        padding: 16px;
-        border: 2px solid #e5e7eb;
-        border-radius: 8px;
-        text-align: center;
-        cursor: pointer;
-        transition: all 0.2s;
-        background: white;
-        font-weight: 600;
-    }
-
-    .likert-option:hover {
-        border-color: #667eea;
-        background: #f3f4ff;
-    }
-
-    .likert-option.selected {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border-color: #667eea;
-    }
-
-    .likert-labels {
-        display: flex;
-        justify-content: space-between;
-        margin-top: 12px;
-        font-size: 0.85rem;
-        color: #6b7280;
-    }
-
-    .open-ended-input {
-        min-height: 150px;
-    }
-
-    .completion-screen {
-        text-align: center;
-        padding: 48px 32px;
-    }
-
-    .completion-icon {
-        font-size: 4rem;
-        margin-bottom: 16px;
-    }
-
-    .completion-title {
-        font-size: 2rem;
-        font-weight: 700;
-        color: #1f2937;
-        margin-bottom: 12px;
-    }
-
-    .completion-text {
-        color: #6b7280;
-        font-size: 1.1rem;
-        margin-bottom: 32px;
-    }
-
-    .quiz-controls {
-        display: flex;
-        gap: 12px;
-        justify-content: center;
-        margin-top: 24px;
-    }
-
-    .quiz-button {
-        height: 48px;
-        padding: 0 24px;
-        font-weight: 600;
-        text-transform: uppercase;
-    }
-</style>
-
-<MudContainer MaxWidth="MaxWidth.Medium" Class="py-8">
-    @if (IsLoading)
+<main id="main-content" class="pulse-page survey-page">
+    @if (isLoading)
     {
-        <div class="question-container" style="text-align: center; padding: 48px;">
-            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
-            <MudText Typo="Typo.h6" Class="mt-4">Loading quiz...</MudText>
-        </div>
+        <section class="pulse-card survey-status" aria-live="polite">
+            <h1>Opening your survey</h1>
+            <p>Please wait while Pulse loads the questions.</p>
+        </section>
     }
-    else if (!string.IsNullOrEmpty(ErrorMessage))
+    else if (!string.IsNullOrWhiteSpace(loadError))
     {
-        <MudAlert Severity="Severity.Error" Class="mb-4">@ErrorMessage</MudAlert>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" @onclick="@(() => NavManager.NavigateTo("/student-join"))">
-            Back to Join
-        </MudButton>
+        <section class="pulse-card survey-status" role="alert">
+            <h1>Unable to open survey</h1>
+            <p>@loadError</p>
+            <a class="pulse-button pulse-button-primary" href="/">Try another code</a>
+        </section>
     }
-    else if (Questions.Count == 0)
+    else if (isPaused)
     {
-        <div class="question-container">
-            <MudAlert Severity="Severity.Info">No questions available for this session yet. Please wait for the instructor to add questions.</MudAlert>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Class="mt-4" @onclick="@(() => NavManager.NavigateTo("/student-join"))">
-                Back to Join
-            </MudButton>
-        </div>
+        <section class="pulse-card survey-status" data-testid="survey-paused" aria-live="polite">
+            <h1>@SurveyText.SurveyPaused</h1>
+            <p>@SurveyText.SurveyPausedHelp</p>
+        </section>
     }
-    else if (!Completed)
+    else if (isSubmitted)
     {
-        <!-- Quiz Header -->
-        <div class="quiz-header">
-            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
-                <div>
-                    <MudText Typo="Typo.h5" Style="font-weight: 600;">Quiz Session</MudText>
-                    <MudText Typo="Typo.caption">Question @CurrentQuestion of @TotalQuestions</MudText>
-                </div>
-                <MudIcon Icon="@Icons.Material.Filled.Quiz" Style="font-size: 2rem;" />
-            </MudStack>
-            <div class="progress-bar">
-                <div class="progress-fill" style="width: @((CurrentQuestion * 100.0 / TotalQuestions).ToString("F0"))%"></div>
-            </div>
-        </div>
-
-        <!-- Question Container -->
-        <div class="question-container">
-            <div class="question-text">@CurrentQ?.Text</div>
-
-            @if (CurrentQ != null)
-            {
-                @switch (CurrentQ.Type)
+        @if (revealedResults is null)
+        {
+            <section class="pulse-card survey-status" aria-live="polite">
+                <p class="pulse-eyebrow">Response received</p>
+                <h1>Survey submitted</h1>
+                <p>Your anonymous responses have been recorded.</p>
+                <p>The results are currently hidden. This page will update when your instructor reveals aggregate results.</p>
+            </section>
+        }
+        else
+        {
+            <header class="survey-header" aria-live="polite">
+                <p class="pulse-eyebrow">Results revealed</p>
+                <h1>@revealedResults.Title</h1>
+                <p>These aggregate results include responses from the class.</p>
+            </header>
+            <section class="survey-results">
+                @foreach (var question in revealedResults.Questions)
                 {
-                    <!-- Multiple Choice -->
-                    case QuestionType.MultipleChoice:
-                        <div class="mc-option">
-                            @foreach (var opt in CurrentQ.Options)
-                            {
-                                var option = opt;
-                                var isSelected = SelectedAnswers.ContainsKey(CurrentQuestion - 1) && SelectedAnswers[CurrentQuestion - 1] == option;
-                                <div class="mc-button @(isSelected ? "selected" : "")"
-                                     role="button"
-                                     tabindex="0"
-                                     @onclick="@(() => SelectAnswer(option))"
-                                     @onkeydown="@((e) => { if (e.Key == "Enter" || e.Key == " ") SelectAnswer(option); })"
-                                     @onkeydown:preventDefault>
-                                    @option
-                                </div>
-                            }
-                        </div>
-                        break;
-
-                    <!-- Likert Scale -->
-                    case QuestionType.LikertScale:
-                        <div>
-                            <div class="likert-scale">
-                                @for (int i = 1; i <= 5; i++)
-                                {
-                                    var scale = i;
-                                    var isSelected = SelectedAnswers.ContainsKey(CurrentQuestion - 1) && SelectedAnswers[CurrentQuestion - 1] == scale.ToString();
-                                    <div class="likert-option @(isSelected ? "selected" : "")"
-                                         role="button"
-                                         tabindex="0"
-                                         @onclick="@(() => SelectAnswer(scale.ToString()))"
-                                         @onkeydown="@((e) => { if (e.Key == "Enter" || e.Key == " ") SelectAnswer(scale.ToString()); })"
-                                         @onkeydown:preventDefault>
-                                        @scale
-                                    </div>
-                                }
+                    <article class="pulse-card survey-result">
+                        <h2>@question.Text</h2>
+                        <p>@question.ResponseCount responses</p>
+                        @if (question.CorrectAnswers is { Count: > 0 })
+                        {
+                            <section class="survey-answer-key" aria-label="@SurveyText.CorrectAnswers">
+                                <h3>@SurveyText.CorrectAnswers</h3>
+                                <ul>
+                                    @foreach (var answer in question.CorrectAnswers)
+                                    {
+                                        <li>@answer</li>
+                                    }
+                                </ul>
+                            </section>
+                        }
+                        @foreach (var tally in question.Tallies)
+                        {
+                            <div class="survey-result-row">
+                                <div><span>@tally.Value</span><strong>@tally.Count</strong></div>
+                                <progress value="@tally.Count" max="@Math.Max(1, question.ResponseCount)"></progress>
                             </div>
-                            <div class="likert-labels">
-                                <span>Strongly Disagree</span>
-                                <span>Neutral</span>
-                                <span>Strongly Agree</span>
-                            </div>
-                        </div>
-                        break;
-
-                    <!-- Open Ended -->
-                    case QuestionType.OpenEnded:
-                        <MudTextField @bind-Value="CurrentOpenAnswer"
-                                      Label="Your Answer"
-                                      Variant="Variant.Outlined"
-                                      Lines="6"
-                                      Class="open-ended-input"
-                                      Placeholder="Type your response here..." />
-                        break;
+                        }
+                    </article>
                 }
-            }
-        </div>
-
-        <!-- Navigation -->
-        <div class="quiz-controls">
-            <MudButton Variant="Variant.Outlined"
-                       Color="Color.Default"
-                       Class="quiz-button"
-                       Disabled="CurrentQuestion == 1"
-                       @onclick="PreviousQuestion">
-                ← Previous
-            </MudButton>
-            @if (CurrentQuestion < TotalQuestions)
-            {
-                <MudButton Variant="Variant.Filled"
-                           Color="Color.Primary"
-                           Class="quiz-button"
-                           @onclick="NextQuestion">
-                    Next →
-                </MudButton>
-            }
-            else
-            {
-                <MudButton Variant="Variant.Filled"
-                           Color="Color.Success"
-                           Class="quiz-button"
-                           @onclick="SubmitQuiz">
-                    Submit
-                </MudButton>
-            }
-        </div>
+            </section>
+        }
     }
     else
     {
-        <!-- Completion Screen -->
-        <div class="question-container">
-            <div class="completion-screen">
-                <div class="completion-icon">✅</div>
-                <div class="completion-title">Quiz Complete!</div>
-                <div class="completion-text">
-                    Thank you for completing the quiz. Your responses have been recorded.
-                </div>
-                <MudButton Variant="Variant.Filled"
-                           Color="Color.Primary"
-                           Size="Size.Large"
-                           Class="quiz-button"
-                           @onclick="@(() => NavManager.NavigateTo("/"))">
-                    Back to Home
-                </MudButton>
+        <header class="survey-header">
+            <p class="pulse-eyebrow">Anonymous survey</p>
+            <h1>@surveyTitle</h1>
+            <p>Answer every question, review your selections, and submit once at the end.</p>
+        </header>
+
+        @if (!string.IsNullOrWhiteSpace(submissionError))
+        {
+            <div class="pulse-alert pulse-alert-error" role="alert">@submissionError</div>
+        }
+
+        <form @onsubmit="SubmitSurveyAsync" @onsubmit:preventDefault>
+            <div class="survey-questions">
+                @foreach (var question in questions)
+                {
+                    <fieldset class="pulse-card survey-question">
+                        <legend>@question.Text</legend>
+
+                        @switch (question.Type)
+                        {
+                            case QuestionType.MultipleChoice:
+                                @foreach (var option in question.Options)
+                                {
+                                    <label class="survey-option">
+                                        <input type="radio"
+                                               name="@($"question-{question.Id}")"
+                                               value="@option"
+                                               checked="@(singleAnswers.GetValueOrDefault(question.Id) == option)"
+                                               @onchange="@(_ => SetSingleAnswer(question.Id, option))" />
+                                        <span>@option</span>
+                                    </label>
+                                }
+                                break;
+
+                            case QuestionType.MultipleAnswer:
+                                @foreach (var option in question.Options)
+                                {
+                                    <label class="survey-option">
+                                        <input type="checkbox"
+                                               value="@option"
+                                               checked="@GetMultipleAnswers(question.Id).Contains(option)"
+                                               @onchange="@(_ => ToggleMultipleAnswer(question.Id, option))" />
+                                        <span>@option</span>
+                                    </label>
+                                }
+                                break;
+
+                            case QuestionType.TrueFalse:
+                                @foreach (var option in TrueFalseOptions)
+                                {
+                                    <label class="survey-option">
+                                        <input type="radio"
+                                               name="@($"question-{question.Id}")"
+                                               value="@option"
+                                               checked="@(singleAnswers.GetValueOrDefault(question.Id) == option)"
+                                               @onchange="@(_ => SetSingleAnswer(question.Id, option))" />
+                                        <span>@option</span>
+                                    </label>
+                                }
+                                break;
+
+                            case QuestionType.Matching:
+                                @foreach (var pair in question.MatchingPairs)
+                                {
+                                    <label class="matching-row">
+                                        <span>@pair.Prompt</span>
+                                        <select value="@GetMatchingAnswer(question.Id, pair.Prompt)"
+                                                @onchange="@(args => SetMatchingAnswer(question.Id, pair.Prompt, args.Value?.ToString()))">
+                                            <option value="">Select a match</option>
+                                            @foreach (var choice in question.Options)
+                                            {
+                                                <option value="@choice">@choice</option>
+                                            }
+                                        </select>
+                                    </label>
+                                }
+                                break;
+                        }
+                    </fieldset>
+                }
             </div>
-        </div>
+
+            <button type="submit"
+                    class="pulse-button pulse-button-primary submit-survey"
+                    data-testid="submit-survey"
+                    disabled="@isSubmitting">
+                @(isSubmitting ? "Submitting..." : "Submit survey")
+            </button>
+        </form>
     }
-</MudContainer>
+</main>
 
 @code {
+    private static readonly string[] TrueFalseOptions = ["True", "False"];
+
     [Parameter]
     public string JoinCode { get; set; } = string.Empty;
 
-    private int CurrentQuestion = 1;
-    private int TotalQuestions => Questions.Count;
-    private bool Completed = false;
-    private bool IsLoading = true;
-    private string ErrorMessage = string.Empty;
-    private string CurrentOpenAnswer = string.Empty;
-    private Dictionary<int, string> SelectedAnswers = new();
-
-    private List<Question> Questions = new();
-    private Guid SessionId = Guid.Empty;
+    private readonly Dictionary<Guid, string> singleAnswers = [];
+    private readonly Dictionary<Guid, HashSet<string>> multipleAnswers = [];
+    private readonly Dictionary<(Guid QuestionId, string Prompt), string> matchingAnswers = [];
+    private List<StudentQuestionResponse> questions = [];
+    private Guid sessionId;
+    private string surveyTitle = "Survey";
+    private string? loadError;
+    private string? submissionError;
+    private bool isLoading = true;
+    private bool isSubmitting;
+    private bool isSubmitted;
+    private bool isPaused;
+    private bool questionsNeedRefresh;
+    private int resetVersion;
+    private bool resultsMonitoringStarted;
+    private Task? resultsPollingTask;
+    private readonly CancellationTokenSource lifetime = new();
+    private SessionRealtimeConnection? realtimeConnection;
+    private StudentSurveyResultsResponse? revealedResults;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            if (string.IsNullOrEmpty(JoinCode))
+            var normalizedCode = JoinCode.Trim().ToUpperInvariant();
+            if (string.IsNullOrWhiteSpace(normalizedCode))
             {
-                ErrorMessage = "No session code provided";
-                IsLoading = false;
+                loadError = "Enter a survey code to continue.";
                 return;
             }
 
-            // Fetch session by join code
-            var encodedJoinCode = Uri.EscapeDataString(JoinCode);
-            var response = await HttpClient.GetAsync($"/api/sessions/join/{encodedJoinCode}");
-            if (!response.IsSuccessStatusCode)
+            var sessionResponse = await Http.GetAsync(
+                $"/api/sessions/join/{Uri.EscapeDataString(normalizedCode)}");
+            if (!sessionResponse.IsSuccessStatusCode)
             {
-                ErrorMessage = "Invalid session code. Please check and try again.";
-                IsLoading = false;
+                loadError = sessionResponse.StatusCode == HttpStatusCode.Conflict
+                    ? "This survey is not currently accepting responses."
+                    : "That survey code is not available. Check the code with your instructor.";
                 return;
             }
 
-            var json = await response.Content.ReadAsStringAsync();
-            var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            var sessionData = System.Text.Json.JsonSerializer.Deserialize<SessionResponse>(json, options);
-            if (sessionData == null)
+            var session = await sessionResponse.Content.ReadFromJsonAsync<JoinSessionResponse>();
+            if (session is null)
             {
-                ErrorMessage = "Failed to load session";
-                IsLoading = false;
+                loadError = "Pulse could not read the survey information.";
                 return;
             }
 
-            SessionId = sessionData.Id;
+            sessionId = session.Id;
+            surveyTitle = session.Title;
+            resetVersion = session.ResetVersion;
 
-            // Fetch questions for this session
-            var questionsResponse = await HttpClient.GetAsync($"/api/sessions/{SessionId}/questions");
+            var questionsResponse = await Http.GetAsync($"/api/sessions/{sessionId}/questions");
             if (!questionsResponse.IsSuccessStatusCode)
             {
-                ErrorMessage = "Failed to load questions for this session.";
-                IsLoading = false;
+                loadError = "Pulse could not load the survey questions.";
                 return;
             }
 
-            var questionsJson = await questionsResponse.Content.ReadAsStringAsync();
-            var qOptions = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            Questions = System.Text.Json.JsonSerializer.Deserialize<List<Question>>(questionsJson, qOptions) ?? new List<Question>();
-            Questions = Questions.OrderBy(q => q.SortOrder).ToList();
+            questions = (await questionsResponse.Content.ReadFromJsonAsync<List<StudentQuestionResponse>>() ?? [])
+                .OrderBy(question => question.SortOrder)
+                .ToList();
+            if (questions.Count == 0)
+                loadError = "This survey does not have any questions.";
+            else
+                await BeginResultsMonitoringAsync();
+        }
+        catch (HttpRequestException ex)
+        {
+            Logger.LogError(ex, "Unable to connect while loading survey {JoinCode}", JoinCode);
+            loadError = "Pulse could not connect. Check your connection and try again.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
 
-            if (Questions.Count == 0)
+    private void SetSingleAnswer(Guid questionId, string answer) =>
+        singleAnswers[questionId] = answer;
+
+    private HashSet<string> GetMultipleAnswers(Guid questionId)
+    {
+        if (!multipleAnswers.TryGetValue(questionId, out var answers))
+        {
+            answers = [];
+            multipleAnswers[questionId] = answers;
+        }
+
+        return answers;
+    }
+
+    private void ToggleMultipleAnswer(Guid questionId, string answer)
+    {
+        var answers = GetMultipleAnswers(questionId);
+        if (!answers.Add(answer))
+            answers.Remove(answer);
+    }
+
+    private string GetMatchingAnswer(Guid questionId, string prompt) =>
+        matchingAnswers.GetValueOrDefault((questionId, prompt), string.Empty);
+
+    private void SetMatchingAnswer(Guid questionId, string prompt, string? answer)
+    {
+        if (string.IsNullOrWhiteSpace(answer))
+            matchingAnswers.Remove((questionId, prompt));
+        else
+            matchingAnswers[(questionId, prompt)] = answer;
+    }
+
+    private async Task SubmitSurveyAsync()
+    {
+        if (isPaused || questionsNeedRefresh)
+            return;
+
+        submissionError = null;
+        var answers = new List<SurveyAnswerRequest>();
+        foreach (var question in questions)
+        {
+            var values = GetValues(question);
+            if (values.Count == 0 ||
+                question.Type == QuestionType.Matching &&
+                values.Count != question.MatchingPairs.Count)
             {
-                ErrorMessage = "No questions available for this session yet.";
+                submissionError = "Answer every question before submitting.";
+                return;
             }
 
-            IsLoading = false;
+            answers.Add(new SurveyAnswerRequest(question.Id, values));
         }
-        catch (Exception ex)
+
+        isSubmitting = true;
+        try
         {
-            Logger.LogError(ex, "Error loading session");
-            ErrorMessage = "An error occurred while loading the session. Please try again.";
-            IsLoading = false;
-        }
-    }
-
-    private Question? CurrentQ => Questions.Count > 0 ? Questions[CurrentQuestion - 1] : null;
-
-    private void SelectAnswer(string answer)
-    {
-        SelectedAnswers[CurrentQuestion - 1] = answer;
-    }
-
-    private void NextQuestion()
-    {
-        if (CurrentQuestion < TotalQuestions)
-        {
-            if (CurrentOpenAnswer != string.Empty && CurrentQ?.Type == QuestionType.OpenEnded)
+            var deviceId = await DeviceIdService.GetDeviceIdAsync();
+            var response = await Http.PostAsJsonAsync(
+                $"/api/sessions/{sessionId}/submit",
+                new SubmitSurveyRequest(deviceId, answers));
+            if (!response.IsSuccessStatusCode)
             {
-                SelectedAnswers[CurrentQuestion - 1] = CurrentOpenAnswer;
+                submissionError = response.StatusCode == HttpStatusCode.Conflict
+                    ? "This survey is no longer accepting responses."
+                    : "Pulse could not submit your survey. Review your answers and try again.";
+                return;
             }
-            CurrentQuestion++;
-            CurrentOpenAnswer = SelectedAnswers.ContainsKey(CurrentQuestion - 1) ? SelectedAnswers[CurrentQuestion - 1] : string.Empty;
+
+            isSubmitted = true;
+            await BeginResultsMonitoringAsync();
+        }
+        catch (HttpRequestException ex)
+        {
+            Logger.LogError(ex, "Unable to submit survey {SessionId}", sessionId);
+            submissionError = "Pulse could not connect. Your answers were not submitted.";
+        }
+        finally
+        {
+            isSubmitting = false;
         }
     }
 
-    private void PreviousQuestion()
-    {
-        if (CurrentQuestion > 1)
+    private IReadOnlyList<string> GetValues(StudentQuestionResponse question) =>
+        question.Type switch
         {
-            if (CurrentOpenAnswer != string.Empty)
+            QuestionType.MultipleChoice or QuestionType.TrueFalse =>
+                singleAnswers.TryGetValue(question.Id, out var answer) ? [answer] : [],
+            QuestionType.MultipleAnswer =>
+                question.Options.Where(option => GetMultipleAnswers(question.Id).Contains(option)).ToList(),
+            QuestionType.Matching =>
+                question.MatchingPairs
+                    .Select(pair => GetMatchingAnswer(question.Id, pair.Prompt))
+                    .Where(answer => !string.IsNullOrWhiteSpace(answer))
+                    .ToList(),
+            _ => []
+        };
+
+    private async Task BeginResultsMonitoringAsync()
+    {
+        await LoadStudentResultsAsync();
+        if (resultsMonitoringStarted)
+            return;
+
+        resultsMonitoringStarted = true;
+
+        var factory = Services.GetService<SessionRealtimeConnectionFactory>();
+        if (factory is not null)
+        {
+            realtimeConnection = factory.Create(
+                _ => InvokeAsync(LoadStudentResultsAsync),
+                () => InvokeAsync(StateHasChanged),
+                () => InvokeAsync(LoadStudentResultsAsync));
+            try
             {
-                SelectedAnswers[CurrentQuestion - 1] = CurrentOpenAnswer;
+                await realtimeConnection.StartAsync(sessionId, lifetime.Token);
             }
-            CurrentQuestion--;
-            CurrentOpenAnswer = SelectedAnswers.ContainsKey(CurrentQuestion - 1) ? SelectedAnswers[CurrentQuestion - 1] : string.Empty;
+            catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException)
+            {
+                Logger.LogWarning(ex, "Live result updates unavailable for survey {SessionId}; polling will continue", sessionId);
+            }
         }
+
+        resultsPollingTask = PollForResultsAsync();
     }
 
-    private void SubmitQuiz()
+    private async Task PollForResultsAsync()
     {
-        if (CurrentOpenAnswer != string.Empty && CurrentQ?.Type == QuestionType.OpenEnded)
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+        try
         {
-            SelectedAnswers[CurrentQuestion - 1] = CurrentOpenAnswer;
+            while (await timer.WaitForNextTickAsync(lifetime.Token))
+                await InvokeAsync(LoadStudentResultsAsync);
         }
-        Completed = true;
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
+        {
+        }
     }
 
-    private class SessionResponse
+    private async Task LoadStudentResultsAsync()
     {
-        public Guid Id { get; set; }
-        public string Title { get; set; } = string.Empty;
-        public string JoinCode { get; set; } = string.Empty;
+        try
+        {
+            using var response = await Http.GetAsync(
+                $"/api/sessions/{sessionId}/results/student",
+                lifetime.Token);
+            if (!response.IsSuccessStatusCode)
+                return;
+
+            var json = await response.Content.ReadAsStringAsync(lifetime.Token);
+            using var document = JsonDocument.Parse(json);
+            if (document.RootElement.TryGetProperty("resetVersion", out var version) &&
+                version.TryGetInt32(out var currentVersion))
+            {
+                if (currentVersion < resetVersion)
+                    return;
+
+                if (currentVersion > resetVersion)
+                {
+                    resetVersion = currentVersion;
+                    questionsNeedRefresh = true;
+                    isPaused = true;
+                    isSubmitted = false;
+                    revealedResults = null;
+                    submissionError = null;
+                    singleAnswers.Clear();
+                    multipleAnswers.Clear();
+                    matchingAnswers.Clear();
+                }
+            }
+            if (!document.RootElement.TryGetProperty("questions", out _))
+            {
+                revealedResults = null;
+                var status = JsonSerializer.Deserialize<StudentResultsStatusResponse>(
+                    json, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+                isPaused = status?.Status == Pulse.Shared.Models.SessionStatus.Draft || questionsNeedRefresh;
+                if (status?.Status == Pulse.Shared.Models.SessionStatus.Active && questionsNeedRefresh)
+                    await ReloadQuestionsAsync();
+                await InvokeAsync(StateHasChanged);
+                return;
+            }
+
+            if (questionsNeedRefresh)
+                await ReloadQuestionsAsync();
+
+            revealedResults = JsonSerializer.Deserialize<StudentSurveyResultsResponse>(
+                json,
+                new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (HttpRequestException ex)
+        {
+            Logger.LogWarning(ex, "Unable to refresh student results for survey {SessionId}", sessionId);
+        }
     }
+
+    private async Task ReloadQuestionsAsync()
+    {
+        using var response = await Http.GetAsync($"/api/sessions/{sessionId}/questions", lifetime.Token);
+        if (!response.IsSuccessStatusCode)
+            return;
+
+        var updated = await response.Content.ReadFromJsonAsync<List<StudentQuestionResponse>>(cancellationToken: lifetime.Token);
+        if (updated is not { Count: > 0 })
+            return;
+
+        questions = updated.OrderBy(question => question.SortOrder).ToList();
+        questionsNeedRefresh = false;
+        isPaused = false;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        lifetime.Cancel();
+        if (realtimeConnection is not null)
+            await realtimeConnection.DisposeAsync();
+        if (resultsPollingTask is not null)
+            await resultsPollingTask;
+        lifetime.Dispose();
+    }
+
+    private sealed record JoinSessionResponse(Guid Id, string Title, string JoinCode, int ResetVersion = 0);
 }

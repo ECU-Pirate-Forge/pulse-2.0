@@ -3,6 +3,11 @@ namespace Pulse.Domain.Entities;
 public enum QuestionType
 {
     MultipleChoice = 0,
-    LikertScale = 1,
-    OpenEnded = 2
+    LegacyLikertScale = 1,
+    LegacyOpenEnded = 2,
+    LikertScale = LegacyLikertScale,
+    OpenEnded = LegacyOpenEnded,
+    MultipleAnswer = 3,
+    TrueFalse = 4,
+    Matching = 5
 }

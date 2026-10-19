@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/Pulse.Admin/Pulse.Admin.csproj" />
     <Project Path="src/Pulse.AppHost/Pulse.AppHost.csproj" />
+    <Project Path="src/Pulse.Application/Pulse.Application.csproj" />
     <Project Path="src/Pulse.MigrationManager/Pulse.MigrationManager.csproj" />
     <Project Path="src/Pulse.ServiceDefaults/Pulse.ServiceDefaults.csproj" />
     <Project Path="src/Pulse.Shared/Pulse.Common.csproj" />

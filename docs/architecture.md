@@ -35,6 +35,7 @@ See [setup/lifecycle](onboarding.md#7-persistent-anonymous-dev-tunnels) and
 The diagrams below describe the broader conceptual architecture and workflows.
 
 This diagram shows the full deployment topology of Pulse: how the Aspire AppHost orchestrates the Web server and Foundry Local, what lives inside the Web process, and how instructor and student browsers interact with it.
+This diagram shows the Pulse deployment topology. The repository has separate WebApp, Admin, WebApi, and Aspire projects. Instructor session, question, QR, and live-results workflows live in Admin, while anonymous survey participation and revealed aggregate results live in WebApp. SignalR distributes live progress, closure, and reveal events without breaking existing join links.
 
 ```mermaid
 graph TD
@@ -57,7 +58,7 @@ graph TD
             subgraph API["ASP.NET Core Minimal API Endpoints"]
                 SessionAPI["Session endpoints\n(POST /api/sessions, GET /sessions, GET /api/sessions/{id}, PUT /api/sessions/{id}/unblind)"]
                 QuestionAPI["Question endpoints\n(/questions and /api/sessions/{sessionId}/questions)"]
-                ResponseAPI["Response endpoint\n(POST …/respond, GET …/results)"]
+                ResponseAPI["Survey submission and results\n(POST …/submit, GET …/results)"]
                 QrAPI["QR endpoints\n(GET /api/sessions/qr/{joinCode}, GET /sessions/{id}/qr)"]
             end
 
@@ -81,8 +82,8 @@ graph TD
             QRCoder["📦 QRCoder library"]
         end
 
-        FoundryLocal["🤖 Foundry Local\n(AI Inference Service — separate process)"]
     end
+    Ollama["Local Ollama\nlocalhost:11434\nSeparate server process"]
 
     %% Client <-> Web
     IB -- "HTTPS + WebSocket (SignalR)" --> Web
@@ -116,16 +117,70 @@ graph TD
     %% QrCodeService -> QRCoder
     QrSvc --> QRCoder
 
-    %% Aspire Dashboard monitors Web & Foundry
+    API -- "local embeddings and chat" --> Ollama
+    %% Aspire Dashboard monitors Web
     Dashboard -. "telemetry / health" .-> Web
-    Dashboard -. "telemetry / health" .-> FoundryLocal
 ```
 
 ---
 
-## Activity Flow
+## Route compatibility
 
-This sequence diagram traces the core classroom workflow end-to-end: an instructor sets up a session, students join via QR code, submit responses, and the instructor views live tallies — culminating in the optional unblinding of results to students.
+The application split must preserve existing links while establishing clear ownership:
+
+- `Pulse.WebApp` owns the canonical student route `/join/{joinCode}`.
+- Existing `/quiz/{joinCode}` links redirect to `/join/{joinCode}` during the transition.
+- Existing `/instructor` and `/instructor/*` WebApp routes redirect to their `Pulse.Admin` equivalents after those pages move.
+- QR codes use the configured public WebApp base URL when present. Without it,
+  the API falls back to the incoming QR request origin, which is suitable for
+  same-host use but must not be used for cross-device testing unless that
+  origin is publicly reachable.
+- Redirects remain until usage data and release notes support their removal.
+
+For local mobile testing, AppHost normally orchestrates a persistent anonymous
+`pulse-devtunnel` exposing the API and student HTTPS endpoints. The public
+student endpoint reference is injected as `App__JoinBaseUrl` (API QR encoding)
+and `StudentApp__BaseUrl` (Admin displayed link) before consumers start.
+Admin is never tunneled; internal service calls retain local service discovery.
+The tunnel identity survives host shutdown, while hosting lasts only for the
+AppHost session. This is run-mode-only infrastructure, not a deployment.
+
+Alternatively, the manual launcher hosts a configured named tunnel, reads
+its published port 7004 `portUri`, and supplies that value to AppHost as
+`Pulse:PublicJoinBaseUrl` (environment form:
+`Pulse__PublicJoinBaseUrl`). AppHost accepts only an absolute HTTPS URL and
+forwards it to the API as `App__JoinBaseUrl` and Admin as
+`StudentApp__BaseUrl`. The public tunnel terminates HTTPS and forwards port
+7004, including WebSocket traffic, to the student Blazor Server app. API and
+Admin endpoints are not directly exposed by the manual workflow. An explicit
+`Pulse:PublicJoinBaseUrl` disables the Aspire-managed tunnel.
+
+Telemetry records session/question correlation, counts, status, request method,
+path, exception type, a message-free stack trace, and correlation ID. Student
+answer values and persistent device IDs are deliberately excluded. Unhandled
+exceptions are logged by type and sanitized stack trace without attaching the
+exception object because exception messages can contain repository input.
+
+## Persistence compatibility
+
+LiteDB session documents retain their existing stored field names while application code uses typed concepts:
+
+- Existing string `Status` values map to `SessionStatus`; unknown or missing values safely default to `Draft`.
+- A missing `Mode` defaults to `Survey`, so existing sessions are never interpreted as trivia.
+- Existing `IsUnblinded` values map to typed `ResultsVisibility`.
+- Draft-to-Active and Active-to-Closed are the only valid lifecycle transitions.
+- Future schema changes must include repository tests that read representative legacy documents.
+
+## Target Activity Flow
+
+This sequence diagram describes the implemented classroom survey workflow, including lifecycle endpoints, atomic whole-survey submission, SignalR events, polling fallback, and instructor-controlled student result reveal.
+
+Trivia uses its own game, team, participant, question, and answer collections.
+Approved bank questions are copied into a game so later bank edits cannot
+change an active competition. The API timestamps question opening and answer
+receipt, calculates points, and returns player-safe state without correct
+answers. Individual and team leaderboards are derived from persisted awarded
+points and refreshed by the Blazor clients.
 
 ```mermaid
 sequenceDiagram
@@ -173,8 +228,8 @@ sequenceDiagram
     %% ── 3. RESPONSE SUBMISSION ────────────────────────────────────────────────
     rect rgb(255, 248, 230)
         Note over IB,SB: 3 — Response Submission
-        SB->>API: POST /api/sessions/{id}/questions/{qid}/respond\n{deviceId, value}
-        API->>DB: Upsert Response (by questionId + deviceId)
+        SB->>API: POST /api/sessions/{id}/submit\n{deviceId, answers[]}
+        API->>DB: Atomically upsert responses and completion marker
         DB-->>API: ok
         API->>DB: Aggregate tallies for question
         DB-->>API: Updated tallies
@@ -201,32 +256,50 @@ sequenceDiagram
 
 ---
 
-## Phase 2 — AI Question Generation
+## Local document-grounded question generation
 
-This short sequence shows the planned Phase 2 AI-assisted question generation flow, where an instructor enters a topic and Foundry Local returns suggested questions for review before they are persisted.
+Ollama runs independently on the API host at `http://localhost:11434`.
+`gemma4:latest` generates structured multiple-choice questions and
+`all-minilm:latest` embeds grounding passages. No new Aspire resource or cloud
+service is required. The feature is grouped under
+`src/Pulse.WebApi/Features/SurveyGeneration` and reuses existing survey
+ownership, draft lifecycle, question persistence, and instructor UI.
+
+Original documents and extracted text are stored with a grounding revision in
+LiteDB. Generation embeds overlapping chunks, ranks them by cosine similarity,
+and selects at most 12 passages, reserving coverage for every document.
+Question count, choices, answer keys, and exact source quotes are validated.
+Previews are server-stored and expire after one hour; approval is transactional.
+Student APIs project questions without answer keys, explanations, or citations.
 
 ```mermaid
 sequenceDiagram
     actor IB as Instructor Browser
     participant API as ASP.NET Core API
-    participant AiSvc as AiQuestionService
-    participant FL as Foundry Local (AI)
+    participant AiSvc as OllamaSurveyGenerator
+    participant OL as Local Ollama
     participant DB as LiteDB
 
     rect rgb(245, 235, 255)
-        Note over IB,DB: Phase 2 — AI Question Generation
-        IB->>API: POST /api/sessions/{id}/questions/generate\n{topic, count}
-        API->>AiSvc: GenerateQuestions(topic, count)
-        AiSvc->>FL: HTTP POST inference request\n(structured prompt with topic)
-        FL-->>AiSvc: Raw model response (JSON / text)
-        AiSvc-->>API: List<QuestionDto> (not yet persisted)
-        API-->>IB: 200 [suggested questions]
+        IB->>API: Upload documents and save additional context
+        API->>DB: Persist original documents, extracted text, revision
+        IB->>API: POST /api/sessions/{id}/questions/generate\n{count}
+        API->>AiSvc: GenerateAsync(material, title, count)
+        AiSvc->>OL: POST /api/embed (chunks and query)
+        OL-->>AiSvc: Local embeddings
+        Note over AiSvc: Retrieve relevant passages
+        AiSvc->>OL: POST /api/chat (gemma4:latest, JSON schema)
+        OL-->>AiSvc: Questions, choices, answer keys, citations
+        Note over AiSvc: Validate exact count and source quotes
+        AiSvc-->>API: Validated questions
+        API->>DB: Store preview with grounding revision
+        API-->>IB: 200 preview ID and questions
 
-        Note over IB: Instructor reviews, edits, approves or rejects each question
+        Note over IB: Instructor reviews and approves or discards batch
 
-        IB->>API: POST /api/sessions/{id}/questions\n(approved questions, one by one or bulk)
-        API->>DB: Insert approved Question(s)
+        IB->>API: POST /api/sessions/{id}/questions/generated/{previewId}/accept
+        API->>DB: Verify revision, append questions, consume preview
         DB-->>API: ok
-        API-->>IB: 201 questions persisted
+        API-->>IB: 200 questions persisted
     end
 ```

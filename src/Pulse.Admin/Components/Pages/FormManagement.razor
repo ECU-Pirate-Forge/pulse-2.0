@@ -1,0 +1,511 @@
+@page "/forms"
+@using MudBlazor
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@using System.Net.Http.Json
+@using Pulse.Shared.Contracts.V1
+@using Pulse.Shared.Models
+@using Pulse.Common.Services
+@rendermode InteractiveServer
+@inject NavigationManager NavManager
+@inject HttpClient Http
+@inject ProtectedSessionStorage ProtectedStorage
+
+<PageTitle>Forms - Pulse</PageTitle>
+
+<style>
+    .dashboard-header {
+        background: var(--pulse-purple-900);
+        color: white;
+        padding: 32px;
+        border-top: 6px solid var(--pulse-gold-500);
+        border-radius: var(--pulse-radius-md);
+        margin-bottom: 32px;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-top: 24px;
+    }
+
+    .stat-card {
+        background: rgba(255, 255, 255, 0.1);
+        padding: 16px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .stat-number {
+        font-size: 2rem;
+        font-weight: 800;
+        margin-bottom: 4px;
+    }
+
+    .stat-label {
+        font-size: 0.95rem;
+        opacity: 0.9;
+    }
+
+    .create-session-form {
+        background: white;
+        border-radius: var(--pulse-radius-md);
+        padding: 24px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        margin-bottom: 32px;
+    }
+
+    .sessions-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 20px;
+    }
+
+    .session-card {
+        background: white;
+        border-radius: var(--pulse-radius-md);
+        box-shadow: var(--pulse-shadow-sm);
+        overflow: hidden;
+    }
+
+    .session-header {
+        background: var(--pulse-purple-700);
+        color: white;
+        padding: 16px;
+    }
+
+    .session-title {
+        font-size: 1.25rem;
+        font-weight: 700;
+        margin-bottom: 4px;
+    }
+
+    .session-code {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 8px 12px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-weight: 600;
+        font-size: 0.9rem;
+        display: inline-block;
+        margin-top: 8px;
+    }
+
+    .session-body {
+        padding: 16px;
+    }
+
+    .session-info-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+        font-size: 0.95rem;
+    }
+
+    .session-label {
+        color: #6b7280;
+        font-weight: 500;
+    }
+
+    .session-value {
+        color: #1f2937;
+        font-weight: 600;
+    }
+
+    .session-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding-top: 16px;
+        border-top: 1px solid #e5e7eb;
+    }
+
+    .action-button {
+        flex: 1 1 30%;
+        font-weight: 600;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 48px 24px;
+        background: white;
+        border-radius: 12px;
+    }
+
+    .empty-title {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #1f2937;
+        margin-bottom: 8px;
+    }
+
+    .empty-text {
+        color: #6b7280;
+    }
+</style>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    @if (!IsAuthenticated)
+    {
+        <MudPaper Elevation="4" Class="pa-8 rounded-lg mx-auto" Style="max-width: 480px;">
+            <MudStack Spacing="4">
+                <div style="text-align: center;">
+                    <MudIcon Icon="@Icons.Material.Filled.Lock" Style="font-size: 3rem; color: var(--pulse-purple-700);" />
+                    <MudText Typo="Typo.h5" Style="font-weight: 700; margin-top: 8px;">Instructor Access</MudText>
+                    <MudText Typo="Typo.body2" Style="color: #6b7280;">Enter your instructor code to manage forms</MudText>
+                </div>
+                <MudTextField @bind-Value="InstructorCodeInput"
+                              Label="Instructor Code"
+                              InputType="InputType.Password"
+                              Variant="Variant.Outlined" />
+                @if (!string.IsNullOrEmpty(AuthError))
+                {
+                    <MudAlert Severity="Severity.Error">@AuthError</MudAlert>
+                }
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           FullWidth="true"
+                           Size="Size.Large"
+                           Disabled="string.IsNullOrWhiteSpace(InstructorCodeInput) || IsLoading"
+                           @onclick="AuthenticateAsync">
+                    Access Forms
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+    }
+    else
+    {
+        <div class="dashboard-header">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                <div>
+                    <MudText Typo="Typo.h4" Style="font-weight: 700;">Form Management</MudText>
+                    <MudText Typo="Typo.subtitle1" Style="opacity: 0.9;">Collect information like names, emails, and interests</MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.Assignment" Style="font-size: 3rem; opacity: 0.8;" />
+            </MudStack>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" data-testid="form-count">@Forms.Count</div>
+                    <div class="stat-label">Forms</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">@Forms.Count(f => f.Status == FormStatus.Open)</div>
+                    <div class="stat-label">Open</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" data-testid="submission-count">@Forms.Sum(f => f.SubmissionCount)</div>
+                    <div class="stat-label">Submissions</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="create-session-form">
+            <MudText Typo="Typo.h6" Style="font-weight: 700; margin-bottom: 16px;">Create new form</MudText>
+            <MudStack Row="true" Spacing="2" AlignItems="AlignItems.End">
+                <MudTextField @bind-Value="NewFormTitle"
+                              Label="Form title"
+                              Placeholder="e.g., Open Source Project Interest"
+                              Variant="Variant.Outlined"
+                              Style="flex: 1;" />
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Size="Size.Large"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           @onclick="CreateFormAsync"
+                           Disabled="string.IsNullOrWhiteSpace(NewFormTitle) || IsCreating"
+                           Style="height: 56px; font-weight: 600;">
+                    @(IsCreating ? "Creating..." : "Create")
+                </MudButton>
+            </MudStack>
+            <MudCheckBox @bind-Value="IncludeStarterFields"
+                         Label="Start with common fields (First Name, Last Name, Email, Degree Major, Interested in Open Source)"
+                         Color="Color.Primary"
+                         Class="mt-2" />
+            @if (!string.IsNullOrEmpty(CreateError))
+            {
+                <MudAlert Severity="Severity.Error" Class="mt-3">@CreateError</MudAlert>
+            }
+        </div>
+
+        <MudText Typo="Typo.h5" Style="font-weight: 700; margin-bottom: 20px;">Your forms</MudText>
+
+        @if (!string.IsNullOrEmpty(ActionError))
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">@ActionError</MudAlert>
+        }
+
+        @if (IsLoading)
+        {
+            <MudProgressLinear Indeterminate="true" Class="mb-4" />
+        }
+        else if (!string.IsNullOrEmpty(LoadError))
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">@LoadError</MudAlert>
+        }
+        else if (Forms.Count == 0)
+        {
+            <div class="empty-state">
+                <div class="empty-title">No forms yet</div>
+                <div class="empty-text">Create your first form using the box above.</div>
+            </div>
+        }
+        else
+        {
+            <div class="sessions-grid">
+                @foreach (var form in Forms)
+                {
+                    <div class="session-card" data-testid="form-card">
+                        <div class="session-header">
+                            <div class="session-title">@form.Title</div>
+                            <div class="session-code">@form.JoinCode</div>
+                        </div>
+                        <div class="session-body">
+                            <div class="session-info-row">
+                                <span class="session-label">Fields:</span>
+                                <span class="session-value">@form.FieldCount</span>
+                            </div>
+                            <div class="session-info-row">
+                                <span class="session-label">Submissions:</span>
+                                <span class="session-value">@form.SubmissionCount</span>
+                            </div>
+                            <div class="session-info-row">
+                                <span class="session-label">Status:</span>
+                                <span class="session-value">@form.Status</span>
+                            </div>
+                            <div class="session-actions">
+                                @if (form.Status == FormStatus.Draft)
+                                {
+                                    <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Primary" Class="action-button"
+                                               @onclick="@(() => NavManager.NavigateTo($"/forms/{form.Id}/edit"))">
+                                        Edit
+                                    </MudButton>
+                                    <MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Primary" Class="action-button"
+                                               Disabled="@(form.FieldCount == 0 || BusyFormId.HasValue)"
+                                               @onclick="@(() => TransitionAsync(form, "open"))">
+                                        Open
+                                    </MudButton>
+                                }
+                                else if (form.Status == FormStatus.Open)
+                                {
+                                    <MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Primary" Class="action-button"
+                                               @onclick="@(() => NavManager.NavigateTo($"/forms/{form.Id}/live"))">
+                                        Monitor
+                                    </MudButton>
+                                    <MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Warning" Class="action-button"
+                                               Disabled="@BusyFormId.HasValue"
+                                               @onclick="@(() => TransitionAsync(form, "close"))">
+                                        Close
+                                    </MudButton>
+                                }
+                                else
+                                {
+                                    <MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Primary" Class="action-button"
+                                               @onclick="@(() => NavManager.NavigateTo($"/forms/{form.Id}/live"))">
+                                        Results
+                                    </MudButton>
+                                    <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Primary" Class="action-button"
+                                               Disabled="@BusyFormId.HasValue"
+                                               @onclick="@(() => TransitionAsync(form, "open"))">
+                                        Reopen
+                                    </MudButton>
+                                }
+                                <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Info" Class="action-button"
+                                           @onclick="@(() => NavManager.NavigateTo($"/forms/{form.Id}/live#qr"))">
+                                    QR Code
+                                </MudButton>
+                                <FormExportButton FormId="form.Id" InstructorCode="@_instructorCode" Class="action-button" />
+                                <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Error" Class="action-button"
+                                           Disabled="@BusyFormId.HasValue"
+                                           @onclick="@(() => DeleteAsync(form.Id))">
+                                    Delete
+                                </MudButton>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    }
+</MudContainer>
+
+@code {
+    private string _instructorCode = string.Empty;
+    private string InstructorCodeInput = string.Empty;
+    private string AuthError = string.Empty;
+    private string NewFormTitle = string.Empty;
+    private bool IncludeStarterFields = true;
+    private string? CreateError;
+    private string? LoadError;
+    private string? ActionError;
+    private bool IsCreating;
+    private bool IsLoading;
+    private Guid? BusyFormId;
+    private List<FormSummary> Forms = [];
+
+    private bool IsAuthenticated => !string.IsNullOrEmpty(_instructorCode);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        try
+        {
+            var result = await ProtectedStorage.GetAsync<string>("instructorCode");
+            if (result.Success && !string.IsNullOrEmpty(result.Value))
+            {
+                _instructorCode = result.Value;
+                await LoadFormsAsync();
+                StateHasChanged();
+            }
+        }
+        catch (InvalidOperationException)
+        {
+        }
+        catch (JSException)
+        {
+        }
+        catch (System.Security.Cryptography.CryptographicException)
+        {
+        }
+    }
+
+    private async Task AuthenticateAsync()
+    {
+        if (string.IsNullOrWhiteSpace(InstructorCodeInput))
+            return;
+
+        _instructorCode = InstructorCodeInput.Trim();
+        AuthError = string.Empty;
+        await ProtectedStorage.SetAsync("instructorCode", _instructorCode);
+        await LoadFormsAsync();
+
+        if (!string.IsNullOrEmpty(LoadError))
+        {
+            AuthError = LoadError;
+            _instructorCode = string.Empty;
+            await ProtectedStorage.DeleteAsync("instructorCode");
+            LoadError = null;
+        }
+    }
+
+    private HttpRequestMessage NewRequest(HttpMethod method, string url)
+    {
+        var request = new HttpRequestMessage(method, url);
+        request.Headers.TryAddWithoutValidation("InstructorCode", _instructorCode);
+        return request;
+    }
+
+    private async Task LoadFormsAsync()
+    {
+        IsLoading = true;
+        LoadError = null;
+        try
+        {
+            using var request = NewRequest(HttpMethod.Get, "/api/forms");
+            using var response = await Http.SendAsync(request);
+            if (response.IsSuccessStatusCode)
+            {
+                Forms = await response.Content.ReadFromJsonAsync<List<FormSummary>>() ?? [];
+            }
+            else if (response.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
+            {
+                LoadError = "Invalid instructor code. Please try again.";
+            }
+            else
+            {
+                LoadError = "Failed to load forms. Please try again.";
+            }
+        }
+        catch
+        {
+            LoadError = "Unable to connect to the server.";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task CreateFormAsync()
+    {
+        if (string.IsNullOrWhiteSpace(NewFormTitle))
+            return;
+
+        IsCreating = true;
+        CreateError = null;
+        try
+        {
+            var fields = IncludeStarterFields ? FormFieldPresets.Starter() : [];
+            using var request = NewRequest(HttpMethod.Post, "/api/forms");
+            request.Content = JsonContent.Create(new SaveFormRequest(NewFormTitle.Trim(), null, fields));
+            using var response = await Http.SendAsync(request);
+            if (response.IsSuccessStatusCode)
+            {
+                var created = await response.Content.ReadFromJsonAsync<Form>();
+                NewFormTitle = string.Empty;
+                if (created is not null)
+                    NavManager.NavigateTo($"/forms/{created.Id}/edit");
+            }
+            else
+            {
+                CreateError = "Failed to create form. Please check your input and try again.";
+            }
+        }
+        catch
+        {
+            CreateError = "Unable to connect to the server.";
+        }
+        finally
+        {
+            IsCreating = false;
+        }
+    }
+
+    private async Task TransitionAsync(FormSummary form, string action)
+    {
+        BusyFormId = form.Id;
+        ActionError = null;
+        try
+        {
+            using var request = NewRequest(HttpMethod.Put, $"/api/forms/{form.Id}/{action}");
+            using var response = await Http.SendAsync(request);
+            if (response.IsSuccessStatusCode)
+                await LoadFormsAsync();
+            else
+                ActionError = $"Failed to {action} form.";
+        }
+        catch
+        {
+            ActionError = "Unable to connect to the server.";
+        }
+        finally
+        {
+            BusyFormId = null;
+        }
+    }
+
+    private async Task DeleteAsync(Guid id)
+    {
+        BusyFormId = id;
+        ActionError = null;
+        try
+        {
+            using var request = NewRequest(HttpMethod.Delete, $"/api/forms/{id}");
+            using var response = await Http.SendAsync(request);
+            if (response.IsSuccessStatusCode)
+                Forms.RemoveAll(f => f.Id == id);
+            else
+                ActionError = "Failed to delete form. Please try again.";
+        }
+        catch
+        {
+            ActionError = "Unable to connect to the server.";
+        }
+        finally
+        {
+            BusyFormId = null;
+        }
+    }
+}

@@ -1,0 +1,134 @@
+.survey-page {
+    max-width: 52rem;
+    margin: 0 auto;
+}
+
+.survey-header {
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    color: white;
+    background: var(--pulse-purple-900);
+    border-top: 0.375rem solid var(--pulse-gold-500);
+    border-radius: var(--pulse-radius-md);
+}
+
+.survey-header h1,
+.survey-status h1 {
+    margin: 0.25rem 0 0.75rem;
+}
+
+.survey-header p:last-child,
+.survey-status p:last-child {
+    margin-bottom: 0;
+}
+
+.survey-questions {
+    display: grid;
+    gap: 1rem;
+}
+
+.survey-question {
+    min-width: 0;
+    padding: 1.25rem;
+    border: 0;
+}
+
+.survey-question legend {
+    width: 100%;
+    padding: 0 0 1rem;
+    color: var(--pulse-ink);
+    font-size: 1.15rem;
+    font-weight: 700;
+}
+
+.survey-option {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 3rem;
+    padding: 0.75rem;
+    margin-top: 0.625rem;
+    border: 0.125rem solid var(--pulse-border);
+    border-radius: var(--pulse-radius-sm);
+    cursor: pointer;
+}
+
+.survey-option:has(input:checked) {
+    border-color: var(--pulse-purple-700);
+    background: var(--pulse-purple-50);
+}
+
+.survey-option input {
+    width: 1.25rem;
+    height: 1.25rem;
+    accent-color: var(--pulse-purple-700);
+}
+
+.matching-row {
+    display: grid;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    font-weight: 600;
+}
+
+.matching-row select {
+    width: 100%;
+    min-height: 3rem;
+    padding: 0.625rem;
+    border: 0.125rem solid var(--pulse-border);
+    border-radius: var(--pulse-radius-sm);
+    background: white;
+    color: var(--pulse-ink);
+}
+
+.submit-survey {
+    width: 100%;
+    min-height: 3.25rem;
+    margin-top: 1.5rem;
+}
+
+.survey-status {
+    padding: 2rem;
+    text-align: center;
+}
+
+.survey-results {
+    display: grid;
+    gap: 1rem;
+}
+
+.survey-result {
+    padding: 1.25rem;
+}
+
+.survey-result h2 {
+    margin-bottom: 0.25rem;
+    font-size: 1.15rem;
+}
+
+.survey-result-row {
+    margin-top: 1rem;
+}
+
+.survey-result-row > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.survey-result-row progress {
+    width: 100%;
+    height: 0.75rem;
+    accent-color: var(--pulse-purple-700);
+}
+
+@media (min-width: 48rem) {
+    .survey-question {
+        padding: 1.75rem;
+    }
+
+    .matching-row {
+        grid-template-columns: minmax(8rem, 1fr) minmax(12rem, 2fr);
+        align-items: center;
+    }
+}

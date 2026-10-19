@@ -13,8 +13,8 @@ public class DevTunnelWiringTests
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var builder = await DistributedApplicationTestingBuilder.CreateAsync(
-            typeof(PulseAppHost), ["--DevTunnels:Enabled=false"], cancellationToken: cancellationToken);
-        Assert.Equal(["migration", "scalar", "webadmin", "webapi", "webapp"],
+            typeof(Projects.Pulse_AppHost), ["--DevTunnels:Enabled=false"], cancellationToken: cancellationToken);
+        Assert.Equal(["migration","migration-rebuilder", "scalar", "webadmin","webadmin-rebuilder", "webapi", "webapi-rebuilder", "webapp", "webapp-rebuilder"],
             builder.Resources.Select(resource => resource.Name).Order().ToArray());
         var webapp = Assert.IsType<ProjectResource>(builder.Resources.Single(resource => resource.Name == "webapp"));
         var environment = await ReadEnvironmentAsync(builder, webapp);
@@ -34,7 +34,7 @@ public class DevTunnelWiringTests
         await using var manager = new DevTunnelManager(options, cli, http, NullLogger.Instance);
         await manager.PrepareAsync(cancellationToken);
         await using var builder = await DistributedApplicationTestingBuilder.CreateAsync(
-            typeof(PulseAppHost), ["--DevTunnels:Enabled=false"], cancellationToken: cancellationToken);
+            typeof(Projects.Pulse_AppHost), ["--DevTunnels:Enabled=false"], cancellationToken: cancellationToken);
         var api = builder.CreateResourceBuilder<ProjectResource>("webapi");
         var app = builder.CreateResourceBuilder<ProjectResource>("webapp");
         var admin = builder.CreateResourceBuilder<ProjectResource>("webadmin");

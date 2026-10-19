@@ -1,0 +1,286 @@
+@page "/question-bank"
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@using Pulse.Domain.Entities
+@using Pulse.Shared.Models
+@rendermode InteractiveServer
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ProtectedSessionStorage ProtectedStorage
+
+<PageTitle>Question Bank | Pulse Instructor</PageTitle>
+
+<main class="bank-page">
+    <header class="bank-header">
+        <p class="pulse-eyebrow-alternate">Reusable content</p>
+        <h1>Question Bank</h1>
+        <p>Build course-aligned questions and moderate anonymous student suggestions before use.</p>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(error))
+    {
+        <div class="pulse-alert pulse-alert-error" role="alert">@error</div>
+    }
+
+    <section class="pulse-card bank-create" aria-labelledby="create-bank-title">
+        <h2 id="create-bank-title">Add an instructor question</h2>
+        <div class="bank-form-grid">
+            <label>Question <textarea @bind="draft.Text" rows="3"></textarea></label>
+            <label>Type
+                <select @bind="draft.Type">
+                    <option value="@QuestionType.MultipleChoice">Multiple choice</option>
+                    <option value="@QuestionType.MultipleAnswer">Multiple answer</option>
+                    <option value="@QuestionType.TrueFalse">True / false</option>
+                    <option value="@QuestionType.Matching">Matching</option>
+                </select>
+            </label>
+            <label>Course <input @bind="draft.Course" placeholder="CSCI 3000" /></label>
+            <label>Topic <input @bind="draft.Topic" placeholder="Networking" /></label>
+            <label>Tags <input @bind="draft.TagsText" placeholder="security, web" /></label>
+            @if (draft.Type is QuestionType.MultipleChoice or QuestionType.MultipleAnswer)
+            {
+                <label class="bank-wide">Options <textarea @bind="draft.OptionsText" rows="3" placeholder="One option per line"></textarea></label>
+            }
+            else if (draft.Type == QuestionType.Matching)
+            {
+                <label class="bank-wide">Pairs <textarea @bind="draft.OptionsText" rows="3" placeholder="HTTP = Protocol"></textarea></label>
+            }
+            <label><span><input type="checkbox" @bind="draft.TriviaEligible" /> Eligible for trivia</span></label>
+            @if (draft.TriviaEligible)
+            {
+                <label>Correct answers <input @bind="draft.CorrectAnswersText" placeholder="Separate answers with commas" /></label>
+            }
+        </div>
+        <button class="pulse-button pulse-button-primary" @onclick="CreateAsync">Add approved question</button>
+    </section>
+
+    <section class="pulse-card bank-filters" aria-labelledby="filter-title">
+        <h2 id="filter-title">Find and moderate questions</h2>
+        <div class="bank-filter-grid">
+            <label>Search <input @bind="search" /></label>
+            <label>Course <input @bind="course" /></label>
+            <label>Topic <input @bind="topic" /></label>
+            <label>Tag <input @bind="tag" /></label>
+            <label>Status
+                <select @bind="status">
+                    <option value="">All statuses</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Rejected">Rejected</option>
+                </select>
+            </label>
+            <label>Sort
+                <select @bind="sort">
+                    <option value="Newest">Newest</option>
+                    <option value="Oldest">Oldest</option>
+                    <option value="Text">Question text</option>
+                </select>
+            </label>
+        </div>
+        <button class="pulse-button pulse-button-secondary" @onclick="LoadAsync">Apply filters</button>
+    </section>
+
+    @if (isLoading)
+    {
+        <p aria-live="polite">Loading question bank...</p>
+    }
+    else if (items.Count == 0)
+    {
+        <section class="pulse-card bank-empty">No questions match these filters.</section>
+    }
+    else
+    {
+        <section class="bank-grid" aria-label="Question bank results">
+            @foreach (var item in items)
+            {
+                <article class="pulse-card bank-item">
+                    <div class="bank-item-heading">
+                        <span class="status-chip status-@item.ModerationStatus.ToString().ToLowerInvariant()">@item.ModerationStatus</span>
+                        <span>@item.Source</span>
+                    </div>
+                    <label>Question <textarea @bind="item.Text" rows="2"></textarea></label>
+                    <div class="bank-taxonomy">
+                        <label>Course <input @bind="item.Course" /></label>
+                        <label>Topic <input @bind="item.Topic" /></label>
+                        <label>Tags <input value="@string.Join(", ", item.Tags)" @onchange="args => SetTags(item, args.Value?.ToString())" /></label>
+                    </div>
+                    <p><strong>@item.Type</strong> · @item.ContributorAttribution</p>
+                    <label><span><input type="checkbox" @bind="item.TriviaEligible" /> Eligible for trivia</span></label>
+                    @if (item.TriviaEligible)
+                    {
+                        <label>Correct answers <input value="@string.Join(", ", item.CorrectAnswers)" @onchange="args => SetCorrectAnswers(item, args.Value?.ToString())" /></label>
+                    }
+                    @if (item.Options.Count > 0)
+                    {
+                        <p>@string.Join(" · ", item.Options)</p>
+                    }
+                    @if (item.MatchingPairs.Count > 0)
+                    {
+                        <p>@string.Join(" · ", item.MatchingPairs.Select(pair => $"{pair.Prompt} → {pair.Match}"))</p>
+                    }
+                    <div class="bank-actions">
+                        <button class="pulse-button pulse-button-primary" @onclick="() => ModerateAsync(item, QuestionModerationStatus.Approved)">Approve and save</button>
+                        <button class="pulse-button pulse-button-secondary" @onclick="() => ModerateAsync(item, QuestionModerationStatus.Rejected)">Reject</button>
+                    </div>
+                </article>
+            }
+        </section>
+    }
+</main>
+
+@code {
+    private string instructorCode = string.Empty;
+    private string search = string.Empty;
+    private string course = string.Empty;
+    private string topic = string.Empty;
+    private string tag = string.Empty;
+    private string status = string.Empty;
+    private string sort = "Newest";
+    private string? error;
+    private bool isLoading = true;
+    private List<QuestionBankItem> items = [];
+    private BankDraft draft = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        var storedCode = await ProtectedStorage.GetAsync<string>("instructorCode");
+        instructorCode = storedCode.Success ? storedCode.Value ?? string.Empty : string.Empty;
+        if (string.IsNullOrWhiteSpace(instructorCode))
+        {
+            Navigation.NavigateTo("/surveys");
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        error = null;
+        var query = new Dictionary<string, object?>
+        {
+            ["text"] = search,
+            ["course"] = course,
+            ["topic"] = topic,
+            ["tag"] = tag,
+            ["moderationStatus"] = status,
+            ["sort"] = sort,
+            ["pageSize"] = 100
+        };
+        var queryString = string.Join("&", query
+            .Where(pair => !string.IsNullOrWhiteSpace(pair.Value?.ToString()))
+            .Select(pair => $"{pair.Key}={Uri.EscapeDataString(pair.Value!.ToString()!)}"));
+        using var request = Authorized(HttpMethod.Get, $"/api/questionbank?{queryString}");
+        var response = await Http.SendAsync(request);
+        if (response.IsSuccessStatusCode)
+        {
+            var payload = await response.Content.ReadFromJsonAsync<QuestionBankResponse>();
+            items = payload?.Items ?? [];
+        }
+        else
+        {
+            error = "Pulse could not load the question bank.";
+        }
+
+        isLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task CreateAsync()
+    {
+        error = null;
+        var requestBody = new
+        {
+            draft.Text,
+            draft.Type,
+            draft.Course,
+            draft.Topic,
+            Tags = SplitLines(draft.TagsText.Replace(',', '\n')),
+            Options = draft.Type is QuestionType.MultipleChoice or QuestionType.MultipleAnswer
+                ? SplitLines(draft.OptionsText)
+                : [],
+            MatchingPairs = draft.Type == QuestionType.Matching
+                ? ParsePairs(draft.OptionsText)
+                : [],
+            draft.TriviaEligible,
+            CorrectAnswers = draft.CorrectAnswersText.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        };
+        using var request = Authorized(HttpMethod.Post, "/api/questionbank", requestBody);
+        var response = await Http.SendAsync(request);
+        if (!response.IsSuccessStatusCode)
+        {
+            error = await response.Content.ReadAsStringAsync();
+            return;
+        }
+
+        draft = new();
+        await LoadAsync();
+    }
+
+    private async Task ModerateAsync(QuestionBankItem item, QuestionModerationStatus moderationStatus)
+    {
+        using var request = Authorized(HttpMethod.Put, $"/api/questionbank/{item.Id}", new
+        {
+            moderationStatus,
+            item.Text,
+            item.Course,
+            item.Topic,
+            item.Tags,
+            item.TriviaEligible,
+            item.CorrectAnswers
+        });
+        var response = await Http.SendAsync(request);
+        if (!response.IsSuccessStatusCode)
+        {
+            error = "Pulse could not save this moderation decision.";
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private HttpRequestMessage Authorized(HttpMethod method, string path, object? content = null)
+    {
+        var request = new HttpRequestMessage(method, path);
+        request.Headers.TryAddWithoutValidation("InstructorCode", instructorCode);
+        if (content is not null)
+            request.Content = JsonContent.Create(content);
+        return request;
+    }
+
+    private static void SetTags(QuestionBankItem item, string? tags) =>
+        item.Tags = SplitLines((tags ?? string.Empty).Replace(',', '\n'));
+
+    private static void SetCorrectAnswers(QuestionBankItem item, string? answers) =>
+        item.CorrectAnswers = (answers ?? string.Empty)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToList();
+
+    private static List<string> SplitLines(string value) =>
+        value.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+
+    private static List<MatchingPair> ParsePairs(string value) =>
+        SplitLines(value)
+            .Select(line => line.Split('=', 2, StringSplitOptions.TrimEntries))
+            .Where(parts => parts.Length == 2)
+            .Select(parts => new MatchingPair { Prompt = parts[0], Match = parts[1] })
+            .ToList();
+
+    private sealed record QuestionBankResponse(List<QuestionBankItem> Items, int TotalCount);
+
+    private sealed class BankDraft
+    {
+        public string Text { get; set; } = string.Empty;
+        public QuestionType Type { get; set; } = QuestionType.MultipleChoice;
+        public string Course { get; set; } = string.Empty;
+        public string Topic { get; set; } = string.Empty;
+        public string TagsText { get; set; } = string.Empty;
+        public string OptionsText { get; set; } = string.Empty;
+        public bool TriviaEligible { get; set; }
+        public string CorrectAnswersText { get; set; } = string.Empty;
+    }
+}

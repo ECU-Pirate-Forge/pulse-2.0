@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="CorrectAnswers" xml:space="preserve"><value>Correct answers</value></data>
+  <data name="ResetSurvey" xml:space="preserve"><value>Reset survey</value></data>
+  <data name="ResetConfirmation" xml:space="preserve"><value>Clear all responses and reopen this survey? Questions, answer keys, and the join code will be kept. Results will be hidden for the new run.</value></data>
+  <data name="ConfirmReset" xml:space="preserve"><value>Clear responses and reopen</value></data>
+  <data name="CancelReset" xml:space="preserve"><value>Cancel</value></data>
+  <data name="ResetFailed" xml:space="preserve"><value>Pulse could not reset this survey.</value></data>
+  <data name="SurveyOnlyReset" xml:space="preserve"><value>Only surveys can be reset.</value></data>
+  <data name="EditSurvey" xml:space="preserve"><value>Edit survey</value></data>
+  <data name="EditHelp" xml:space="preserve"><value>Pause this survey to edit its questions. When finished, activate it from the surveys dashboard to accept responses again.</value></data>
+  <data name="EditConfirmation" xml:space="preserve"><value>This survey has responses. Clear all responses and completion records and pause the survey for editing? Questions, answer keys, and the join code will be kept.</value></data>
+  <data name="ConfirmEdit" xml:space="preserve"><value>Clear responses and edit</value></data>
+  <data name="EditFailed" xml:space="preserve"><value>Pulse could not open this survey for editing.</value></data>
+  <data name="SurveyOnlyEdit" xml:space="preserve"><value>Only surveys can be reopened for editing.</value></data>
+  <data name="EditingReady" xml:space="preserve"><value>This survey is paused for editing. Activate it from the surveys dashboard when your changes are ready.</value></data>
+  <data name="SurveyPaused" xml:space="preserve"><value>Survey paused</value></data>
+  <data name="SurveyPausedHelp" xml:space="preserve"><value>Your instructor is editing this survey. The updated questions will appear here when the survey is activated again.</value></data>
+  <data name="SubmissionChanged" xml:space="preserve"><value>This survey changed or was paused before your submission was saved. Wait for the updated survey and submit again.</value></data>
+</root>

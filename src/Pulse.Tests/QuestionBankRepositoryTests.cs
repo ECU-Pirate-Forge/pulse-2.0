@@ -9,7 +9,8 @@ public class QuestionBankRepositoryTests
 {
     private QuestionBankRepository CreateRepository()
     {
-        var db = new LiteDatabase("Filename=:memory:");
+        // Isolate mapping metadata from other databases used by parallel tests.
+        var db = new LiteDatabase("Filename=:memory:", new BsonMapper());
         return new QuestionBankRepository(db);
     }
 

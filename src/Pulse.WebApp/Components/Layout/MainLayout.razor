@@ -1,4 +1,4 @@
-﻿@using MudBlazor
+@using MudBlazor
 @inherits LayoutComponentBase
 
 <MudThemeProvider Theme="_theme" />
@@ -6,53 +6,49 @@
 <MudSnackbarProvider />
 <MudPopoverProvider />
 
-<div class="pulse-layout">
-    <!-- Navigation Bar -->
-    <MudAppBar Elevation="2" Color="Color.Primary" Class="pulse-navbar">
-        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Style="width: 100%;">
-            <MudIconButton Icon="@Icons.Material.Filled.Quiz" Color="Color.Inherit" Edge="Edge.Start" />
-            <MudText Typo="Typo.h6" Style="font-weight: 700; color: white; flex-grow: 1;">
-                Pulse Quiz
-            </MudText>
-            <MudIconButton Icon="@Icons.Material.Filled.Home" Color="Color.Inherit" href="/" />
-        </MudStack>
-    </MudAppBar>
-
-    <!-- Main Content -->
-    <div class="pulse-content" style="padding-top: 70px;">
-        <ErrorBoundary>
-            <ChildContent>
-                @Body
-            </ChildContent>
-            <ErrorContent>
-                <MudAlert Severity="Severity.Error" Class="ma-4">
-                    An unhandled error has occurred.
-                    <MudButton Variant="Variant.Text" Href="/">Reload</MudButton>
-                </MudAlert>
-            </ErrorContent>
-        </ErrorBoundary>
-    </div>
+<a class="pulse-skip-link" href="#main-content">Skip to main content</a>
+<div class="student-shell">
+    <header class="student-header">
+        <div class="student-header-inner">
+            <a class="pulse-brand" href="/" aria-label="Pulse home">
+                <img src="/images/pulse_logo.png" height="100" alt="Pulse logo" />
+            </a>
+            <span class="student-header-purpose">Anonymous classroom surveys</span>
+        </div>
+    </header>
+    <ErrorBoundary>
+        <ChildContent>
+            @Body
+        </ChildContent>
+        <ErrorContent>
+            <main id="main-content" class="pulse-page">
+                <div class="pulse-card error-card" role="alert">
+                    <h1>Pulse could not load this page</h1>
+                    <p>Try reloading. If the problem continues, ask your instructor for help.</p>
+                    <a class="pulse-button pulse-button-primary" href="/">Return home</a>
+                </div>
+            </main>
+        </ErrorContent>
+    </ErrorBoundary>
 </div>
 
-<style>
-    .pulse-layout {
-        display: flex;
-        flex-direction: column;
-        min-height: 100vh;
-        background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
-    }
-
-    .pulse-navbar {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-    }
-
-    .pulse-content {
-        flex: 1;
-        overflow-y: auto;
-    }
-</style>
-
 @code {
-    private readonly MudTheme _theme = new();
+    private readonly MudTheme _theme = new()
+    {
+        PaletteLight = new PaletteLight
+        {
+            Primary = "#592A8A",
+            Secondary = "#FDC82F",
+            Background = "#F7F5F8",
+            Surface = "#FFFFFF",
+            TextPrimary = "#211C27",
+            TextSecondary = "#625B68",
+            AppbarBackground = "#321653",
+            AppbarText = "#FFFFFF"
+        },
+        LayoutProperties = new LayoutProperties
+        {
+            DefaultBorderRadius = "6px"
+        }
+    };
 }

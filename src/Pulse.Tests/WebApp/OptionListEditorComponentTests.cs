@@ -2,7 +2,7 @@ using Bunit;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor.Services;
-using Pulse.WebApp.Components;
+using Pulse.Admin.Components;
 using Xunit;
 
 namespace Pulse.Tests.WebApp;
@@ -14,14 +14,14 @@ public class OptionListEditorComponentTests : BunitContext
         Services.AddMudServices();
 
         // Configure JSInterop to allow all MudBlazor JS calls
-        JSInterop.SetupVoid("mudElementRef.addOnBlurEvent", _ => true);
-        JSInterop.SetupVoid("mudElementRef.addOnFocusEvent", _ => true);
-        JSInterop.SetupVoid("mudElementRef.removeOnBlurEvent", _ => true);
-        JSInterop.SetupVoid("mudElementRef.removeOnFocusEvent", _ => true);
-        JSInterop.SetupVoid("mudPopoverFactory.initialize", _ => true);
-        JSInterop.SetupVoid("scrollManager.initialize", _ => true);
-        JSInterop.SetupVoid("scrollManager.unlock", _ => true);
-        JSInterop.SetupVoid("scrollManager.lock", _ => true);
+        JSInterop.SetupVoid("mudElementRef.addOnBlurEvent", _ => true).SetVoidResult();
+        JSInterop.SetupVoid("mudElementRef.addOnFocusEvent", _ => true).SetVoidResult();
+        JSInterop.SetupVoid("mudElementRef.removeOnBlurEvent", _ => true).SetVoidResult();
+        JSInterop.SetupVoid("mudElementRef.removeOnFocusEvent", _ => true).SetVoidResult();
+        JSInterop.SetupVoid("mudPopoverFactory.initialize", _ => true).SetVoidResult();
+        JSInterop.SetupVoid("scrollManager.initialize", _ => true).SetVoidResult();
+        JSInterop.SetupVoid("scrollManager.unlock", _ => true).SetVoidResult();
+        JSInterop.SetupVoid("scrollManager.lock", _ => true).SetVoidResult();
     }
     [Fact]
     public void Renders_Initial_Empty_Option()

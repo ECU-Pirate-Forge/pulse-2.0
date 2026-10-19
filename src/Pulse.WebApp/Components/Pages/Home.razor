@@ -1,179 +1,87 @@
-﻿@page "/"
-@using MudBlazor
-@using Microsoft.AspNetCore.Components
-@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
-@rendermode InteractiveServer
-@inject NavigationManager NavManager
-@inject ProtectedSessionStorage ProtectedStorage
+@page "/"
+@inject IConfiguration Configuration
 
-<PageTitle>Pulse Quiz - Home</PageTitle>
+<PageTitle>Pulse | Anonymous classroom surveys</PageTitle>
 
-<style>
-    .hero-section {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 60px 20px;
-        text-align: center;
-        border-radius: 16px;
-        margin: 0 auto 40px;
-        max-width: 1200px;
-    }
-
-    .hero-title {
-        font-size: 3.5rem;
-        font-weight: 800;
-        margin-bottom: 16px;
-        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-    }
-
-    .hero-subtitle {
-        font-size: 1.25rem;
-        opacity: 0.95;
-        margin-bottom: 8px;
-    }
-
-    .role-cards {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 24px;
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 0 20px 60px;
-    }
-
-    .role-icon {
-        font-size: 4rem;
-        margin-bottom: 16px;
-        text-align: center;
-    }
-
-    .role-title {
-        font-size: 1.75rem;
-        font-weight: 700;
-        margin-bottom: 12px;
-        color: #1f2937;
-        text-align: center;
-    }
-
-    .role-description {
-        color: #6b7280;
-        margin-bottom: 24px;
-        line-height: 1.6;
-        text-align: center;
-    }
-
-    .role-features {
-        text-align: left;
-        margin: 20px 0;
-        padding: 16px;
-        background: #f9fafb;
-        border-radius: 8px;
-        list-style: none;
-        padding-left: 0;
-    }
-
-    .role-features li {
-        margin: 8px 0;
-        color: #4b5563;
-        display: flex;
-        align-items: center;
-    }
-
-    .role-features li::before {
-        content: "✓";
-        margin-right: 8px;
-        font-weight: bold;
-        color: #10b981;
-    }
-
-    .student-card {
-        border-top: 4px solid #3b82f6;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    .student-card:hover {
-        transform: translateY(-8px);
-        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
-    }
-
-    .instructor-card {
-        border-top: 4px solid #10b981;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    .instructor-card:hover {
-        transform: translateY(-8px);
-        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
-    }
-</style>
-
-<MudContainer MaxWidth="MaxWidth.Large" Class="py-0">
-    <!-- Hero Section -->
-    <div class="hero-section">
-        <div class="hero-title">Welcome to Pulse</div>
-        <div class="hero-subtitle">Interactive Quiz Platform for Teachers and Students</div>
-    </div>
-
-    <!-- Role Selection Cards -->
-    <div class="role-cards">
-        <!-- Student Card -->
-        <MudCard Class="student-card">
-            <MudCardContent>
-                <div class="role-icon">👨‍🎓</div>
-                <div class="role-title">Student</div>
-                <div class="role-description">
-                    Join a quiz session and test your knowledge
-                </div>
-                <ul class="role-features">
-                    <li>Join sessions with a code</li>
-                    <li>Take interactive quizzes</li>
-                    <li>Multiple question types</li>
-                    <li>Instant feedback</li>
+<main id="main-content">
+    <section class="student-hero" aria-labelledby="student-hero-title">
+        <div class="pulse-page student-hero-grid">
+            <div class="student-hero-copy">
+                <p class="pulse-eyebrow">Classroom feedback</p>
+                <h1 id="student-hero-title" class="pulse-heading">Share what you think. No name required.</h1>
+                <p class="pulse-lead">
+                    Join an anonymous survey from your instructor. Your responses help shape the
+                    conversation without identifying you.
+                </p>
+                <ul class="privacy-list" aria-label="Survey privacy">
+                    <li>No account or student name</li>
+                    <li>One current response per question</li>
+                    <li>Class results appear only when your instructor reveals them</li>
                 </ul>
-            </MudCardContent>
-            <MudCardActions>
-                <MudButton Variant="Variant.Filled" Color="Color.Info" FullWidth="true" Size="Size.Large"
-                           Style="text-transform: uppercase; font-weight: 600;"
-                           OnClick="@(() => NavManager.NavigateTo("/student-join"))">
-                    Join Session
-                </MudButton>
-            </MudCardActions>
-        </MudCard>
+            </div>
+            <aside class="pulse-card join-card" aria-labelledby="join-title">
+                <p class="pulse-eyebrow">Have a code?</p>
+                <h2 id="join-title">Join your survey</h2>
+                <JoinSurveyForm />
+                <p class="scan-note">Scanning your instructor's QR code takes you directly to the survey.</p>
+            </aside>
+        </div>
+    </section>
 
-        <!-- Instructor Card -->
-        <MudCard Class="instructor-card">
-            <MudCardContent>
-                <div class="role-icon">👨‍🏫</div>
-                <div class="role-title">Instructor</div>
-                <div class="role-description">
-                    Create and manage quiz sessions for your students
-                </div>
-                <ul class="role-features">
-                    <li>Create quiz sessions</li>
-                    <li>Manage questions</li>
-                    <li>Generate QR codes</li>
-                    <li>Monitor responses</li>
-                </ul>
-            </MudCardContent>
-            <MudCardActions>
-                <MudButton Variant="Variant.Filled" Color="Color.Success" FullWidth="true" Size="Size.Large"
-                           Style="text-transform: uppercase; font-weight: 600;"
-                           OnClick="@(() => NavManager.NavigateTo("/instructor"))">
-                    Dashboard
-                </MudButton>
-            </MudCardActions>
-        </MudCard>
-    </div>
-</MudContainer>
+    <section class="pulse-page how-it-works" aria-labelledby="how-title">
+        <div>
+            <p class="pulse-eyebrow">How Pulse works</p>
+            <h2 id="how-title">A clear view of the room</h2>
+        </div>
+        <div class="steps-grid">
+            <article>
+                <span aria-hidden="true">01</span>
+                <h3>Join</h3>
+                <p>Scan the QR code or enter the short code your instructor shares.</p>
+            </article>
+            <article>
+                <span aria-hidden="true">02</span>
+                <h3>Respond</h3>
+                <p>Complete the survey on one mobile-friendly page and submit once.</p>
+            </article>
+            <article>
+                <span aria-hidden="true">03</span>
+                <h3>See the pulse</h3>
+                <p>View anonymous class results after your instructor reveals them.</p>
+            </article>
+        </div>
+    </section>
+
+    <section class="pulse-page how-it-works" aria-labelledby="contribute-title">
+        <div>
+            <p class="pulse-eyebrow">Question bank</p>
+            <h2 id="contribute-title">Have a good question?</h2>
+            <p>Suggest one anonymously. An instructor will review it before it becomes available.</p>
+        </div>
+        <a class="pulse-button pulse-button-secondary" href="/suggest-question">Suggest a question</a>
+    </section>
+
+    <section class="pulse-page how-it-works" aria-labelledby="trivia-title">
+        <div>
+            <p class="pulse-eyebrow">Trivia competitions</p>
+            <h2 id="trivia-title">Ready to play?</h2>
+            <p>Join an individual or team trivia game with the code from your instructor.</p>
+        </div>
+        <a class="pulse-button pulse-button-primary" href="/trivia">Join trivia</a>
+    </section>
+
+    <section class="instructor-callout" aria-labelledby="instructor-title">
+        <div class="pulse-page">
+            <div>
+                <p class="pulse-eyebrow">For instructors</p>
+                <h2 id="instructor-title">Create and share anonymous classroom surveys.</h2>
+            </div>
+            <a class="pulse-button pulse-button-outline" href="@InstructorUrl">Open instructor workspace</a>
+        </div>
+    </section>
+</main>
 
 @code {
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        // Clear instructor code when returning home so they need to re-authenticate
-        if (firstRender)
-        {
-            await ProtectedStorage.DeleteAsync("instructorCode");
-        }
-    }
+    private string InstructorUrl =>
+        Configuration["Admin:BaseUrl"] ?? "https://localhost:7019";
 }
-

@@ -4,6 +4,7 @@ using Pulse.Application.Services;
 using Pulse.Common.Services;
 using Pulse.Domain.Entities;
 using Pulse.Shared.Models;
+using Pulse.Shared.Contracts.V1;
 using Pulse.WebApi;
 using Pulse.WebApi.Middleware;
 
@@ -25,6 +26,10 @@ public class SessionResultsEndpointTests
         var repo = new Mock<IResponseRepository>();
         repo.Setup(r => r.GetByQuestionId(It.IsAny<Guid>()))
             .Returns((Guid id) => responses.Where(r => r.QuestionId == id));
+        repo.Setup(r => r.GetBySession(It.IsAny<Guid>()))
+            .Returns((Guid id) => responses.Where(r => r.SessionId == id));
+        repo.Setup(r => r.GetSubmissionsBySession(It.IsAny<Guid>()))
+            .Returns([]);
         return repo;
     }
 
@@ -45,9 +50,9 @@ public class SessionResultsEndpointTests
 
         var sessionRepo = BuildSessionRepo(session);
         var responseRepo = BuildResponseRepo([
-            new Response { QuestionId = questionId, DeviceId = "d1", Value = "A" },
-            new Response { QuestionId = questionId, DeviceId = "d2", Value = "A" },
-            new Response { QuestionId = questionId, DeviceId = "d3", Value = "B" }
+            new Response { SessionId = sessionId, QuestionId = questionId, DeviceId = "d1", Value = "A" },
+            new Response { SessionId = sessionId, QuestionId = questionId, DeviceId = "d2", Value = "A" },
+            new Response { SessionId = sessionId, QuestionId = questionId, DeviceId = "d3", Value = "B" }
         ]);
 
         using var db = new LiteDB.LiteDatabase("Filename=:memory:");
@@ -59,13 +64,13 @@ public class SessionResultsEndpointTests
         var result = await SessionResultsEndpointHandlers.GetSessionResults(
             sessionId, context, sessionRepo.Object, questionRepo, responseRepo.Object);
 
-        var okResult = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.Ok<SessionResultsResponse>>(result);
+        var okResult = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.Ok<InstructorSurveyResultsResponse>>(result);
         Assert.Equal(200, okResult.StatusCode);
-        Assert.Equal(3, okResult.Value!.TotalResponses);
+        Assert.Equal(3, okResult.Value!.ParticipantCount);
         Assert.Single(okResult.Value.Questions);
         var questionTally = okResult.Value.Questions[0];
-        Assert.Equal(2, questionTally.Tallies.First(t => t.Option == "A").Count);
-        Assert.Equal(1, questionTally.Tallies.First(t => t.Option == "B").Count);
+        Assert.Equal(2, questionTally.Tallies.First(t => t.Value == "A").Count);
+        Assert.Equal(1, questionTally.Tallies.First(t => t.Value == "B").Count);
     }
 
     [Fact]

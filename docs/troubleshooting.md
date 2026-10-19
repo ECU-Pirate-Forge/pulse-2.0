@@ -183,6 +183,68 @@ Start with the [tunnel setup and configuration guide](onboarding.md#7-persistent
 
 To disable tunnels, set AppHost `DevTunnels:Enabled=false`, remove any overriding
 environment value, and restart. This does not delete persisted tunnel definitions.
+### 10. Dev tunnel returns 502 or the Blazor app keeps reconnecting
+
+For the default Aspire-managed workflow, inspect `pulse-devtunnel` and both
+HTTPS port resources in the dashboard. Check their logs, local target URLs,
+and public `/health` responses (HTTP 200, exactly `Healthy`). Confirm
+`devtunnel user show` reports a signed-in user. Restart AppHost after trusting
+the developer certificate. Do not host the same tunnel ID in another process.
+
+For the alternative manual launcher:
+
+1. Confirm `https://localhost:7004/health` returns exactly `Healthy`. If TLS
+   validation fails, run `dotnet dev-certs https --trust`, restart Aspire, and
+   retry.
+2. Confirm the named tunnel has explicit HTTPS forwarding:
+   `devtunnel port create <tunnel-id> -p 7004 --protocol https`.
+3. Trust the local certificate with `dotnet dev-certs https --trust`, restart
+   Aspire, and retry.
+4. Do not expose port `7019`; that is the local Admin app.
+5. Check that VPN, firewall, or managed-device policy permits WebSockets.
+   Survey updates can fall back to polling, but the Blazor Server UI itself
+   still needs a reliable circuit.
+6. The launcher's automated public health request skips the anti-phishing page
+   and requires the exact `Healthy` body. A physical browser may still show the
+   one-time Microsoft Dev Tunnels trust screen; continue after reviewing it.
+
+### 11. QR opens localhost, the API, or an old tunnel
+
+The QR target is fixed when the API generates the image. In the default
+workflow, confirm the student tunnel port is running and WebApi's
+`App__JoinBaseUrl` and Admin's `StudentApp__BaseUrl` match its public URL.
+An explicit `Pulse__PublicJoinBaseUrl` disables the managed tunnel; remove a
+stale override and restart AppHost, then refresh the QR image.
+
+For the alternative manual workflow, stop the current launcher and restart
+through the checked-in launcher, which discovers the URL after hosting begins:
+
+```powershell
+.\tools\Start-MobileTest.ps1 -TunnelId <tunnel-id>
+```
+
+Prefer the named tunnel workflow in [Onboarding](onboarding.md) to avoid URL
+changes. If the optional `PublicJoinBaseUrl` check is used, the URL must be
+absolute HTTPS with no credentials, query, or fragment and must exactly match
+the hosted tunnel's port 7004 `portUri`.
+
+### 12. Named tunnel is unavailable or unexpectedly prompts for sign-in
+
+For an Aspire-managed tunnel, check the dashboard's resolved tunnel ID and
+anonymous access on both modeled HTTPS ports. Sign in with
+`devtunnel user login` and restart AppHost. A one-time anti-phishing browser
+screen is distinct from a sign-in requirement. The tunnel is retained after
+shutdown but expires by default after 30 days without hosting.
+
+For the alternative manual launcher:
+
+Inspect it with `devtunnel show <tunnel-id> --json`. Before hosting, confirm
+port `7004` uses protocol `https` and the `tunnel.accessControl` array contains
+an entry with type `Anonymous` and scope `connect`; `portUri` appears only
+after hosting starts. Recreate the tunnel with `--allow-anonymous` if
+necessary. Anonymous mode exposes the student UI to anyone with the URL; stop
+hosting after testing and delete obsolete tunnels with
+`devtunnel delete <tunnel-id>`.
 
 ## Still Stuck?
 

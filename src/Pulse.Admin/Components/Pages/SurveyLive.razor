@@ -1,0 +1,231 @@
+@page "/surveys/{SessionId:guid}/live"
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@using Pulse.Shared.Contracts.V1
+@using Pulse.Shared.Resources
+@using Pulse.Shared.Services
+@implements IAsyncDisposable
+@rendermode InteractiveServer
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ProtectedSessionStorage ProtectedStorage
+@inject SessionRealtimeConnectionFactory RealtimeConnections
+@inject ILogger<SurveyLive> Logger
+
+<PageTitle>Live survey | Pulse</PageTitle>
+
+<main class="pulse-page live-results-page">
+    <header class="live-results-header">
+        <div>
+            <p class="pulse-eyebrow-alternate">Instructor live view</p>
+            <h1>@(results?.Title ?? "Survey results")</h1>
+            @if (!string.IsNullOrWhiteSpace(JoinCode))
+            {
+                <p>Join code: <strong>@JoinCode</strong></p>
+            }
+        </div>
+        <a class="pulse-button pulse-button-secondary" href="/surveys">Back to surveys</a>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(error))
+    {
+        <div class="pulse-alert pulse-alert-error" role="alert">@error</div>
+    }
+    @if (results is null)
+    {
+        <section class="pulse-card live-loading" aria-live="polite">Loading live results...</section>
+    }
+    else
+    {
+        <section class="live-stat-grid" aria-label="Survey participation">
+            <div class="pulse-card live-stat">
+                <strong>@results.ParticipantCount</strong>
+                <span>Participants</span>
+            </div>
+            <div class="pulse-card live-stat">
+                <strong>@results.CompletedCount</strong>
+                <span>Completed surveys</span>
+            </div>
+        </section>
+
+        <div class="live-actions">
+            <a class="pulse-button pulse-button-secondary" href="@($"/instructor/questions/{SessionId}")">@SurveyText.EditSurvey</a>
+            <button class="pulse-button pulse-button-secondary" disabled="@isPerformingAction" @onclick="CloseAsync">Close survey</button>
+            <button class="pulse-button pulse-button-primary" disabled="@isPerformingAction" @onclick="RevealAsync">Reveal results</button>
+            <button class="pulse-button pulse-button-secondary" disabled="@isPerformingAction" @onclick="@(() => confirmReset = true)">@SurveyText.ResetSurvey</button>
+        </div>
+
+        @if (confirmReset)
+        {
+            <section class="pulse-card" role="alertdialog" aria-modal="false" aria-labelledby="reset-survey-title">
+                <h2 id="reset-survey-title">@SurveyText.ResetSurvey</h2>
+                <p>@SurveyText.ResetConfirmation</p>
+                <button class="pulse-button pulse-button-primary" data-testid="confirm-reset" disabled="@isPerformingAction" @onclick="ResetAsync">@SurveyText.ConfirmReset</button>
+                <button class="pulse-button pulse-button-secondary" disabled="@isPerformingAction" @onclick="@(() => confirmReset = false)">@SurveyText.CancelReset</button>
+            </section>
+        }
+
+        <section class="live-question-grid">
+            @foreach (var question in results.Questions)
+            {
+                <article class="pulse-card live-question">
+                    <div class="live-question-title">
+                        <h2>@question.Text</h2>
+                        <span>@question.ResponseCount responses</span>
+                    </div>
+                    @if (question.CorrectAnswers is { Count: > 0 })
+                    {
+                        <section class="survey-answer-key" aria-label="@SurveyText.CorrectAnswers">
+                            <h3>@SurveyText.CorrectAnswers</h3>
+                            <ul>
+                                @foreach (var answer in question.CorrectAnswers)
+                                {
+                                    <li>@answer</li>
+                                }
+                            </ul>
+                        </section>
+                    }
+                    @foreach (var tally in question.Tallies)
+                    {
+                        var percentage = question.ResponseCount == 0
+                            ? 0
+                            : (int)Math.Round(tally.Count * 100d / question.ResponseCount);
+                        <div class="result-row">
+                            <div><span>@tally.Value</span><strong>@tally.Count</strong></div>
+                            <progress value="@tally.Count" max="@Math.Max(1, question.ResponseCount)">@percentage%</progress>
+                        </div>
+                    }
+                </article>
+            }
+        </section>
+    }
+</main>
+
+@code {
+    [Parameter] public Guid SessionId { get; set; }
+    [SupplyParameterFromQuery] public string JoinCode { get; set; } = string.Empty;
+
+    private readonly CancellationTokenSource lifetime = new();
+    private InstructorSurveyResultsResponse? results;
+    private SessionRealtimeConnection? realtimeConnection;
+    private string instructorCode = string.Empty;
+    private string? error;
+    private bool confirmReset;
+    private bool isPerformingAction;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        var storedCode = await ProtectedStorage.GetAsync<string>("instructorCode");
+        instructorCode = storedCode.Success ? storedCode.Value ?? string.Empty : string.Empty;
+        if (string.IsNullOrWhiteSpace(instructorCode))
+        {
+            Navigation.NavigateTo("/surveys");
+            return;
+        }
+
+        await RefreshAsync();
+        realtimeConnection = RealtimeConnections.Create(
+            _ => InvokeAsync(RefreshAsync),
+            () => InvokeAsync(RefreshAsync),
+            () => InvokeAsync(RefreshAsync));
+        try
+        {
+            await realtimeConnection.StartAsync(SessionId, lifetime.Token);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException)
+        {
+            Logger.LogWarning(ex, "Live updates unavailable for survey {SessionId}; polling will continue", SessionId);
+        }
+
+        _ = PollAsync();
+    }
+
+    private async Task PollAsync()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(lifetime.Token))
+                await InvokeAsync(RefreshAsync);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
+        {
+        }
+    }
+
+    private async Task RefreshAsync()
+    {
+        using var request = AuthorizedRequest(HttpMethod.Get, $"/api/sessions/{SessionId}/results");
+        using var response = await Http.SendAsync(request, lifetime.Token);
+        if (!response.IsSuccessStatusCode)
+        {
+            error = "Pulse could not load the live survey results.";
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        results = await response.Content.ReadFromJsonAsync<InstructorSurveyResultsResponse>(
+            cancellationToken: lifetime.Token);
+        error = results is null ? "Pulse returned an invalid live-results response." : null;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private Task CloseAsync() => PerformActionAsync("close", "Pulse could not close this survey.");
+
+    private Task RevealAsync() => PerformActionAsync("unblind", "Pulse could not reveal these results.");
+
+    private async Task ResetAsync()
+    {
+        await PerformActionAsync("reset", SurveyText.ResetFailed);
+        if (error is null)
+            confirmReset = false;
+    }
+
+    private async Task PerformActionAsync(string action, string failureMessage)
+    {
+        if (isPerformingAction)
+            return;
+
+        isPerformingAction = true;
+        try
+        {
+            using var request = AuthorizedRequest(HttpMethod.Put, $"/api/sessions/{SessionId}/{action}");
+            using var response = await Http.SendAsync(request, lifetime.Token);
+            if (!response.IsSuccessStatusCode)
+            {
+                error = failureMessage;
+                return;
+            }
+
+            error = null;
+            await RefreshAsync();
+        }
+        catch (HttpRequestException ex)
+        {
+            Logger.LogWarning(ex, "Survey action {Action} failed for {SessionId}", action, SessionId);
+            error = failureMessage;
+        }
+        finally
+        {
+            isPerformingAction = false;
+        }
+    }
+
+    private HttpRequestMessage AuthorizedRequest(HttpMethod method, string path)
+    {
+        var request = new HttpRequestMessage(method, path);
+        request.Headers.TryAddWithoutValidation("InstructorCode", instructorCode);
+        return request;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        lifetime.Cancel();
+        if (realtimeConnection is not null)
+            await realtimeConnection.DisposeAsync();
+        lifetime.Dispose();
+    }
+}

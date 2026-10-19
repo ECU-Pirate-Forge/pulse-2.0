@@ -56,7 +56,10 @@ public class GlobalExceptionMiddlewareTests
 
         var logger = new TestLogger<Pulse.WebApi.Middleware.GlobalExceptionMiddleware>();
 
-        RequestDelegate next = _ => throw new InvalidOperationException("boom");
+        const string studentResponse = "private student response";
+        const string deviceId = "7ed9232b-e5ac-4588-8690-8cc50e4c650c";
+        RequestDelegate next = _ => throw new InvalidOperationException(
+            $"Failed to save {studentResponse} for {deviceId}");
 
         var middleware = new Pulse.WebApi.Middleware.GlobalExceptionMiddleware(next, logger);
 
@@ -80,8 +83,15 @@ public class GlobalExceptionMiddlewareTests
         Assert.NotEmpty(logger.Entries);
         var entry = logger.Entries.Find(e => e.Level == LogLevel.Error);
         Assert.NotNull(entry);
-        Assert.NotNull(entry.Exception);
+        Assert.Null(entry.Exception);
         Assert.Contains("Unhandled exception.", entry.Message);
+        Assert.Contains(nameof(InvalidOperationException), entry.Message);
+        Assert.Contains(nameof(InvokeWhenNextThrowsLogsErrorAndReturns500WithCorrelationId), entry.Message);
+        Assert.Contains(correlationId, entry.Message);
+        Assert.Contains("POST", entry.Message);
+        Assert.Contains("/test/path", entry.Message);
+        Assert.DoesNotContain(studentResponse, entry.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(deviceId, entry.Message, StringComparison.Ordinal);
 
         Assert.NotEmpty(logger.Scopes);
         var scope = logger.Scopes[0] as IDictionary<string, object>;

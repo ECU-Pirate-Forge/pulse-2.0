@@ -1,0 +1,107 @@
+@page "/suggest-question"
+@using System.Net.Http.Json
+@using Pulse.Domain.Entities
+@rendermode InteractiveServer
+@inject HttpClient Http
+
+<PageTitle>Suggest a question | Pulse</PageTitle>
+
+<main id="main-content" class="pulse-page suggestion-page">
+    <header class="suggestion-header">
+        <p class="pulse-eyebrow">Help build the question bank</p>
+        <h1>Suggest a question</h1>
+        <p>No name or account is requested. An instructor reviews every suggestion before it can be used.</p>
+    </header>
+
+    @if (submitted)
+    {
+        <section class="pulse-card suggestion-status" aria-live="polite">
+            <h2>Suggestion received</h2>
+            <p>Your anonymous question is pending instructor review.</p>
+            <button class="pulse-button pulse-button-secondary" @onclick="Reset">Suggest another</button>
+        </section>
+    }
+    else
+    {
+        <form class="pulse-card suggestion-form" @onsubmit="SubmitAsync" @onsubmit:preventDefault>
+            @if (!string.IsNullOrWhiteSpace(error))
+            {
+                <div class="pulse-alert pulse-alert-error" role="alert">@error</div>
+            }
+            <label>Question <textarea data-testid="suggestion-text" @bind="text" rows="3" required></textarea></label>
+            <label>Question type
+                <select @bind="type">
+                    <option value="@QuestionType.MultipleChoice">Multiple choice</option>
+                    <option value="@QuestionType.MultipleAnswer">Multiple answer</option>
+                    <option value="@QuestionType.TrueFalse">True / false</option>
+                    <option value="@QuestionType.Matching">Matching</option>
+                </select>
+            </label>
+            <label>Course <input @bind="course" placeholder="Example: CSCI 3000" /></label>
+            <label>Topic <input @bind="topic" /></label>
+            <label>Tags <input @bind="tags" placeholder="Separate tags with commas" /></label>
+            @if (type is QuestionType.MultipleChoice or QuestionType.MultipleAnswer)
+            {
+                <label>Answer options <textarea @bind="answerData" rows="4" placeholder="One option per line" required></textarea></label>
+            }
+            else if (type == QuestionType.Matching)
+            {
+                <label>Matching pairs <textarea @bind="answerData" rows="4" placeholder="Term = Match, one pair per line" required></textarea></label>
+            }
+            <button class="pulse-button pulse-button-primary" data-testid="submit-suggestion" type="submit" disabled="@isSubmitting">
+                @(isSubmitting ? "Sending..." : "Submit for review")
+            </button>
+        </form>
+    }
+</main>
+
+@code {
+    private string text = string.Empty;
+    private QuestionType type = QuestionType.MultipleChoice;
+    private string course = string.Empty;
+    private string topic = string.Empty;
+    private string tags = string.Empty;
+    private string answerData = string.Empty;
+    private string? error;
+    private bool submitted;
+    private bool isSubmitting;
+
+    private async Task SubmitAsync()
+    {
+        error = null;
+        isSubmitting = true;
+        var lines = SplitLines(answerData);
+        var body = new
+        {
+            Text = text,
+            Type = type,
+            Course = course,
+            Topic = topic,
+            Tags = tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+            Options = type is QuestionType.MultipleChoice or QuestionType.MultipleAnswer ? lines : [],
+            MatchingPairs = type == QuestionType.Matching
+                ? lines.Select(line => line.Split('=', 2, StringSplitOptions.TrimEntries))
+                    .Where(parts => parts.Length == 2)
+                    .Select(parts => new { Prompt = parts[0], Match = parts[1] })
+                    .ToList()
+                : []
+        };
+
+        var response = await Http.PostAsJsonAsync("/api/questionbank/suggestions", body);
+        if (response.IsSuccessStatusCode)
+            submitted = true;
+        else
+            error = await response.Content.ReadAsStringAsync();
+        isSubmitting = false;
+    }
+
+    private void Reset()
+    {
+        text = course = topic = tags = answerData = string.Empty;
+        type = QuestionType.MultipleChoice;
+        submitted = false;
+    }
+
+    private static List<string> SplitLines(string value) =>
+        value.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+}

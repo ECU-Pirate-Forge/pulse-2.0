@@ -2,9 +2,10 @@ using Xunit;
 using Bunit;
 using Moq;
 using Moq.Protected;
-using Pulse.WebApp.Components;
+using Pulse.Admin.Components;
 using FluentAssertions;
 using System.Net;
+using Microsoft.Extensions.Configuration;
 using MudBlazor.Services;
 using Microsoft.Extensions.Configuration;
 

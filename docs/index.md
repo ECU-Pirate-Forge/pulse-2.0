@@ -7,4 +7,5 @@ Welcome to the Pulse documentation.
 - [Architecture](architecture.md)
 - [API Reference](api.md)
 - [Troubleshooting](troubleshooting.md)
+- [Mobile acceptance matrix](mobile-acceptance.md)
 - [Sprint Backlog](sprint-backlog.md)
