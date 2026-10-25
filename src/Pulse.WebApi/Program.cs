@@ -18,17 +18,17 @@ var connectionString = builder.Configuration.GetConnectionString("pulse-db") ?? 
 builder.Services.AddPulseWebApiCoreServices(connectionString);
 
 var useDevTunnels = builder.Configuration.GetValue<bool>("DevTunnels:Enabled");
-const string scalarTunnelCorsPolicy = "ScalarDevTunnel";
-if (useDevTunnels)
-{
-    if (!Uri.TryCreate(builder.Configuration["DevTunnels:ScalarOrigin"], UriKind.Absolute, out var scalarOrigin) ||
-        scalarOrigin.Scheme != "https" || !scalarOrigin.Host.EndsWith(".devtunnels.ms", StringComparison.OrdinalIgnoreCase) ||
-        !scalarOrigin.IsDefaultPort || scalarOrigin.AbsolutePath != "/" || !string.IsNullOrEmpty(scalarOrigin.UserInfo) ||
-        !string.IsNullOrEmpty(scalarOrigin.Query) || !string.IsNullOrEmpty(scalarOrigin.Fragment))
-        throw new InvalidOperationException("DevTunnels:ScalarOrigin must be the HTTPS origin of the Scalar dev tunnel supplied by AppHost.");
-    builder.Services.AddCors(options => options.AddPolicy(scalarTunnelCorsPolicy, policy =>
-        policy.WithOrigins(scalarOrigin.GetLeftPart(UriPartial.Authority)).AllowAnyMethod().AllowAnyHeader()));
-}
+// const string scalarTunnelCorsPolicy = "ScalarDevTunnel";
+// if (useDevTunnels)
+// {
+//     if (!Uri.TryCreate(builder.Configuration["DevTunnels:ScalarOrigin"], UriKind.Absolute, out var scalarOrigin) ||
+//         scalarOrigin.Scheme != "https" || !scalarOrigin.Host.EndsWith(".devtunnels.ms", StringComparison.OrdinalIgnoreCase) ||
+//         !scalarOrigin.IsDefaultPort || scalarOrigin.AbsolutePath != "/" || !string.IsNullOrEmpty(scalarOrigin.UserInfo) ||
+//         !string.IsNullOrEmpty(scalarOrigin.Query) || !string.IsNullOrEmpty(scalarOrigin.Fragment))
+//         throw new InvalidOperationException("DevTunnels:ScalarOrigin must be the HTTPS origin of the Scalar dev tunnel supplied by AppHost.");
+//     builder.Services.AddCors(options => options.AddPolicy(scalarTunnelCorsPolicy, policy =>
+//         policy.WithOrigins(scalarOrigin.GetLeftPart(UriPartial.Authority)).AllowAnyMethod().AllowAnyHeader()));
+// }
 
 //builder.Services.AddOpenApi(options => options.AddDocumentTransformer((document, _, _) =>
 //{
@@ -42,15 +42,15 @@ builder.Services.AddSignalR();
 var app = builder.Build();
 
 app.UseMiddleware<GlobalExceptionMiddleware>();
-if (useDevTunnels)
-    app.UseCors(scalarTunnelCorsPolicy);
+// if (useDevTunnels)
+//     app.UseCors(scalarTunnelCorsPolicy);
 app.UseMiddleware<InstructorCodeMiddleware>();
 app.UsePulseDevTunnels();
 
 if (app.Environment.IsDevelopment())
 {
     //app.MapOpenApi();
-    app.MapScalarApiReference();
+    // app.MapScalarApiReference();
 }
 
 app.MapGet("/", () =>

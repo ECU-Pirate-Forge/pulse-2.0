@@ -110,6 +110,17 @@
     margin-top: 1rem;
 }
 
+.correct-answer-badge {
+    display: inline-block;
+    margin-left: 0.5rem;
+    padding: 0.125rem 0.5rem;
+    color: var(--pulse-purple-900);
+    background: var(--pulse-gold-500);
+    border-radius: var(--pulse-radius-sm);
+    font-size: 0.875rem;
+    font-weight: 700;
+}
+
 .survey-result-row > div {
     display: flex;
     justify-content: space-between;

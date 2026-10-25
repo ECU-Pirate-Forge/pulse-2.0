@@ -4,7 +4,7 @@ namespace Pulse.AppHost.DevTunnels;
 
 public sealed class DevTunnelOptions
 {
-    public static readonly string[] ServiceNames = ["webapi", "webadmin", "webapp", "scalar"];
+    public static readonly string[] ServiceNames = ["webapi", "webadmin", "webapp"]; // "scalar",
 
     public bool Enabled { get; set; }
     public string CliPath { get; set; } = "devtunnel";
@@ -21,9 +21,6 @@ public sealed class DevTunnelOptions
             throw new InvalidOperationException("DevTunnels:CliPath is required.");
         if (StartupTimeoutSeconds <= 0 || ReconnectTimeoutSeconds <= 0)
             throw new InvalidOperationException("DevTunnels startup and reconnect timeouts must be positive.");
-        if (Services.Count != ServiceNames.Length || ServiceNames.Any(name => !Services.ContainsKey(name)))
-            throw new InvalidOperationException(
-                $"DevTunnels:Services must contain exactly: {string.Join(", ", ServiceNames)}.");
 
         foreach (var (name, service) in Services)
         {
@@ -34,9 +31,6 @@ public sealed class DevTunnelOptions
                 throw new InvalidOperationException($"DevTunnels:Services:{name}:Port must be between 1 and 65535.");
         }
 
-        if (Services.Values.Select(s => s.TunnelId).Distinct(StringComparer.Ordinal).Count() != Services.Count ||
-            Services.Values.Select(s => s.Port).Distinct().Count() != Services.Count)
-            throw new InvalidOperationException("DevTunnels service TunnelId and Port values must be unique.");
     }
 }
 

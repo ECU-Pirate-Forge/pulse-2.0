@@ -1,4 +1,5 @@
 using Aspire.Hosting;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Pulse.AppHost;
 using Pulse.AppHost.DevTunnels;
@@ -8,6 +9,21 @@ namespace Pulse.Tests.DevTunnels;
 
 public class DevTunnelWiringTests
 {
+    [Fact]
+    public async Task AppHostUsesLocalOllamaWithoutProvisioningAnOllamaTunnel()
+    {
+        await using var builder = await DistributedApplicationTestingBuilder.CreateAsync(
+            typeof(Projects.Pulse_AppHost), ["--DevTunnels:Enabled=false"],
+            cancellationToken: TestContext.Current.CancellationToken);
+        var api = Assert.IsType<ProjectResource>(builder.Resources.Single(resource => resource.Name == "webapi"));
+        var environment = await ReadEnvironmentAsync(builder, api);
+
+        Assert.Equal("http://localhost:11434/v1", environment["Ollama__BaseUrl"]);
+        Assert.DoesNotContain("ollama", builder.Configuration.GetSection("DevTunnels:Services")
+            .GetChildren().Select(service => service.Key));
+        Assert.DoesNotContain("ollama", DevTunnelOptions.ServiceNames);
+    }
+
     [Fact]
     public async Task DisabledAppHostBuildsExistingGraphWithoutTunnelEnvironment()
     {
@@ -42,7 +58,7 @@ public class DevTunnelWiringTests
         DevTunnelWiring.ConfigureApplication(api, options, manager);
         DevTunnelWiring.ConfigureApplication(app, options, manager);
         DevTunnelWiring.ConfigureApplication(admin, options, manager);
-        DevTunnelWiring.ConfigureScalar(scalar, api, options, manager);
+        //DevTunnelWiring.ConfigureScalar(scalar, api, options, manager);
         await using var application = await builder.BuildAsync(cancellationToken);
 
         foreach (var resource in new[] { api.Resource, app.Resource, admin.Resource })

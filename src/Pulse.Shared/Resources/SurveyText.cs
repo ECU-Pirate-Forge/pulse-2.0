@@ -9,6 +9,7 @@ public static class SurveyText
     private static readonly ResourceManager Resources = new(typeof(SurveyText));
 
     public static string CorrectAnswers => Get(nameof(CorrectAnswers));
+    public static string CorrectAnswer => Get(nameof(CorrectAnswer));
     public static string ResetSurvey => Get(nameof(ResetSurvey));
     public static string ResetConfirmation => Get(nameof(ResetConfirmation));
     public static string ConfirmReset => Get(nameof(ConfirmReset));

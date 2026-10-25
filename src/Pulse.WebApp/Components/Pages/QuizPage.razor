@@ -64,23 +64,22 @@
                     <article class="pulse-card survey-result">
                         <h2>@question.Text</h2>
                         <p>@question.ResponseCount responses</p>
-                        @if (question.CorrectAnswers is { Count: > 0 })
-                        {
-                            <section class="survey-answer-key" aria-label="@SurveyText.CorrectAnswers">
-                                <h3>@SurveyText.CorrectAnswers</h3>
-                                <ul>
-                                    @foreach (var answer in question.CorrectAnswers)
-                                    {
-                                        <li>@answer</li>
-                                    }
-                                </ul>
-                            </section>
-                        }
                         @foreach (var tally in question.Tallies)
                         {
+                            var percentage = question.ResponseCount == 0
+                                ? 0
+                                : (int)Math.Round(tally.Count * 100d / question.ResponseCount);
                             <div class="survey-result-row">
-                                <div><span>@tally.Value</span><strong>@tally.Count</strong></div>
-                                <progress value="@tally.Count" max="@Math.Max(1, question.ResponseCount)"></progress>
+                                <div>
+                                    <span>@tally.Value
+                                        @if (question.CorrectAnswers?.Contains(tally.Value, StringComparer.Ordinal) == true)
+                                        {
+                                            <span class="correct-answer-badge">@SurveyText.CorrectAnswer</span>
+                                        }
+                                    </span>
+                                    <strong>@tally.Count (@percentage%)</strong>
+                                </div>
+                                <progress aria-label="@tally.Value" value="@tally.Count" max="@Math.Max(1, question.ResponseCount)">@percentage%</progress>
                             </div>
                         }
                     </article>

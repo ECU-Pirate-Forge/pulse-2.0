@@ -77,18 +77,20 @@ Current future-work themes:
 ## Local document-grounded question generation
 
 Ollama runs separately from Aspire on the same machine as Pulse.WebApi.
-The defaults are `http://localhost:11434`, `gemma4:latest` for generation,
-and `all-minilm:latest` for embeddings. Install Ollama, then prepare both models:
+The OpenAI-compatible API base URL is `http://localhost:11434/v1`, with `gemma4:latest` for generation
+and `embeddinggemma:latest` for embeddings. Install Ollama, then prepare both models:
 
 ```powershell
 ollama pull gemma4:latest
-ollama pull all-minilm:latest
+ollama pull embeddinggemma:latest
 ollama serve
 ```
 
 If the Ollama desktop service is already running, do not start a second server.
 Settings are in `src/Pulse.WebApi/appsettings.json`; environment overrides are
 `Ollama__BaseUrl`, `Ollama__Model`, and `Ollama__EmbeddingModel`.
+AppHost passes its `Ollama:BaseUrl` to the API. Ollama is not exposed or checked
+through a dev tunnel; generation uses `/v1/chat/completions` and `/v1/embeddings`.
 Only loopback HTTP/HTTPS inference endpoints are accepted. No cloud inference
 or embedding service is used.
 
@@ -110,6 +112,11 @@ Embeddings are computed locally during generation. Retrieval selects up to
 it does not promise exhaustive coverage of every document. Changing saved
 grounding invalidates previews; previews expire after one hour. Approving a
 preview is transactional and cannot insert that batch twice.
+
+The model selects a retrieved passage by ID rather than transcribing a quote.
+The server rejects missing or unknown passage IDs and copies the original passage
+into the citation, preserving code, punctuation, and whitespace exactly.
+Instructors must still verify that the cited passage supports the answer.
 
 Generation has a five-minute inference timeout and does not automatically
 retry POST requests. Missing models, invalid output, unsupported documents,

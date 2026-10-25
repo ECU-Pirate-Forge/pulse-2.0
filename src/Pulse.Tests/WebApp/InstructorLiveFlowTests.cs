@@ -66,13 +66,45 @@ public class InstructorLiveFlowTests : BunitContext
     }
 
     [Fact]
-    public async Task SurveyLive_ShowsCorrectAnswerWithoutAResponseForIt()
+    public async Task SurveyLive_ShowsEveryOptionPercentageAndMarksCorrectAnswerInline()
     {
         await PrepareSurveyAsync(new SurveyLiveHandler());
 
         var cut = Render<SurveyLive>(parameters => parameters.Add(page => page.SessionId, SurveyLiveHandler.SessionId));
 
-        Assert.Equal("B", cut.WaitForElement(".survey-answer-key li").TextContent);
+        cut.WaitForElement(".correct-answer-badge");
+        var rows = cut.FindAll(".result-row");
+        Assert.Equal(3, rows.Count);
+        Assert.Contains("3 (100%)", rows[0].TextContent);
+        Assert.Contains("0 (0%)", rows[1].TextContent);
+        Assert.Contains("B", rows[1].TextContent);
+        Assert.Equal("Correct answer", rows[1].QuerySelector(".correct-answer-badge")!.TextContent);
+        Assert.Contains("C", rows[2].TextContent);
+        Assert.Empty(rows[0].QuerySelectorAll(".correct-answer-badge"));
+        Assert.Empty(rows[2].QuerySelectorAll(".correct-answer-badge"));
+        Assert.Empty(cut.FindAll(".survey-answer-key"));
+    }
+
+    [Fact]
+    public async Task SurveyLive_WithoutResponsesShowsZeroPercentages()
+    {
+        await PrepareSurveyAsync(new SurveyLiveHandler { ResetCalled = true });
+        var cut = Render<SurveyLive>(parameters => parameters.Add(page => page.SessionId, SurveyLiveHandler.SessionId));
+
+        cut.WaitForElement(".correct-answer-badge");
+
+        Assert.All(cut.FindAll(".result-row strong"), count => Assert.Equal("0 (0%)", count.TextContent));
+    }
+
+    [Theory]
+    [InlineData(1, 3, "1 (33%)")]
+    [InlineData(2, 3, "2 (67%)")]
+    public async Task SurveyLive_PercentagesUseQuestionRespondents(int selections, int responses, string expected)
+    {
+        await PrepareSurveyAsync(new SurveyLiveHandler { Selections = selections, Responses = responses });
+        var cut = Render<SurveyLive>(parameters => parameters.Add(page => page.SessionId, SurveyLiveHandler.SessionId));
+
+        Assert.Equal(expected, cut.WaitForElement(".result-row strong").TextContent);
     }
 
     [Fact]
@@ -94,7 +126,7 @@ public class InstructorLiveFlowTests : BunitContext
         var cut = Render<SurveyLive>(parameters => parameters.Add(page => page.SessionId, SurveyLiveHandler.SessionId));
         cut.WaitForElement(".live-actions").QuerySelectorAll("button").Single(button => button.TextContent == "Reset survey").Click();
 
-        cut.Find("[role='alertdialog']").QuerySelectorAll("button").Single(button => button.TextContent == "Cancel").Click();
+        cut.WaitForElement("[role='alertdialog']").QuerySelectorAll("button").Single(button => button.TextContent == "Cancel").Click();
 
         Assert.False(handler.ResetCalled);
     }
@@ -107,7 +139,7 @@ public class InstructorLiveFlowTests : BunitContext
         var cut = Render<SurveyLive>(parameters => parameters.Add(page => page.SessionId, SurveyLiveHandler.SessionId));
         cut.WaitForElement(".live-actions").QuerySelectorAll("button").Single(button => button.TextContent == "Reset survey").Click();
 
-        cut.Find("[data-testid='confirm-reset']").Click();
+        cut.WaitForElement("[data-testid='confirm-reset']").Click();
 
         cut.WaitForAssertion(() => Assert.Equal(InstructorCode, handler.InstructorCode));
     }
@@ -120,7 +152,7 @@ public class InstructorLiveFlowTests : BunitContext
         var cut = Render<SurveyLive>(parameters => parameters.Add(page => page.SessionId, SurveyLiveHandler.SessionId));
         cut.WaitForElement(".live-actions").QuerySelectorAll("button").Single(button => button.TextContent == "Reset survey").Click();
 
-        cut.Find("[data-testid='confirm-reset']").Click();
+        cut.WaitForElement("[data-testid='confirm-reset']").Click();
 
         cut.WaitForAssertion(() => Assert.All(cut.FindAll(".live-stat strong"), count => Assert.Equal("0", count.TextContent)));
     }
@@ -312,7 +344,9 @@ public class InstructorLiveFlowTests : BunitContext
     {
         public static readonly Guid SessionId = Guid.NewGuid();
         public bool RevealCalled { get; private set; }
-        public bool ResetCalled { get; private set; }
+        public bool ResetCalled { get; set; }
+        public int Selections { get; init; } = 3;
+        public int Responses { get; init; } = 3;
         public string? InstructorCode { get; private set; }
 
         protected override Task<HttpResponseMessage> SendAsync(
@@ -331,8 +365,9 @@ public class InstructorLiveFlowTests : BunitContext
                         Guid.NewGuid(),
                         "Live question",
                         "MultipleChoice",
-                        [new OptionTallyResponse("A", ResetCalled ? 0 : 3)],
-                        ResetCalled ? 0 : 3,
+                        [new OptionTallyResponse("A", ResetCalled ? 0 : Selections),
+                         new OptionTallyResponse("B", 0), new OptionTallyResponse("C", 0)],
+                        ResetCalled ? 0 : Responses,
                         ["B"])])));
             }
 

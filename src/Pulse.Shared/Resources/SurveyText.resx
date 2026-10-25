@@ -5,6 +5,7 @@
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
   <data name="CorrectAnswers" xml:space="preserve"><value>Correct answers</value></data>
+  <data name="CorrectAnswer" xml:space="preserve"><value>Correct answer</value></data>
   <data name="ResetSurvey" xml:space="preserve"><value>Reset survey</value></data>
   <data name="ResetConfirmation" xml:space="preserve"><value>Clear all responses and reopen this survey? Questions, answer keys, and the join code will be kept. Results will be hidden for the new run.</value></data>
   <data name="ConfirmReset" xml:space="preserve"><value>Clear responses and reopen</value></data>

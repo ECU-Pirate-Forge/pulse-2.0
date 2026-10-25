@@ -48,24 +48,38 @@ public class ResponseAggregationService
         if (question.Id == Guid.Empty)
             return AggregationResult.Failure("Question ID is invalid.");
 
-        var values = _repo.GetByQuestionId(question.Id)
-            .SelectMany(response => DecodeValues(response.Value))
+        var responses = _repo.GetByQuestionId(question.Id).ToList();
+        var values = responses
+            .SelectMany(response => DecodeValues(response.Value)
+                .Select(value => (Value: value, response.DeviceId)))
             .ToList();
 
         if (question.Type == QuestionType.Matching)
         {
-            var responses = _repo.GetByQuestionId(question.Id).ToList();
             values = responses.SelectMany(response =>
             {
                 var matches = DecodeValues(response.Value);
                 return question.MatchingPairs.Select((pair, index) =>
-                    $"{pair.Prompt}: {matches.ElementAtOrDefault(index) ?? string.Empty}");
-            }).Where(value => !value.EndsWith(": ", StringComparison.Ordinal)).ToList();
+                    (Value: $"{pair.Prompt}: {matches.ElementAtOrDefault(index) ?? string.Empty}", response.DeviceId));
+            }).Where(item => !item.Value.EndsWith(": ", StringComparison.Ordinal)).ToList();
         }
 
-        return AggregationResult.Success(values
-            .GroupBy(value => value)
-            .Select(group => new QuestionTally(group.Key, group.Count()))
+        var counts = values
+            .GroupBy(item => item.Value, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key,
+                group => group.Select(item => item.DeviceId).Distinct(StringComparer.Ordinal).Count(),
+                StringComparer.Ordinal);
+        IEnumerable<string> options = question.Type switch
+        {
+            QuestionType.TrueFalse => ["True", "False"],
+            QuestionType.Matching => question.MatchingPairs.SelectMany(pair =>
+                question.MatchingPairs.Select(choice => $"{pair.Prompt}: {choice.Match}")),
+            _ => question.Options
+        };
+
+        return AggregationResult.Success(options.Concat(counts.Keys)
+            .Distinct(StringComparer.Ordinal)
+            .Select(option => new QuestionTally(option, counts.GetValueOrDefault(option)))
             .ToList());
     }
 

@@ -98,7 +98,7 @@ public class SurveyPageTests : BunitContext
         {
             Assert.Contains("Results revealed", cut.Markup);
             Assert.Contains("A", cut.Markup);
-            Assert.Contains(">1<", cut.Markup);
+            Assert.Contains("1 (100%)", cut.Markup);
             Assert.DoesNotContain("results are currently hidden", cut.Markup, StringComparison.OrdinalIgnoreCase);
         });
     }
@@ -113,6 +113,7 @@ public class SurveyPageTests : BunitContext
         cut.WaitForElement("[data-testid='submit-survey']");
 
         Assert.Empty(cut.FindAll(".survey-answer-key"));
+        Assert.Empty(cut.FindAll(".correct-answer-badge"));
     }
 
     [Fact]
@@ -127,6 +128,7 @@ public class SurveyPageTests : BunitContext
         cut.WaitForAssertion(() => Assert.Contains("Survey submitted", cut.Markup));
 
         Assert.Empty(cut.FindAll(".survey-answer-key"));
+        Assert.Empty(cut.FindAll(".correct-answer-badge"));
     }
 
     [Fact]
@@ -139,7 +141,34 @@ public class SurveyPageTests : BunitContext
 
         cut.Find("[data-testid='submit-survey']").Click();
 
-        Assert.Equal("B", cut.WaitForElement(".survey-answer-key li").TextContent);
+        cut.WaitForElement(".correct-answer-badge");
+        var rows = cut.FindAll(".survey-result-row");
+        Assert.Equal(2, rows.Count);
+        Assert.Contains("1 (100%)", rows[0].TextContent);
+        Assert.Empty(rows[0].QuerySelectorAll(".correct-answer-badge"));
+        Assert.Contains("B", rows[1].TextContent);
+        Assert.Contains("0 (0%)", rows[1].TextContent);
+        Assert.Equal("Correct answer", rows[1].QuerySelector(".correct-answer-badge")!.TextContent);
+        Assert.Empty(cut.FindAll(".survey-answer-key"));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RevealedResults_MarksOnlyConfiguredCorrectOptions(bool hasAnswerKey)
+    {
+        var question = SingleQuestion();
+        question.CorrectAnswers = hasAnswerKey ? ["A", "B"] : [];
+        var handler = new SurveyHandler(_sessionId, [question]) { RevealResults = true };
+        Services.AddSingleton(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+        var cut = Render<QuizPage>(parameters => parameters.Add(page => page.JoinCode, "ABC123"));
+        cut.WaitForElement("input[value='A']").Change("A");
+
+        cut.Find("[data-testid='submit-survey']").Click();
+
+        cut.WaitForElement(".survey-result-row");
+        Assert.Equal(hasAnswerKey ? 2 : 0, cut.FindAll(".correct-answer-badge").Count);
+        Assert.Empty(cut.FindAll(".survey-answer-key"));
     }
 
     [Theory]
@@ -306,7 +335,7 @@ public class SurveyPageTests : BunitContext
                                     questions[0].Id,
                                     questions[0].Text,
                                     questions[0].Type.ToString(),
-                                    [new OptionTallyResponse("A", 1)],
+                                    questions[0].Options.Select(option => new OptionTallyResponse(option, option == "A" ? 1 : 0)).ToList(),
                                     1,
                                     questions[0].CorrectAnswers)
                             ], ResetVersion))

@@ -60,6 +60,8 @@ public class StudentResultsEndpointTests
         var ok = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.Ok<StudentSurveyResultsResponse>>(result);
         Assert.Equal(1, ok.Value!.Questions.Single().Tallies.Single(tally => tally.Value == "A").Count);
         Assert.Equal(1, ok.Value.Questions.Single().Tallies.Single(tally => tally.Value == "C").Count);
+        Assert.Equal(0, ok.Value.Questions.Single().Tallies.Single(tally => tally.Value == "B").Count);
+        Assert.Equal(1, ok.Value.Questions.Single().ResponseCount);
     }
 
     [Fact]

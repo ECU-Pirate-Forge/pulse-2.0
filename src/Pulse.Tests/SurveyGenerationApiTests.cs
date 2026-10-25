@@ -83,14 +83,21 @@ public class SurveyGenerationApiTests
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add("InstructorCode", "INST");
         var sessionId = await CreateSession(client);
+        const string sourceText = "Photosynthesis converts light energy to chemical energy.";
         (await client.PutAsJsonAsync($"/api/sessions/{sessionId}/grounding/context",
-            new { additionalContext = "Photosynthesis converts light energy to chemical energy." })).EnsureSuccessStatusCode();
+            new { additionalContext = sourceText })).EnsureSuccessStatusCode();
 
         using var response = await client.PostAsJsonAsync($"/api/sessions/{sessionId}/questions/generate", new { count = 2 });
         response.EnsureSuccessStatusCode();
         var preview = await response.Content.ReadFromJsonAsync<JsonElement>();
         var id = preview.GetProperty("id").GetGuid();
         Assert.Equal(2, preview.GetProperty("questions").GetArrayLength());
+        Assert.All(preview.GetProperty("questions").EnumerateArray(), question =>
+        {
+            Assert.Equal("context:1", question.GetProperty("sourceId").GetString());
+            Assert.Equal(sourceText, question.GetProperty("sourceQuote").GetString());
+            Assert.False(question.TryGetProperty("passageId", out _));
+        });
         Assert.Equal("[]", await client.GetStringAsync($"/api/sessions/{sessionId}/questions/instructor"));
 
         using var accepted = await client.PostAsync($"/api/sessions/{sessionId}/questions/generated/{id}/accept", null);
@@ -98,7 +105,11 @@ public class SurveyGenerationApiTests
         var questions = await accepted.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(2, questions.GetArrayLength());
         Assert.Equal("Light", questions[0].GetProperty("correctAnswers")[0].GetString());
-        Assert.NotEmpty(questions[0].GetProperty("sourceQuote").GetString()!);
+        Assert.All(questions.EnumerateArray(), question =>
+        {
+            Assert.Equal("context:1", question.GetProperty("sourceId").GetString());
+            Assert.Equal(sourceText, question.GetProperty("sourceQuote").GetString());
+        });
         using var duplicate = await client.PostAsync($"/api/sessions/{sessionId}/questions/generated/{id}/accept", null);
         Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
         Assert.Equal(2, (await client.GetFromJsonAsync<JsonElement>($"/api/sessions/{sessionId}/questions/instructor")).GetArrayLength());

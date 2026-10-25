@@ -258,7 +258,9 @@ sequenceDiagram
 
 ## Local document-grounded question generation
 
-Ollama runs independently on the API host at `http://localhost:11434`.
+Ollama runs independently on the API host with OpenAI-compatible base URL
+`http://localhost:11434/v1`. AppHost passes this configuration to the API;
+Ollama is not part of dev tunnel provisioning or public readiness checks.
 `gemma4:latest` generates structured multiple-choice questions and
 `all-minilm:latest` embeds grounding passages. No new Aspire resource or cloud
 service is required. The feature is grouped under
@@ -268,7 +270,11 @@ ownership, draft lifecycle, question persistence, and instructor UI.
 Original documents and extracted text are stored with a grounding revision in
 LiteDB. Generation embeds overlapping chunks, ranks them by cosine similarity,
 and selects at most 12 passages, reserving coverage for every document.
-Question count, choices, answer keys, and exact source quotes are validated.
+The model returns a `passageId` referencing one of those selected chunks, not a
+model-written quote. The server validates the ID and populates the existing
+`SourceId` and `SourceQuote` fields from the original chunk ID and text.
+Question count, choices, and answer keys remain validated. Citation text is
+verbatim by construction; instructors still review whether it supports the answer.
 Previews are server-stored and expire after one hour; approval is transactional.
 Student APIs project questions without answer keys, explanations, or citations.
 
@@ -285,12 +291,12 @@ sequenceDiagram
         API->>DB: Persist original documents, extracted text, revision
         IB->>API: POST /api/sessions/{id}/questions/generate\n{count}
         API->>AiSvc: GenerateAsync(material, title, count)
-        AiSvc->>OL: POST /api/embed (chunks and query)
+        AiSvc->>OL: POST /v1/embeddings (chunks and query)
         OL-->>AiSvc: Local embeddings
         Note over AiSvc: Retrieve relevant passages
-        AiSvc->>OL: POST /api/chat (gemma4:latest, JSON schema)
-        OL-->>AiSvc: Questions, choices, answer keys, citations
-        Note over AiSvc: Validate exact count and source quotes
+        AiSvc->>OL: POST /v1/chat/completions (gemma4:latest, JSON schema)
+        OL-->>AiSvc: Questions, choices, answer keys, passage IDs
+        Note over AiSvc: Validate questions and passage IDs; copy original citations
         AiSvc-->>API: Validated questions
         API->>DB: Store preview with grounding revision
         API-->>IB: 200 preview ID and questions

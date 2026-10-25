@@ -254,6 +254,14 @@ Response codes:
 
 Get aggregated results for all questions in a session.
 
+Tallies include every configured option in authored order, including zero counts.
+True/false questions include both choices; matching questions include each
+prompt/choice combination. Counts represent distinct students selecting an option.
+Both instructor monitoring and student-revealed results display each count and
+its percentage of students who answered that question (0% before any responses).
+Multi-select percentages may total more than 100%. Correct options are marked
+inline using `correctAnswers`, without a second copy of the answer key.
+
 Protected: Yes (InstructorCode required)
 
 Response 200 shape:

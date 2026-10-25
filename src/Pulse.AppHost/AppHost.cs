@@ -10,6 +10,12 @@ using Pulse.AppHost;
 
 var builder = DistributedApplication.CreateBuilder(args);
 var publicJoinBaseUrl = builder.Configuration["Pulse:PublicJoinBaseUrl"];
+var ollamaBaseUrl = builder.Configuration["Ollama:BaseUrl"];
+var ollamaModel = builder.Configuration["Ollama:Model"];
+var ollamaEmbeddingModel = builder.Configuration["Ollama:EmbeddingModel"];
+var securityInstructorCode = builder.Configuration["Security:InstructorCode"];
+var securityAdminCode = builder.Configuration["Security:AdminCode"];
+var pulseDbConnectionString = builder.Configuration.GetConnectionString("pulse-db");
 
 if (!string.IsNullOrWhiteSpace(publicJoinBaseUrl))
     publicJoinBaseUrl = PublicJoinUrl.Normalize(publicJoinBaseUrl);
@@ -26,40 +32,44 @@ if (!string.IsNullOrWhiteSpace(publicJoinBaseUrl))
     await tunnels.PrepareAsync(CancellationToken.None);
 
     builder.AddProject<Projects.Pulse_MigrationManager>("migration");
+
     var webapi = builder.AddProject<Projects.Pulse_WebApi>("webapi")
+        .WithEnvironment("ConnectionStrings__pulse-db", pulseDbConnectionString)
+        .WithEnvironment("Security__InstructorCode", securityInstructorCode)
+        .WithEnvironment("Security__AdminCode", securityAdminCode)
+        .WithEnvironment("Ollama__BaseUrl", ollamaBaseUrl)
+        .WithEnvironment("Ollama__Model", ollamaModel)
+        .WithEnvironment("Ollama__EmbeddingModel", ollamaEmbeddingModel)
         .WithExternalHttpEndpoints()
         .WithHttpHealthCheck("/health");
+
     var webadmin = builder.AddProject<Projects.Pulse_Admin>("webadmin")
         .WaitFor(webapi)
         .WithReference(webapi)
         .WithExternalHttpEndpoints()
         .WithHttpHealthCheck("/health");
+
     var webapp = builder.AddProject<Projects.Pulse_WebApp>("webapp")
         .WaitFor(webapi)
         .WithReference(webapi)
         .WithExternalHttpEndpoints()
         .WithHttpHealthCheck("/health");
-    var scalar = builder.AddScalarApiReference(scalarOptions =>
-    {
-        if (options.Enabled)
-            scalarOptions.DisableDefaultProxy();
-    });
+
+    var scalar = builder.AddScalarApiReference("scalar");
+    scalar.WithApiReference(webapi)
+        .WithExternalHttpEndpoints()
+        .WaitFor(webapi);
 
     if (options.Enabled)
     {
         DevTunnelWiring.ConfigureApplication(webapi, options, tunnels);
         DevTunnelWiring.ConfigureApplication(webadmin, options, tunnels);
         DevTunnelWiring.ConfigureApplication(webapp, options, tunnels);
-        DevTunnelWiring.ConfigureScalar(scalar, webapi, options, tunnels);
         builder.Services.AddHealthChecks().AddCheck("pulse-dev-tunnels", () =>
             tunnels.IsHealthy ? HealthCheckResult.Healthy() : HealthCheckResult.Unhealthy("Public tunnels are not verified or connectivity is recovering."));
         builder.AddResource(new DevTunnelWiring.DevTunnelStatusResource("dev-tunnels"))
             .WithInitialState(new() { ResourceType = "DevTunnels", State = KnownResourceStates.Running, Properties = [] })
             .WithHealthCheck("pulse-dev-tunnels");
-    }
-    else
-    {
-        scalar.WithApiReference(webapi);
     }
 
     await using var app = builder.Build();
