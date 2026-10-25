@@ -4,6 +4,7 @@
 @using System.Net.Http.Json
 @using Pulse.Shared.Contracts.V1
 @using Pulse.Shared.Models
+@using Pulse.Shared.Components
 @rendermode InteractiveServer
 @implements IDisposable
 @inject NavigationManager NavManager
@@ -40,7 +41,7 @@
                             <MudText Typo="Typo.h4" data-testid="live-title">@_form.Title</MudText>
                             @if (!string.IsNullOrWhiteSpace(_form.Description))
                             {
-                                <MudText Typo="Typo.body2" Class="mud-text-secondary">@_form.Description</MudText>
+                                <div class="mud-text-secondary"><MarkdownContent Text="@_form.Description" /></div>
                             }
                         </div>
                         <MudSpacer />
@@ -80,7 +81,7 @@
                                     <th>Submitted</th>
                                     @foreach (var field in OrderedFields)
                                     {
-                                        <th>@field.Label</th>
+                                        <th><MarkdownContent Text="@field.Label" /></th>
                                     }
                                 </tr>
                             </thead>

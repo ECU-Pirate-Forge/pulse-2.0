@@ -3,6 +3,7 @@
 @using System.Net.Http.Json
 @using Pulse.Shared.Contracts.V1
 @using Pulse.Shared.Models
+@using Pulse.Shared.Components
 @rendermode InteractiveServer
 @inject HttpClient Http
 
@@ -34,7 +35,7 @@
             <h1 data-testid="form-title">@form.Title</h1>
             @if (!string.IsNullOrWhiteSpace(form.Description))
             {
-                <p>@form.Description</p>
+                <MarkdownContent Text="@form.Description" />
             }
 
             @if (!string.IsNullOrWhiteSpace(submitError))
@@ -47,28 +48,29 @@
                 {
                     var key = field.Id.ToString();
                     var inputId = $"field-{key}";
+                    var labelId = $"{inputId}-label";
                     <div class="form-field" style="display:flex;flex-direction:column;gap:.25rem;margin-bottom:1rem;">
+                        <div id="@labelId">
+                            <MarkdownContent Text="@field.Label" />
+                            @RequiredMark(field)
+                        </div>
                         @if (field.FieldType == FormFieldType.Checkbox)
                         {
-                            <label for="@inputId">
-                                <input id="@inputId" type="checkbox" data-field="@key"
-                                       checked="@(GetValue(key) == "true")"
-                                       @onchange="e => SetCheckbox(key, e.Value)" />
-                                @field.Label @RequiredMark(field)
-                            </label>
+                            <input id="@inputId" type="checkbox" data-field="@key" aria-labelledby="@labelId"
+                                   checked="@(GetValue(key) == "true")"
+                                   @onchange="e => SetCheckbox(key, e.Value)" />
                         }
                         else
                         {
-                            <label for="@inputId">@field.Label @RequiredMark(field)</label>
                             @switch (field.FieldType)
                             {
                                 case FormFieldType.TextArea:
-                                    <textarea id="@inputId" data-field="@key" rows="4" placeholder="@field.Placeholder"
+                                    <textarea id="@inputId" data-field="@key" aria-labelledby="@labelId" rows="4" placeholder="@field.Placeholder"
                                               value="@GetValue(key)" @onchange="e => SetValue(key, e.Value?.ToString())"></textarea>
                                     break;
                                 case FormFieldType.Dropdown:
                                 case FormFieldType.YesNo:
-                                    <select id="@inputId" data-field="@key" value="@GetValue(key)"
+                                    <select id="@inputId" data-field="@key" aria-labelledby="@labelId" value="@GetValue(key)"
                                             @onchange="e => SetValue(key, e.Value?.ToString())">
                                         <option value="">Select…</option>
                                         @foreach (var option in field.Options)
@@ -78,7 +80,7 @@
                                     </select>
                                     break;
                                 default:
-                                    <input id="@inputId" data-field="@key" type="@InputType(field.FieldType)"
+                                    <input id="@inputId" data-field="@key" aria-labelledby="@labelId" type="@InputType(field.FieldType)"
                                            placeholder="@field.Placeholder" value="@GetValue(key)"
                                            @onchange="e => SetValue(key, e.Value?.ToString())" />
                                     break;

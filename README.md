@@ -37,6 +37,26 @@ survey matches. Trivia codes continue to `/trivia/{code}` with the game already
 loaded; students enter a display name and, for team games, select a team.
 Students can also enter their game code directly on `/trivia`.
 
+### Markdown in forms
+
+Form descriptions and field labels (questions) accept standard CommonMark Markdown,
+including **bold**, *italic*, headings, lists, links, images, block quotes, and code
+blocks. Enter Markdown directly in the form editor's description and label inputs;
+it renders on participant forms and in instructor monitoring. For example:
+
+```markdown
+## Before you begin
+
+- Read the [instructions](https://example.com).
+- Tell us **what you learned**.
+```
+
+Existing plain text continues to work. Raw HTML is displayed as text, and unsafe
+link/image destinations (such as `javascript:` and `data:` URLs) are not rendered
+as links or images. Titles, placeholders, dropdown options, submitted answers, and
+survey/trivia prompts remain plain text. Existing description and label length
+limits still apply, and exports retain the original Markdown source.
+
 ## Fully Implemented Features
 
 The following are currently implemented in this repository (and covered by project tests):

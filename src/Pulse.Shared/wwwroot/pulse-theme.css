@@ -199,6 +199,37 @@ a:hover {
     font-size: 0.875rem;
 }
 
+.pulse-markdown {
+    overflow-wrap: anywhere;
+}
+
+.pulse-markdown > :first-child {
+    margin-top: 0;
+}
+
+.pulse-markdown > :last-child {
+    margin-bottom: 0;
+}
+
+.pulse-markdown ul,
+.pulse-markdown ol {
+    padding-left: 1.5rem;
+    list-style: revert;
+}
+
+.pulse-markdown pre {
+    max-width: 100%;
+    overflow-x: auto;
+    padding: 0.75rem;
+    background: var(--pulse-purple-50);
+    border-radius: var(--pulse-radius-sm);
+}
+
+.pulse-markdown img {
+    max-width: 100%;
+    height: auto;
+}
+
 @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
