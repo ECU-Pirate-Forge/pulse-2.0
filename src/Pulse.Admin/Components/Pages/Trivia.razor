@@ -94,7 +94,7 @@
             @foreach (var question in control.Questions)
             {
                 <div class="trivia-question-row">
-                    <span>@question.Text</span>
+                    <Pulse.Shared.Components.MarkdownContent Text="@question.Text" />
                     <button class="pulse-button pulse-button-secondary" @onclick="() => OpenQuestionAsync(question.Id)">Open question</button>
                 </div>
             }

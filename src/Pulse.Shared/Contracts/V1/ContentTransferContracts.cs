@@ -29,6 +29,7 @@ public sealed class PortableQuestion
     public string Topic { get; init; } = string.Empty;
     public List<string> Tags { get; init; } = [];
     public bool TriviaEligible { get; init; }
+    public bool IsDraft { get; init; }
     public string ModerationStatus { get; init; } = "Approved";
 }
 

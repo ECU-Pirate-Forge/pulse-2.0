@@ -3,6 +3,7 @@
 @using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
 @using Pulse.Domain.Entities
 @using Pulse.Shared.Models
+@using Pulse.Shared.Components
 @rendermode InteractiveServer
 @inject HttpClient Http
 @inject NavigationManager Navigation
@@ -28,7 +29,8 @@
     <section class="pulse-card bank-create" aria-labelledby="create-bank-title">
         <h2 id="create-bank-title">Add an instructor question</h2>
         <div class="bank-form-grid">
-            <label>Question <textarea @bind="draft.Text" rows="3"></textarea></label>
+            <label>Question (Markdown) <textarea @bind="draft.Text" @bind:event="oninput" rows="3"></textarea></label>
+            <MarkdownContent Text="@draft.Text" />
             <label>Type
                 <select @bind="draft.Type">
                     <option value="@QuestionType.MultipleChoice">Multiple choice</option>
@@ -42,19 +44,35 @@
             <label>Tags <input @bind="draft.TagsText" placeholder="security, web" /></label>
             @if (draft.Type is QuestionType.MultipleChoice or QuestionType.MultipleAnswer)
             {
-                <label class="bank-wide">Options <textarea @bind="draft.OptionsText" rows="3" placeholder="One option per line"></textarea></label>
+                @for (var i = 0; i < draft.Options.Count; i++)
+                {
+                    var index = i;
+                    <label>Choice @(index + 1) (Markdown) <textarea value="@draft.Options[index]" @oninput="args => SetChoice(draft.Options, draft.CorrectAnswers, index, args.Value?.ToString() ?? string.Empty)" rows="3"></textarea>
+                        <MarkdownContent Text="@draft.Options[index]" />
+                        <button type="button" @onclick="() => RemoveChoice(draft.Options, draft.CorrectAnswers, index)">Remove choice</button>
+                    </label>
+                }
+                <button type="button" @onclick='() => draft.Options.Add(string.Empty)'>Add choice</button>
             }
             else if (draft.Type == QuestionType.Matching)
             {
                 <label class="bank-wide">Pairs <textarea @bind="draft.OptionsText" rows="3" placeholder="HTTP = Protocol"></textarea></label>
             }
             <label><span><input type="checkbox" @bind="draft.TriviaEligible" /> Eligible for trivia</span></label>
-            @if (draft.TriviaEligible)
+            @if (draft.Type is QuestionType.MultipleChoice or QuestionType.MultipleAnswer or QuestionType.TrueFalse)
             {
-                <label>Correct answers <input @bind="draft.CorrectAnswersText" placeholder="Separate answers with commas" /></label>
+                <div>Correct answers
+                    @foreach (var choice in draft.Type == QuestionType.TrueFalse ? new List<string> { "True", "False" } : draft.Options.Where(option => !string.IsNullOrWhiteSpace(option)).ToList())
+                    {
+                        <label><input type="checkbox" checked="@draft.CorrectAnswers.Contains(choice)" @onchange="() => ToggleAnswer(draft.CorrectAnswers, choice)" />
+                            <MarkdownContent Text="@choice" />
+                        </label>
+                    }
+                </div>
             }
         </div>
-        <button class="pulse-button pulse-button-primary" @onclick="CreateAsync">Add approved question</button>
+        <button class="pulse-button pulse-button-primary" @onclick="() => CreateAsync(false)">Add approved question</button>
+        <button class="pulse-button pulse-button-secondary" @onclick="() => CreateAsync(true)">Save as draft</button>
     </section>
 
     <section class="pulse-card bank-filters" aria-labelledby="filter-title">
@@ -67,6 +85,7 @@
             <label>Status
                 <select @bind="status">
                     <option value="">All statuses</option>
+                    <option value="Draft">Draft</option>
                     <option value="Pending">Pending</option>
                     <option value="Approved">Approved</option>
                     <option value="Rejected">Rejected</option>
@@ -98,10 +117,11 @@
             {
                 <article class="pulse-card bank-item">
                     <div class="bank-item-heading">
-                        <span class="status-chip status-@item.ModerationStatus.ToString().ToLowerInvariant()">@item.ModerationStatus</span>
+                        <span class="status-chip status-@(item.IsDraft ? "draft" : item.ModerationStatus.ToString().ToLowerInvariant())">@(item.IsDraft ? "Draft" : item.ModerationStatus.ToString())</span>
                         <span>@item.Source</span>
                     </div>
-                    <label>Question <textarea @bind="item.Text" rows="2"></textarea></label>
+                    <label>Question (Markdown) <textarea @bind="item.Text" @bind:event="oninput" rows="2"></textarea></label>
+                    <MarkdownContent Text="@item.Text" />
                     <div class="bank-taxonomy">
                         <label>Course <input @bind="item.Course" /></label>
                         <label>Topic <input @bind="item.Topic" /></label>
@@ -109,21 +129,59 @@
                     </div>
                     <p><strong>@item.Type</strong> · @item.ContributorAttribution</p>
                     <label><span><input type="checkbox" @bind="item.TriviaEligible" /> Eligible for trivia</span></label>
-                    @if (item.TriviaEligible)
+                    @if (item.Type is QuestionType.MultipleChoice or QuestionType.MultipleAnswer or QuestionType.TrueFalse)
                     {
-                        <label>Correct answers <input value="@string.Join(", ", item.CorrectAnswers)" @onchange="args => SetCorrectAnswers(item, args.Value?.ToString())" /></label>
+                        <div>Correct answers
+                            @foreach (var choice in item.Type == QuestionType.TrueFalse ? new List<string> { "True", "False" } : item.Options.Where(option => !string.IsNullOrWhiteSpace(option)).ToList())
+                            {
+                                <label><input type="checkbox" checked="@item.CorrectAnswers.Contains(choice)" @onchange="() => ToggleAnswer(item.CorrectAnswers, choice)" />
+                                    <MarkdownContent Text="@choice" />
+                                </label>
+                            }
+                        </div>
                     }
+                    <label>Explanation <textarea @bind="item.Explanation" rows="2"></textarea></label>
                     @if (item.Options.Count > 0)
                     {
-                        <p>@string.Join(" · ", item.Options)</p>
+                        @for (var i = 0; i < item.Options.Count; i++)
+                        {
+                            var index = i;
+                            <label>Choice @(index + 1) (Markdown)
+                                <textarea class="bank-option" value="@item.Options[index]" @oninput="args => SetChoice(item.Options, item.CorrectAnswers, index, args.Value?.ToString() ?? string.Empty)" rows="3"></textarea>
+                            </label>
+                            <MarkdownContent Text="@item.Options[index]" />
+                            <button type="button" @onclick="() => RemoveChoice(item.Options, item.CorrectAnswers, index)">Remove choice</button>
+                        }
+                    }
+                    @if (item.Type is QuestionType.MultipleChoice or QuestionType.MultipleAnswer)
+                    {
+                        <button type="button" @onclick="() => item.Options.Add(string.Empty)">Add choice</button>
                     }
                     @if (item.MatchingPairs.Count > 0)
                     {
-                        <p>@string.Join(" · ", item.MatchingPairs.Select(pair => $"{pair.Prompt} → {pair.Match}"))</p>
+                        @foreach (var pair in item.MatchingPairs)
+                        {
+                            <label>Prompt <textarea @bind="pair.Prompt" rows="2"></textarea></label>
+                            <label>Match <textarea @bind="pair.Match" rows="2"></textarea></label>
+                            <button type="button" @onclick="() => item.MatchingPairs.Remove(pair)">Remove pair</button>
+                        }
+                        @if (item.Type == QuestionType.Matching)
+                        {
+                            <button type="button" @onclick="() => item.MatchingPairs.Add(new MatchingPair())">Add pair</button>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(item.SourceQuote))
+                        {
+                            <p>Source: @item.SourceId</p>
+                            <blockquote>@item.SourceQuote</blockquote>
+                        }
                     }
                     <div class="bank-actions">
                         <ContentTransfer InstructorCode="@instructorCode" ExportUrl="@($"/api/content/questions?questionId={item.Id}")" />
-                        <button class="pulse-button pulse-button-primary" @onclick="() => ModerateAsync(item, QuestionModerationStatus.Approved)">Approve and save</button>
+                        <button class="pulse-button pulse-button-primary" @onclick="() => ModerateAsync(item, QuestionModerationStatus.Approved, false)">Approve and save</button>
+                        @if (item.Source != QuestionSource.StudentSuggestion)
+                        {
+                            <button class="pulse-button pulse-button-secondary" @onclick="() => ModerateAsync(item, item.ModerationStatus, true)">Save as draft</button>
+                        }
                         <button class="pulse-button pulse-button-secondary" @onclick="() => ModerateAsync(item, QuestionModerationStatus.Rejected)">Reject</button>
                     </div>
                 </article>
@@ -171,7 +229,8 @@
             ["course"] = course,
             ["topic"] = topic,
             ["tag"] = tag,
-            ["moderationStatus"] = status,
+            ["moderationStatus"] = status == "Draft" ? null : status,
+            ["isDraft"] = status == "Draft" ? "true" : status.Length > 0 ? "false" : null,
             ["sort"] = sort,
             ["pageSize"] = 100
         };
@@ -194,7 +253,7 @@
         StateHasChanged();
     }
 
-    private async Task CreateAsync()
+    private async Task CreateAsync(bool isDraft)
     {
         error = null;
         var requestBody = new
@@ -203,15 +262,16 @@
             draft.Type,
             draft.Course,
             draft.Topic,
+            IsDraft = isDraft,
             Tags = SplitLines(draft.TagsText.Replace(',', '\n')),
             Options = draft.Type is QuestionType.MultipleChoice or QuestionType.MultipleAnswer
-                ? SplitLines(draft.OptionsText)
+                ? draft.Options
                 : [],
             MatchingPairs = draft.Type == QuestionType.Matching
                 ? ParsePairs(draft.OptionsText)
                 : [],
             draft.TriviaEligible,
-            CorrectAnswers = draft.CorrectAnswersText.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            draft.CorrectAnswers
         };
         using var request = Authorized(HttpMethod.Post, "/api/questionbank", requestBody);
         var response = await Http.SendAsync(request);
@@ -225,22 +285,27 @@
         await LoadAsync();
     }
 
-    private async Task ModerateAsync(QuestionBankItem item, QuestionModerationStatus moderationStatus)
+    private async Task ModerateAsync(QuestionBankItem item, QuestionModerationStatus moderationStatus, bool isDraft = false)
     {
         using var request = Authorized(HttpMethod.Put, $"/api/questionbank/{item.Id}", new
         {
             moderationStatus,
+            IsDraft = isDraft,
             item.Text,
+            item.Type,
+            item.Options,
+            item.MatchingPairs,
             item.Course,
             item.Topic,
             item.Tags,
             item.TriviaEligible,
-            item.CorrectAnswers
+            item.CorrectAnswers,
+            item.Explanation
         });
         var response = await Http.SendAsync(request);
         if (!response.IsSuccessStatusCode)
         {
-            error = "Pulse could not save this moderation decision.";
+            error = await response.Content.ReadAsStringAsync();
             return;
         }
 
@@ -259,10 +324,27 @@
     private static void SetTags(QuestionBankItem item, string? tags) =>
         item.Tags = SplitLines((tags ?? string.Empty).Replace(',', '\n'));
 
-    private static void SetCorrectAnswers(QuestionBankItem item, string? answers) =>
-        item.CorrectAnswers = (answers ?? string.Empty)
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .ToList();
+    private static void SetChoice(List<string> options, List<string> answers, int index, string value)
+    {
+        for (var i = 0; i < answers.Count; i++)
+        {
+            if (answers[i] == options[index])
+                answers[i] = value;
+        }
+        options[index] = value;
+    }
+
+    private static void RemoveChoice(List<string> options, List<string> answers, int index)
+    {
+        answers.RemoveAll(answer => answer == options[index]);
+        options.RemoveAt(index);
+    }
+
+    private static void ToggleAnswer(List<string> answers, string choice)
+    {
+        if (!answers.Remove(choice))
+            answers.Add(choice);
+    }
 
     private static List<string> SplitLines(string value) =>
         value.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
@@ -284,7 +366,8 @@
         public string Topic { get; set; } = string.Empty;
         public string TagsText { get; set; } = string.Empty;
         public string OptionsText { get; set; } = string.Empty;
+        public List<string> Options { get; set; } = [string.Empty, string.Empty];
         public bool TriviaEligible { get; set; }
-        public string CorrectAnswersText { get; set; } = string.Empty;
+        public List<string> CorrectAnswers { get; set; } = [];
     }
 }

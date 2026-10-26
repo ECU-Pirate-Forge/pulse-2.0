@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Text.Json;
 using Bunit;
 using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
 using Microsoft.AspNetCore.DataProtection;
@@ -16,6 +17,82 @@ namespace Pulse.Tests.Tests.WebApp;
 public class InstructorLiveFlowTests : BunitContext
 {
     private const string InstructorCode = "INSTRUCTOR";
+
+    [Fact]
+    public async Task QuestionBank_ReopensEditsAndFiltersDrafts()
+    {
+        await AddInstructorStorageAsync();
+        var handler = new BankDraftHandler();
+        Services.AddSingleton(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+        var cut = Render<QuestionBank>();
+        cut.WaitForElement(".bank-item");
+        Assert.Contains("Draft", cut.Find(".status-chip").TextContent);
+        cut.Find(".bank-item textarea").Input("Edited **question**");
+        const string choice = "```csharp\nvar pair = (1, 2);\n```";
+        cut.Find(".bank-option").Input(choice);
+        cut.Find(".bank-taxonomy label:last-child input").Change("code, review");
+        Assert.Equal("question", cut.Find(".bank-item .pulse-markdown strong").TextContent);
+        Assert.Contains("var pair", cut.Find(".bank-item pre code").TextContent);
+        cut.FindAll(".bank-item button").Single(button => button.TextContent == "Save as draft").Click();
+        cut.WaitForAssertion(() => Assert.NotNull(handler.Saved));
+        Assert.True(handler.Saved!.Value.GetProperty("isDraft").GetBoolean());
+        Assert.Equal("Edited **question**", handler.Saved.Value.GetProperty("text").GetString());
+        Assert.Equal(choice, handler.Saved.Value.GetProperty("options")[0].GetString());
+        Assert.Equal(choice, handler.Saved.Value.GetProperty("correctAnswers")[0].GetString());
+        Assert.Equal("review", handler.Saved.Value.GetProperty("tags")[1].GetString());
+
+        cut.Find(".bank-filters select").Change("Draft");
+        cut.FindAll("button").Single(button => button.TextContent == "Apply filters").Click();
+        cut.WaitForAssertion(() => Assert.Contains("isDraft=true", handler.Query));
+        Assert.DoesNotContain("moderationStatus=Draft", handler.Query);
+    }
+
+    [Fact]
+    public async Task QuestionBank_CreatesIncompleteDraft()
+    {
+        await AddInstructorStorageAsync();
+        var handler = new BankDraftHandler();
+        Services.AddSingleton(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+        var cut = Render<QuestionBank>();
+        cut.WaitForElement(".bank-item");
+        cut.Find(".bank-create textarea").Input("Finish later");
+        cut.FindAll(".bank-create button").Single(button => button.TextContent == "Save as draft").Click();
+        cut.WaitForAssertion(() => Assert.NotNull(handler.Saved));
+        Assert.True(handler.Saved!.Value.GetProperty("isDraft").GetBoolean());
+        Assert.Equal("Finish later", handler.Saved.Value.GetProperty("text").GetString());
+    }
+
+    private sealed class BankDraftHandler : HttpMessageHandler
+    {
+        public JsonElement? Saved { get; private set; }
+        public string Query { get; private set; } = string.Empty;
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Assert.Equal(InstructorCode, request.Headers.GetValues("InstructorCode").Single());
+            if (request.Method != HttpMethod.Get)
+            {
+                Saved = await request.Content!.ReadFromJsonAsync<JsonElement>(cancellationToken);
+                return new HttpResponseMessage(HttpStatusCode.OK);
+            }
+            Query = request.RequestUri!.Query;
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new
+                {
+                    Items = new[]
+                    {
+                        new QuestionBankItem
+                        {
+                            Text = "Draft question", Type = QuestionType.MultipleChoice, IsDraft = true,
+                            Source = QuestionSource.InstructorAuthored, Options = ["A", "B"], CorrectAnswers = ["A"]
+                        }
+                    },
+                    TotalCount = 1
+                })
+            };
+        }
+    }
 
     [Fact]
     public async Task TriviaControl_OpensSelectedQuestionWithInstructorCode()

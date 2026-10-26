@@ -204,10 +204,11 @@
         
         <MudStack Spacing="3">
             <MudTextField @bind-Value="NewQuestion.Text"
-                          Label="Question Text"
+                          Label="Question Text (Markdown)"
                           Placeholder="Enter your question here"
                           Variant="Variant.Outlined"
                           Lines="3" />
+            <Pulse.Shared.Components.MarkdownContent Text="@NewQuestion.Text" />
 
             <MudSelect @bind-Value="NewQuestion.Type"
                        Label="Question Type"
@@ -246,7 +247,7 @@
                         <label style="display: block;">
                             <input type="checkbox" checked="@NewQuestion.CorrectAnswers.Contains(choice)"
                                    @onchange="_ => ToggleCorrectAnswer(choice)" />
-                            @choice
+                            <Pulse.Shared.Components.MarkdownContent Text="@choice" />
                         </label>
                     }
                 </div>
@@ -321,7 +322,7 @@
             {
                 <div class="question-card">
                     <div class="question-type">@GetTypeName(q.Type)</div>
-                    <div class="question-text">@q.Text</div>
+                    <div class="question-text"><Pulse.Shared.Components.MarkdownContent Text="@q.Text" /></div>
                     <ContentTransfer InstructorCode="@_instructorCode"
                                      ExportUrl="@($"/api/content/questions?sessionId={SessionId}&questionId={q.Id}")" />
                     @if (q.CorrectAnswers.Count > 0)
@@ -336,7 +337,7 @@
                             <strong>Options:</strong><br />
                             @foreach (var opt in q.Options)
                             {
-                                <div>• @opt</div>
+                                <Pulse.Shared.Components.MarkdownContent Text="@opt" />
                             }
                         </div>
                     }
@@ -346,7 +347,8 @@
                             <strong>Pairs:</strong><br />
                             @foreach (var pair in q.MatchingPairs)
                             {
-                                <div>@pair.Prompt → @pair.Match</div>
+                                <Pulse.Shared.Components.MarkdownContent Text="@pair.Prompt" />
+                                <Pulse.Shared.Components.MarkdownContent Text="@pair.Match" />
                             }
                         </div>
                     }
@@ -390,7 +392,7 @@
     else
     {
         <MudTextField @bind-Value="BankSearch"
-                      Label="Search question bank"
+                      Label="Search question text or tags"
                       Variant="Variant.Outlined"
                       Adornment="Adornment.Start"
                       AdornmentIcon="@Icons.Material.Filled.Search"
@@ -409,14 +411,15 @@
                 {
                     <div class="question-card">
                         <div class="question-type">@GetTypeName((int)item.Type)</div>
-                        <div class="question-text">@item.Text</div>
+                        <div class="question-text"><Pulse.Shared.Components.MarkdownContent Text="@item.Text" /></div>
+                        <p>@string.Join(", ", item.Tags)</p>
                         @if (item.Type is QuestionType.MultipleChoice or QuestionType.MultipleAnswer && item.Options?.Count > 0)
                         {
                             <div class="question-options">
                                 <strong>Options:</strong><br />
                                 @foreach (var opt in item.Options)
                                 {
-                                    <div>• @opt</div>
+                                    <Pulse.Shared.Components.MarkdownContent Text="@opt" />
                                 }
                             </div>
                         }
@@ -468,7 +471,8 @@
     private IEnumerable<QuestionBankItem> FilteredBankItems =>
         string.IsNullOrWhiteSpace(BankSearch)
             ? BankItems
-            : BankItems.Where(i => i.Text.Contains(BankSearch, StringComparison.OrdinalIgnoreCase));
+            : BankItems.Where(i => i.Text.Contains(BankSearch, StringComparison.OrdinalIgnoreCase) ||
+                i.Tags.Any(tag => tag.Contains(BankSearch, StringComparison.OrdinalIgnoreCase)));
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {

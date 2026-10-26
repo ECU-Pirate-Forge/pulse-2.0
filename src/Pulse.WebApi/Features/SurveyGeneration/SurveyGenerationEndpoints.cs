@@ -22,6 +22,7 @@ public static class SurveyGenerationEndpoints
         group.MapDelete("/grounding/documents/{documentId:guid}", RemoveDocument);
         group.MapPost("/questions/generate", Generate);
         group.MapPost("/questions/generated/{previewId:guid}/accept", Accept);
+        group.MapPut("/questions/generated/{previewId:guid}", UpdatePreview);
         group.MapGet("/questions/instructor", GetInstructorQuestions);
     }
 
@@ -172,6 +173,26 @@ public static class SurveyGenerationEndpoints
                     ? "Local Ollama generation timed out. Try fewer questions."
                     : "Could not connect to local Ollama. Start Ollama at http://localhost:11434 and try again.";
             return Results.Problem(message, statusCode: StatusCodes.Status502BadGateway);
+        }
+    }
+
+    private static async Task<IResult> UpdatePreview(
+        Guid sessionId, Guid previewId, UpdateGeneratedSurveyPreviewRequest request, HttpContext context,
+        ISessionRepository sessions, SurveyGenerationRepository repository)
+    {
+        var error = await CheckAccess(sessionId, context, sessions);
+        if (error is not null)
+            return error;
+        if (request.Questions is null || request.Questions.Any(question => question is null))
+            return Results.BadRequest("Questions are required.");
+        try
+        {
+            repository.UpdatePreview(sessionId, previewId, request.Questions);
+            return Results.NoContent();
+        }
+        catch (GroundingValidationException ex)
+        {
+            return Results.BadRequest(ex.Message);
         }
     }
 

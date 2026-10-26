@@ -70,8 +70,10 @@ join codes and belong to the importing instructor. Existing content is never rep
 Responses, participant data, instructor credentials, live/reveal state, and timestamps
 are not transferred. Source IDs/quotes and explanations are preserved, but document
 grounding uploads themselves are not included. Bank course/topic/tags, trivia
-eligibility, and moderation status are preserved for bank imports; those bank-only
-properties do not apply when questions are appended to a survey. Imported bank
+eligibility, draft state, and moderation status are preserved for bank imports.
+Tags also travel with survey questions; other bank-only properties do not apply
+when questions are appended to a survey. Draft bank questions cannot be imported
+into a survey until reviewed and approved. Imported bank
 questions are attributed to the instructor, not to the original contributor.
 
 Files must be at most **2 MiB**. Exports over that limit return 413 instead of producing
@@ -461,6 +463,7 @@ Writes and generation additionally require Draft status.
 | POST | `/grounding/documents` | Append multipart document files; maximum five attachments total. |
 | DELETE | `/grounding/documents/{documentId}` | Remove one attachment and invalidate previews. |
 | POST | `/questions/generate` | Generate `{ "count": 5 }` using local Ollama; count must be 1-20. |
+| PUT | `/questions/generated/{previewId}` | Save edited/selected preview questions as `{ "questions": [...] }` before approval. |
 | POST | `/questions/generated/{previewId}/accept` | Approve the server-stored preview and atomically append its questions. |
 
 Uploads support TXT/MD (UTF-8), text PDFs (maximum 100 pages), and DOCX body
@@ -475,12 +478,14 @@ Generation returns:
   "id": "11111111-1111-1111-1111-111111111111",
   "questions": [
     {
+      "id": "22222222-2222-2222-2222-222222222222",
       "text": "Which pigment absorbs light during photosynthesis?",
       "options": ["Chlorophyll", "Hemoglobin", "Melanin", "Keratin"],
       "correctAnswer": "Chlorophyll",
       "explanation": "The source identifies chlorophyll as the light-absorbing pigment.",
       "sourceId": "context:1",
-      "sourceQuote": "Chlorophyll absorbs light."
+      "sourceQuote": "Chlorophyll absorbs light.",
+      "tags": ["biology"]
     }
   ]
 }
@@ -491,6 +496,22 @@ sources use `context:{chunkNumber}`. The model must supply four distinct
 choices, one matching correct answer, and an exact quote from a retrieved
 passage. The application rejects invalid citations and wrong question counts.
 No survey questions are inserted by generation itself.
+
+The instructor preview supports editing question text, individual multiline choices,
+the correct answer, explanation, and comma-separated tags, plus removing unwanted
+questions. Text and choices render with the existing safe Markdown renderer,
+including fenced code blocks; raw HTML and unsafe link destinations are not rendered.
+Stored/submitted answer values remain the original Markdown source, not rendered HTML.
+Matching choices use radio groups rather than native dropdowns so Markdown and code
+blocks can be displayed for every choice.
+
+Preview updates must retain the generated question IDs, contain 1-20 distinct
+questions, and provide at least two distinct nonempty choices with a matching
+correct answer. Source IDs and quotes are preserved from the original server-side
+preview, not overwritten by submitted edits. Approval uses the edited preview.
+Individual **Save question to bank** and **Save as draft** actions store the edited
+question, tags, answer key, explanation, and citation in the question bank and remove
+it from the current preview. They do not add the question to the survey.
 
 Approval returns an array of saved questions. Previews expire after one hour,
 are replaced by a newer preview for the same survey, and are invalidated when
@@ -508,15 +529,28 @@ Question-bank items include `course`, `topic`, `tags`, `type`,
 `moderationStatus`, `source`, `contributorAttribution`, `createdAt`, and
 `updatedAt`. Existing bank records remain approved for compatibility.
 
-- `POST /api/questionbank` creates an approved instructor-authored item.
+- `POST /api/questionbank` creates an approved instructor-authored item, or an
+  unfinished draft when `isDraft: true` is supplied. Drafts require question text
+  and a supported type, but may have incomplete choices or trivia configuration.
+  Optional `explanation`, `sourceId`, and `sourceQuote` preserve generated metadata.
 - `POST /api/questionbank/suggestions` accepts an anonymous student suggestion
   and always stores it as `Pending`.
 - `PUT /api/questionbank/{id}` lets an instructor edit and approve or reject an
-  item.
+  item. Supply `isDraft: true` to keep instructor work as a draft, or `isDraft: false`
+  with `moderationStatus: 0` (Approved) to publish it after full validation.
+  Student suggestions cannot be converted into instructor drafts.
 - `GET /api/questionbank` supports `text`, `type`, `course`, `topic`, `tag`,
-  `moderationStatus`, `source`, `sort`, `page`, and `pageSize`.
+  `moderationStatus`, `source`, `sort`, `page`, `pageSize`, and `isDraft`.
+  `isDraft=true` lists unfinished work. Approved queries exclude drafts unless
+  explicitly filtering by `isDraft=true`. Tag matching is case-insensitive; tags
+  are trimmed and deduplicated.
 
-Only approved items can be imported into a draft survey. Student suggestions
+The Question Bank page offers a Draft filter, editable Markdown text and individual
+choices, tags, answer keys, and **Save as draft** / **Approve and save** actions.
+Drafts persist in LiteDB for later review and are separate from moderation status;
+existing records default to non-draft without a migration.
+
+Only approved, non-draft items can be imported into a draft survey or used for trivia. Student suggestions
 cannot update or publish existing records.
 
 CSV preview accepts the columns `Text`, `Type`, `Options`, `MatchingPairs`,

@@ -31,7 +31,7 @@ public class OptionListEditorComponentTests : BunitContext
             .Add(p => p.Options, new List<string>()));
 
         // Act & Assert
-        var optionInputs = component.FindAll("input[type='text']");
+        var optionInputs = component.FindAll("textarea");
         Assert.NotEmpty(optionInputs);
     }
 
@@ -44,7 +44,7 @@ public class OptionListEditorComponentTests : BunitContext
             .Add(p => p.Options, options));
 
         // Act & Assert
-        var optionInputs = component.FindAll("input[type='text']");
+        var optionInputs = component.FindAll("textarea");
         Assert.Equal(3, optionInputs.Count);
     }
 
@@ -62,12 +62,12 @@ public class OptionListEditorComponentTests : BunitContext
         await addButton.ClickAsync(new Microsoft.AspNetCore.Components.Web.MouseEventArgs());
         component.WaitForAssertion(() =>
         {
-            var optionInputs = component.FindAll("input[type='text']");
+            var optionInputs = component.FindAll("textarea");
             Assert.Equal(2, optionInputs.Count);
         });
 
         // Assert
-        var finalInputs = component.FindAll("input[type='text']");
+        var finalInputs = component.FindAll("textarea");
         Assert.Equal(2, finalInputs.Count);
     }
 
@@ -85,12 +85,12 @@ public class OptionListEditorComponentTests : BunitContext
         await removeButtons.First().ClickAsync(new Microsoft.AspNetCore.Components.Web.MouseEventArgs());
         component.WaitForAssertion(() =>
         {
-            var optionInputs = component.FindAll("input[type='text']");
+            var optionInputs = component.FindAll("textarea");
             Assert.Single(optionInputs);
         });
 
         // Assert
-        var finalInputs = component.FindAll("input[type='text']");
+        var finalInputs = component.FindAll("textarea");
         Assert.Single(finalInputs);
     }
 
@@ -144,7 +144,7 @@ public class OptionListEditorComponentTests : BunitContext
         var component = Render<OptionListEditor>(parameters => parameters
             .Add(p => p.Options, options));
 
-        var optionInputs = component.FindAll("input[type='text']");
+        var optionInputs = component.FindAll("textarea");
 
         // Act
         await optionInputs.First().ChangeAsync(new ChangeEventArgs { Value = "Updated Option 1" });
@@ -215,7 +215,7 @@ public class OptionListEditorComponentTests : BunitContext
             .Add(p => p.OptionsChanged, EventCallback.Factory.Create<List<string>>(
                 this, (opts) => changedOptions = opts)));
 
-        var optionInputs = component.FindAll("input[type='text']");
+        var optionInputs = component.FindAll("textarea");
 
         // Act
         await optionInputs.First().ChangeAsync(new ChangeEventArgs { Value = "New Value" });

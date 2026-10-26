@@ -93,7 +93,7 @@ public static class ContentTransferEndpoints
             {
                 Text = q.Text, Type = q.Type.ToString(), Options = q.Options, MatchingPairs = q.MatchingPairs,
                 CorrectAnswers = q.CorrectAnswers, Course = q.Course, Topic = q.Topic, Tags = q.Tags,
-                TriviaEligible = q.TriviaEligible, ModerationStatus = q.ModerationStatus.ToString(),
+                TriviaEligible = q.TriviaEligible, IsDraft = q.IsDraft, ModerationStatus = q.ModerationStatus.ToString(),
                 Explanation = q.Explanation, SourceId = q.SourceId, SourceQuote = q.SourceQuote
             }).ToList();
         }
@@ -151,14 +151,14 @@ public static class ContentTransferEndpoints
             return Results.BadRequest($"Invalid Pulse JSON at {ex.Path ?? "$"}: {ex.Message}");
         }
 
-        var error = Validate(document, kind, validation);
+        var error = Validate(document, kind, validation, sessionId.HasValue);
         if (error is not null)
             return Results.BadRequest(error);
         // Validation above checks the complete document before any writes.
         return Persist(document!, target, code, database, questions, bank, forms, joinCodes);
     }
 
-    private static string? Validate(ContentTransferDocument? document, string kind, QuestionService validation)
+    private static string? Validate(ContentTransferDocument? document, string kind, QuestionService validation, bool forSurvey)
     {
         if (document is null || document.Format != "pulse" || document.Version != 1)
             return "Expected a Pulse JSON document with format 'pulse' and version 1.";
@@ -189,19 +189,22 @@ public static class ContentTransferEndpoints
             var prefix = $"Question {i + 1}: ";
             if (q is null || string.IsNullOrWhiteSpace(q.Text))
                 return prefix + "text is required.";
+            if (q.IsDraft && (document.Kind == "survey" || forSurvey))
+                return prefix + "draft questions must be reviewed and approved in the question bank before use.";
             if (!Enum.GetNames<QuestionType>().Contains(q.Type))
                 return prefix + "type is invalid.";
             if (q.Options is null || q.MatchingPairs is null || q.CorrectAnswers is null || q.Tags is null ||
                 q.Options.Any(string.IsNullOrWhiteSpace) || q.CorrectAnswers.Any(string.IsNullOrWhiteSpace) ||
                 q.Tags.Any(string.IsNullOrWhiteSpace) ||
-                q.MatchingPairs.Any(p => p is null || string.IsNullOrWhiteSpace(p.Prompt) || string.IsNullOrWhiteSpace(p.Match)) ||
+                q.MatchingPairs.Any(p => p is null || p.Prompt is null || p.Match is null ||
+                    !q.IsDraft && (string.IsNullOrWhiteSpace(p.Prompt) || string.IsNullOrWhiteSpace(p.Match))) ||
                 q.Explanation is null || q.SourceId is null || q.SourceQuote is null || q.Course is null || q.Topic is null)
                 return prefix + "arrays and metadata must not be null; array entries must be complete, non-empty values.";
             if (!Enum.GetNames<QuestionModerationStatus>().Contains(q.ModerationStatus))
                 return prefix + "moderationStatus is invalid.";
             var type = Enum.Parse<QuestionType>(q.Type);
             // Legacy definitions remain transferable, but cannot be authored through the editors.
-            if (type is not (QuestionType.LegacyLikertScale or QuestionType.LegacyOpenEnded))
+            if (!q.IsDraft && type is not (QuestionType.LegacyLikertScale or QuestionType.LegacyOpenEnded))
             {
                 var result = validation.ValidateQuestion(new QuestionDTO
                 {
@@ -212,7 +215,7 @@ public static class ContentTransferEndpoints
             }
             var triviaError = QuestionBankEndpointHandlers.ValidateTriviaConfiguration(
                 type, q.TriviaEligible, q.Options, q.CorrectAnswers);
-            if (triviaError is not null)
+            if (!q.IsDraft && triviaError is not null)
                 return prefix + triviaError;
         }
         return null;
@@ -264,7 +267,7 @@ public static class ContentTransferEndpoints
                         questions.Insert(new Question
                         {
                             SessionId = target.Id, Text = q.Text, Type = type, Options = q.Options,
-                            MatchingPairs = q.MatchingPairs, CorrectAnswers = q.CorrectAnswers, SortOrder = sortOrder++,
+                            MatchingPairs = q.MatchingPairs, CorrectAnswers = q.CorrectAnswers, Tags = q.Tags, SortOrder = sortOrder++,
                             Explanation = q.Explanation, SourceId = q.SourceId, SourceQuote = q.SourceQuote
                         });
                     }
@@ -275,7 +278,7 @@ public static class ContentTransferEndpoints
                             Text = q.Text, Type = type, Options = q.Options, MatchingPairs = q.MatchingPairs,
                             CorrectAnswers = q.CorrectAnswers, Course = q.Course, Topic = q.Topic, Tags = q.Tags,
                             Explanation = q.Explanation, SourceId = q.SourceId, SourceQuote = q.SourceQuote,
-                            TriviaEligible = q.TriviaEligible, ModerationStatus = Enum.Parse<QuestionModerationStatus>(q.ModerationStatus),
+                            TriviaEligible = q.TriviaEligible, IsDraft = q.IsDraft, ModerationStatus = Enum.Parse<QuestionModerationStatus>(q.ModerationStatus),
                             Source = QuestionSource.InstructorAuthored, ContributorAttribution = "Instructor"
                         });
                     }
@@ -299,7 +302,7 @@ public static class ContentTransferEndpoints
     private static PortableQuestion FromQuestion(Question q) => new()
     {
         Text = q.Text, Type = q.Type.ToString(), Options = q.Options, MatchingPairs = q.MatchingPairs,
-        CorrectAnswers = q.CorrectAnswers, Explanation = q.Explanation, SourceId = q.SourceId, SourceQuote = q.SourceQuote
+        CorrectAnswers = q.CorrectAnswers, Tags = q.Tags, Explanation = q.Explanation, SourceId = q.SourceId, SourceQuote = q.SourceQuote
     };
 
     private static IResult Download(ContentTransferDocument document, string name)

@@ -62,7 +62,7 @@
                 @foreach (var question in revealedResults.Questions)
                 {
                     <article class="pulse-card survey-result">
-                        <h2>@question.Text</h2>
+                        <div role="heading" aria-level="2"><Pulse.Shared.Components.MarkdownContent Text="@question.Text" /></div>
                         <p>@question.ResponseCount responses</p>
                         @foreach (var tally in question.Tallies)
                         {
@@ -71,12 +71,12 @@
                                 : (int)Math.Round(tally.Count * 100d / question.ResponseCount);
                             <div class="survey-result-row">
                                 <div>
-                                    <span>@tally.Value
+                                    <div><Pulse.Shared.Components.MarkdownContent Text="@tally.Value" />
                                         @if (question.CorrectAnswers?.Contains(tally.Value, StringComparer.Ordinal) == true)
                                         {
                                             <span class="correct-answer-badge">@SurveyText.CorrectAnswer</span>
                                         }
-                                    </span>
+                                    </div>
                                     <strong>@tally.Count (@percentage%)</strong>
                                 </div>
                                 <progress aria-label="@tally.Value" value="@tally.Count" max="@Math.Max(1, question.ResponseCount)">@percentage%</progress>
@@ -104,8 +104,8 @@
             <div class="survey-questions">
                 @foreach (var question in questions)
                 {
-                    <fieldset class="pulse-card survey-question">
-                        <legend>@question.Text</legend>
+                    <fieldset class="pulse-card survey-question" aria-labelledby="@($"question-label-{question.Id}")">
+                        <div class="survey-question-label" id="@($"question-label-{question.Id}")"><Pulse.Shared.Components.MarkdownContent Text="@question.Text" /></div>
 
                         @switch (question.Type)
                         {
@@ -118,7 +118,7 @@
                                                value="@option"
                                                checked="@(singleAnswers.GetValueOrDefault(question.Id) == option)"
                                                @onchange="@(_ => SetSingleAnswer(question.Id, option))" />
-                                        <span>@option</span>
+                                        <Pulse.Shared.Components.MarkdownContent Text="@option" />
                                     </label>
                                 }
                                 break;
@@ -131,7 +131,7 @@
                                                value="@option"
                                                checked="@GetMultipleAnswers(question.Id).Contains(option)"
                                                @onchange="@(_ => ToggleMultipleAnswer(question.Id, option))" />
-                                        <span>@option</span>
+                                        <Pulse.Shared.Components.MarkdownContent Text="@option" />
                                     </label>
                                 }
                                 break;
@@ -145,25 +145,26 @@
                                                value="@option"
                                                checked="@(singleAnswers.GetValueOrDefault(question.Id) == option)"
                                                @onchange="@(_ => SetSingleAnswer(question.Id, option))" />
-                                        <span>@option</span>
+                                        <Pulse.Shared.Components.MarkdownContent Text="@option" />
                                     </label>
                                 }
                                 break;
 
                             case QuestionType.Matching:
-                                @foreach (var pair in question.MatchingPairs)
+                                @foreach (var (pair, pairIndex) in question.MatchingPairs.Select((pair, index) => (pair, index)))
                                 {
-                                    <label class="matching-row">
-                                        <span>@pair.Prompt</span>
-                                        <select value="@GetMatchingAnswer(question.Id, pair.Prompt)"
-                                                @onchange="@(args => SetMatchingAnswer(question.Id, pair.Prompt, args.Value?.ToString()))">
-                                            <option value="">Select a match</option>
-                                            @foreach (var choice in question.Options)
-                                            {
-                                                <option value="@choice">@choice</option>
-                                            }
-                                        </select>
-                                    </label>
+                                    <fieldset class="matching-row" aria-labelledby="@($"match-label-{question.Id}-{pairIndex}")">
+                                        <div id="@($"match-label-{question.Id}-{pairIndex}")"><Pulse.Shared.Components.MarkdownContent Text="@pair.Prompt" /></div>
+                                        @foreach (var choice in question.Options)
+                                        {
+                                            <label class="survey-option">
+                                                <input type="radio" name="@($"match-{question.Id}-{pairIndex}")" value="@choice"
+                                                       checked="@(GetMatchingAnswer(question.Id, pair.Prompt) == choice)"
+                                                       @onchange="@(_ => SetMatchingAnswer(question.Id, pair.Prompt, choice))" />
+                                                <Pulse.Shared.Components.MarkdownContent Text="@choice" />
+                                            </label>
+                                        }
+                                    </fieldset>
                                 }
                                 break;
                         }

@@ -24,6 +24,52 @@ public class SurveyPageTests : BunitContext
     }
 
     [Fact]
+    public void MarkdownQuestionsAndChoices_RenderWithoutChangingSubmittedValues()
+    {
+        const string choice = "```csharp\nConsole.WriteLine(\"hello\");\n```";
+        var question = new Question
+        {
+            SessionId = _sessionId, Text = "Read **carefully** <script>alert(1)</script>",
+            Type = QuestionType.MultipleChoice, Options = [choice, "Other"]
+        };
+        var handler = new SurveyHandler(_sessionId, [question]);
+        Services.AddSingleton(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+        var cut = Render<QuizPage>(parameters => parameters.Add(page => page.JoinCode, "ABC123"));
+        cut.WaitForElement("pre code");
+        Assert.Equal("carefully", cut.Find("strong").TextContent);
+        Assert.Empty(cut.FindAll("script"));
+        Assert.Contains("Console.WriteLine", cut.Find("pre code").TextContent);
+        cut.Find("input[type=radio]").Change(choice);
+        cut.Find("[data-testid='submit-survey']").Click();
+        cut.WaitForAssertion(() => Assert.NotNull(handler.SubmittedRequest));
+        Assert.Equal([choice], Assert.Single(handler.SubmittedRequest!.Answers).Values);
+    }
+
+    [Fact]
+    public void MatchingChoices_RenderMarkdownAndSubmitOriginalValuesInPromptOrder()
+    {
+        const string code = "```csharp\nreturn 1;\n```";
+        var question = new Question
+        {
+            SessionId = _sessionId, Text = "Match **code**", Type = QuestionType.Matching,
+            MatchingPairs =
+            [
+                new MatchingPair { Prompt = "**First**", Match = code },
+                new MatchingPair { Prompt = "Second", Match = "Other" }
+            ]
+        };
+        var handler = new SurveyHandler(_sessionId, [question]);
+        Services.AddSingleton(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+        var cut = Render<QuizPage>(parameters => parameters.Add(page => page.JoinCode, "ABC123"));
+        cut.WaitForElement(".matching-row pre code");
+        cut.FindAll(".matching-row")[0].QuerySelectorAll("input").Single(input => input.GetAttribute("value") == code).Change(code);
+        cut.FindAll(".matching-row")[1].QuerySelectorAll("input").Single(input => input.GetAttribute("value") == "Other").Change("Other");
+        cut.Find("[data-testid='submit-survey']").Click();
+        cut.WaitForAssertion(() => Assert.NotNull(handler.SubmittedRequest));
+        Assert.Equal([code, "Other"], Assert.Single(handler.SubmittedRequest!.Answers).Values);
+    }
+
+    [Fact]
     public void ActiveSurvey_RendersEveryQuestionOnOnePage()
     {
         Services.AddSingleton(CreateHttpClient(CreateAllQuestionTypes()));

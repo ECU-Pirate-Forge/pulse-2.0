@@ -18,6 +18,8 @@ public static class QuestionBankEndpointHandlers
 
         if (request.Type is null)
             return TypedResults.BadRequest("Type is required.");
+        if (request.IsDraft && request.Type is not (QuestionType.MultipleChoice or QuestionType.MultipleAnswer or QuestionType.TrueFalse or QuestionType.Matching))
+            return TypedResults.BadRequest("Question type is invalid.");
 
         var normalizedOptions = (request.Options ?? [])
             .Where(o => !string.IsNullOrWhiteSpace(o))
@@ -38,14 +40,14 @@ public static class QuestionBankEndpointHandlers
             Options = normalizedOptions,
             MatchingPairs = normalizedPairs
         });
-        if (!validation.IsValid)
+        if (!request.IsDraft && !validation.IsValid)
             return TypedResults.BadRequest(validation.ErrorMessage!);
         var triviaValidation = ValidateTriviaConfiguration(
             request.Type.Value,
             request.TriviaEligible,
             normalizedOptions,
             NormalizeOptions(request.CorrectAnswers));
-        if (triviaValidation is not null)
+        if (!request.IsDraft && triviaValidation is not null)
             return TypedResults.BadRequest(triviaValidation);
 
         var item = new QuestionBankItem
@@ -57,11 +59,15 @@ public static class QuestionBankEndpointHandlers
             Course = request.Course?.Trim() ?? string.Empty,
             Topic = request.Topic?.Trim() ?? string.Empty,
             Tags = NormalizeTags(request.Tags),
+            IsDraft = request.IsDraft,
             ModerationStatus = QuestionModerationStatus.Approved,
             Source = QuestionSource.InstructorAuthored,
             ContributorAttribution = "Instructor",
             TriviaEligible = request.TriviaEligible,
             CorrectAnswers = NormalizeOptions(request.CorrectAnswers),
+            Explanation = request.Explanation?.Trim() ?? string.Empty,
+            SourceId = request.SourceId ?? string.Empty,
+            SourceQuote = request.SourceQuote ?? string.Empty,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -82,7 +88,8 @@ public static class QuestionBankEndpointHandlers
         bool? triviaEligible = null,
         QuestionBankSort sort = QuestionBankSort.Newest,
         int page = 1,
-        int pageSize = 20)
+        int pageSize = 20,
+        bool? isDraft = null)
     {
         if (page < 1)
             return TypedResults.BadRequest("Page must be greater than 0.");
@@ -99,7 +106,8 @@ public static class QuestionBankEndpointHandlers
             moderationStatus,
             source,
             triviaEligible,
-            sort)).ToList();
+            sort,
+            isDraft)).ToList();
         var totalCount = filtered.Count;
         var items = filtered
             .Skip((page - 1) * pageSize)
@@ -155,19 +163,26 @@ public static class QuestionBankEndpointHandlers
 
         var text = request.Text?.Trim() ?? item.Text;
         var type = request.Type ?? item.Type;
+        if ((request.IsDraft ?? item.IsDraft) && type is not (QuestionType.MultipleChoice or QuestionType.MultipleAnswer or QuestionType.TrueFalse or QuestionType.Matching))
+            return TypedResults.BadRequest("Question type is invalid.");
         var options = request.Options is null ? item.Options : NormalizeOptions(request.Options);
         var matchingPairs = request.MatchingPairs is null
             ? item.MatchingPairs
             : NormalizePairs(request.MatchingPairs);
         var triviaEligible = request.TriviaEligible ?? item.TriviaEligible;
+        var isDraft = request.IsDraft ?? item.IsDraft;
+        if (isDraft && item.Source == QuestionSource.StudentSuggestion)
+            return TypedResults.BadRequest("Student suggestions must be moderated, not saved as instructor drafts.");
         var correctAnswers = request.CorrectAnswers is null
             ? item.CorrectAnswers
             : NormalizeOptions(request.CorrectAnswers);
         var validationError = ValidateRequest(text, type, options, matchingPairs, questionService);
-        if (validationError is not null)
+        if (string.IsNullOrWhiteSpace(text))
+            return TypedResults.BadRequest("Text is required.");
+        if (!isDraft && validationError is not null)
             return TypedResults.BadRequest(validationError);
         validationError = ValidateTriviaConfiguration(type, triviaEligible, options, correctAnswers);
-        if (validationError is not null)
+        if (!isDraft && validationError is not null)
             return TypedResults.BadRequest(validationError);
 
         item.ModerationStatus = request.ModerationStatus.Value;
@@ -177,6 +192,8 @@ public static class QuestionBankEndpointHandlers
         item.MatchingPairs = matchingPairs;
         item.TriviaEligible = triviaEligible;
         item.CorrectAnswers = correctAnswers;
+        item.IsDraft = isDraft;
+        item.Explanation = request.Explanation?.Trim() ?? item.Explanation;
         item.Course = request.Course?.Trim() ?? item.Course;
         item.Topic = request.Topic?.Trim() ?? item.Topic;
         if (request.Tags is not null)
@@ -239,7 +256,10 @@ public static class QuestionBankEndpointHandlers
         IReadOnlyCollection<string> correctAnswers)
     {
         if (!triviaEligible)
-            return null;
+            return type is QuestionType.MultipleChoice or QuestionType.MultipleAnswer &&
+                correctAnswers.Any(answer => !options.Contains(answer, StringComparer.Ordinal))
+                ? "Correct answers must match the available options."
+                : null;
         if (type == QuestionType.Matching)
             return "Matching questions are not currently eligible for trivia.";
         if (correctAnswers.Count == 0)
@@ -254,6 +274,10 @@ public static class QuestionBankEndpointHandlers
 
 public class CreateQuestionBankItemRequest
 {
+    public bool IsDraft { get; init; }
+    public string? Explanation { get; init; }
+    public string? SourceId { get; init; }
+    public string? SourceQuote { get; init; }
     public string? Text { get; init; }
     public QuestionType? Type { get; init; }
     public List<string>? Options { get; init; }
@@ -269,6 +293,8 @@ public sealed class SubmitQuestionSuggestionRequest : CreateQuestionBankItemRequ
 
 public sealed class ModerateQuestionBankItemRequest
 {
+    public bool? IsDraft { get; init; }
+    public string? Explanation { get; init; }
     public QuestionModerationStatus? ModerationStatus { get; init; }
     public string? Text { get; init; }
     public string? Course { get; init; }

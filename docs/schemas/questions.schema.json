@@ -41,8 +41,8 @@
             "additionalProperties": false,
             "required": ["prompt", "match"],
             "properties": {
-              "prompt": { "$ref": "#/$defs/nonBlank" },
-              "match": { "$ref": "#/$defs/nonBlank" }
+              "prompt": { "type": "string" },
+              "match": { "type": "string" }
             }
           }
         },
@@ -54,6 +54,7 @@
         "topic": { "type": "string", "default": "" },
         "tags": { "$ref": "#/$defs/stringList" },
         "triviaEligible": { "type": "boolean", "default": false },
+        "isDraft": { "type": "boolean", "default": false },
         "moderationStatus": {
           "enum": ["Approved", "Pending", "Rejected"],
           "default": "Approved"
@@ -61,21 +62,31 @@
       },
       "allOf": [
         {
-          "if": { "properties": { "type": { "enum": ["MultipleChoice", "MultipleAnswer"] } } },
+          "if": { "properties": { "type": { "enum": ["MultipleChoice", "MultipleAnswer"] } }, "not": { "properties": { "isDraft": { "const": true } }, "required": ["isDraft"] } },
           "then": {
             "required": ["options"],
             "properties": { "options": { "minItems": 2 } }
           }
         },
         {
-          "if": { "properties": { "type": { "const": "Matching" } } },
+          "if": { "properties": { "type": { "const": "Matching" } }, "not": { "properties": { "isDraft": { "const": true } }, "required": ["isDraft"] } },
           "then": {
             "required": ["matchingPairs"],
-            "properties": { "matchingPairs": { "minItems": 2 } }
+            "properties": {
+              "matchingPairs": {
+                "minItems": 2,
+                "items": {
+                  "properties": {
+                    "prompt": { "$ref": "#/$defs/nonBlank" },
+                    "match": { "$ref": "#/$defs/nonBlank" }
+                  }
+                }
+              }
+            }
           }
         },
         {
-          "if": { "properties": { "triviaEligible": { "const": true } }, "required": ["triviaEligible"] },
+          "if": { "properties": { "triviaEligible": { "const": true } }, "required": ["triviaEligible"], "not": { "properties": { "isDraft": { "const": true } }, "required": ["isDraft"] } },
           "then": {
             "required": ["correctAnswers"],
             "properties": {

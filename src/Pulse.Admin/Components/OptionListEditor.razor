@@ -24,7 +24,8 @@
             <div class="option-row" @key="_optionKeys[index]">
                 <MudTextField 
                     Value="LocalOptions[index]"
-                    Label="@($"Option {index + 1}")"
+                    Label="@($"Option {index + 1} (Markdown)")"
+                    Lines="3"
                     Variant="Variant.Outlined"
                     Class="flex-grow-1"
                     ValueChanged="@((string? newValue) => OnOptionChanged(index, newValue ?? string.Empty))" />
@@ -38,6 +39,7 @@
                     Remove
                 </MudButton>
             </div>
+            <Pulse.Shared.Components.MarkdownContent Text="@LocalOptions[index]" />
         }
     </div>
 

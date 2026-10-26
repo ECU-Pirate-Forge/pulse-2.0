@@ -33,7 +33,7 @@
     border: 0;
 }
 
-.survey-question legend {
+.survey-question-label {
     width: 100%;
     padding: 0 0 1rem;
     color: var(--pulse-ink);
@@ -69,16 +69,14 @@
     gap: 0.5rem;
     margin-top: 1rem;
     font-weight: 600;
+    min-width: 0;
+    padding: 0;
+    border: 0;
 }
 
-.matching-row select {
-    width: 100%;
-    min-height: 3rem;
-    padding: 0.625rem;
-    border: 0.125rem solid var(--pulse-border);
-    border-radius: var(--pulse-radius-sm);
-    background: white;
-    color: var(--pulse-ink);
+.survey-option ::deep .pulse-markdown {
+    min-width: 0;
+    flex: 1;
 }
 
 .submit-survey {
@@ -136,10 +134,5 @@
 @media (min-width: 48rem) {
     .survey-question {
         padding: 1.75rem;
-    }
-
-    .matching-row {
-        grid-template-columns: minmax(8rem, 1fr) minmax(12rem, 2fr);
-        align-items: center;
     }
 }

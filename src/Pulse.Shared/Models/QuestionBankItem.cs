@@ -34,7 +34,8 @@ public sealed record QuestionBankQuery(
     QuestionModerationStatus? ModerationStatus = null,
     QuestionSource? Source = null,
     bool? TriviaEligible = null,
-    QuestionBankSort Sort = QuestionBankSort.Newest);
+    QuestionBankSort Sort = QuestionBankSort.Newest,
+    bool? IsDraft = null);
 
 public class QuestionBankItem
 {
@@ -47,6 +48,7 @@ public class QuestionBankItem
     public string Course { get; set; } = string.Empty;
     public string Topic { get; set; } = string.Empty;
     public List<string> Tags { get; set; } = [];
+    public bool IsDraft { get; set; }
     public QuestionModerationStatus ModerationStatus { get; set; } = QuestionModerationStatus.Approved;
     public QuestionSource Source { get; set; } = QuestionSource.Legacy;
     public string ContributorAttribution { get; set; } = string.Empty;

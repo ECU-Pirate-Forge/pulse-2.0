@@ -85,7 +85,8 @@
     font-weight: 700;
 }
 
-.status-pending {
+.status-pending,
+.status-draft {
     color: #5d4100;
     background: var(--pulse-gold-200);
 }

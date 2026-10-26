@@ -92,7 +92,7 @@ public static class TriviaEndpointHandlers
 
         var bankItem = bankRepository.GetById(request.QuestionBankItemId);
         if (bankItem is null ||
-            bankItem.ModerationStatus != QuestionModerationStatus.Approved ||
+            bankItem.IsDraft || bankItem.ModerationStatus != QuestionModerationStatus.Approved ||
             !bankItem.TriviaEligible ||
             bankItem.CorrectAnswers.Count == 0)
         {

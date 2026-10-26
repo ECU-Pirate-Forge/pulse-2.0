@@ -63,6 +63,11 @@ public class QuestionBankRepository : IQuestionBankRepository
         if (query.ModerationStatus is not null)
             all = all.Where(x => x.ModerationStatus == query.ModerationStatus);
 
+        if (query.IsDraft is not null)
+            all = all.Where(x => x.IsDraft == query.IsDraft);
+        else if (query.ModerationStatus == QuestionModerationStatus.Approved)
+            all = all.Where(x => !x.IsDraft);
+
         if (query.Source is not null)
             all = all.Where(x => x.Source == query.Source);
 
