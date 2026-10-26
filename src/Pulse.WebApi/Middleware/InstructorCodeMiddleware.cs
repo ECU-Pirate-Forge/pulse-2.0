@@ -89,6 +89,11 @@ public static class InstructorOnlyEndpointMatcher
             return false;
         }
 
+        if (path.StartsWith("/api/content/", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
         if (HttpMethods.IsGet(method) && path.StartsWith("/questions", StringComparison.OrdinalIgnoreCase))
         {
             return false;

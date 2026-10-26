@@ -57,6 +57,19 @@ as links or images. Titles, placeholders, dropdown options, submitted answers, a
 survey/trivia prompts remain plain text. Existing description and label length
 limits still apply, and exports retain the original Markdown source.
 
+### Reusing content with JSON
+
+Instructors can export and import survey definitions, form definitions, and question
+files using the JSON controls in their management pages. Imports create new draft
+surveys/forms or reusable bank questions; question files can also be appended to a
+draft survey. Responses and credentials are never included. Existing form response
+CSV downloads are unchanged.
+
+See the [import/export API and examples](docs/api.md#portable-json-import-and-export),
+[question JSON Schema](docs/schemas/questions.schema.json), and
+[ready-to-import question file](docs/examples/questions.json). Files are limited to
+2 MiB and are validated and saved atomically.
+
 ## Fully Implemented Features
 
 The following are currently implemented in this repository (and covered by project tests):

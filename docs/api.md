@@ -38,6 +38,136 @@ Response 200:
 Pulse API is running
 ```
 
+## Portable JSON import and export
+
+Use **Export JSON** on survey/form cards or on the question-bank and survey-question
+pages. Use the corresponding **Import** file picker to create a copy. Question-bank
+exports include the entire bank (not just the currently filtered page); individual
+questions also have an export control. JSON definitions are separate from the
+existing form response CSV export and database backup.
+
+All routes below require a valid `InstructorCode` header. Survey/form exports and
+imports into an existing survey also check ownership. Files use UTF-8 JSON, camelCase
+property names, case-sensitive string type names, and a versioned envelope.
+
+| Method | Route | Behavior |
+| --- | --- | --- |
+| GET | `/api/content/surveys/{id}` | Download one survey with ordered questions and answer keys |
+| GET | `/api/content/forms/{id}` | Download one form with ordered fields and Markdown source |
+| GET | `/api/content/questions` | Download all bank questions, including moderation statuses |
+| GET | `/api/content/questions?questionId={id}` | Download one bank question |
+| GET | `/api/content/questions?sessionId={id}` | Download ordered survey questions |
+| GET | `/api/content/questions?sessionId={id}&questionId={questionId}` | Download one question from that survey |
+| POST | `/api/content/import/survey` | Create a new draft survey |
+| POST | `/api/content/import/form` | Create a new draft form |
+| POST | `/api/content/import/questions` | Create new question-bank items |
+| POST | `/api/content/import/questions?sessionId={id}` | Append questions to an owned draft survey |
+
+POST bodies are the JSON file itself (`Content-Type: application/json`), not multipart
+uploads. Every export is directly importable using the matching kind. New surveys,
+forms, questions, and form fields receive fresh IDs; new surveys/forms receive fresh
+join codes and belong to the importing instructor. Existing content is never replaced.
+Responses, participant data, instructor credentials, live/reveal state, and timestamps
+are not transferred. Source IDs/quotes and explanations are preserved, but document
+grounding uploads themselves are not included. Bank course/topic/tags, trivia
+eligibility, and moderation status are preserved for bank imports; those bank-only
+properties do not apply when questions are appended to a survey. Imported bank
+questions are attributed to the instructor, not to the original contributor.
+
+Files must be at most **2 MiB**. Exports over that limit return 413 instead of producing
+a file that cannot be reimported; export questions individually to split a large bank
+or survey. An entire file is validated before saving and all writes share a database
+transaction, so invalid files or write failures do not leave partially imported content.
+Repeated successful imports intentionally create additional copies.
+
+Successful imports return 200:
+
+```json
+{ "kind": "survey", "id": "11111111-1111-1111-1111-111111111111", "importedCount": 4 }
+```
+
+`id` is the new survey/form ID or the destination survey ID; it is null for bank
+imports. `importedCount` counts questions or form fields. Errors: 400 for malformed,
+unsupported-version, invalid-definition, unknown-property, or wrong-kind files; 401/403
+for authentication/ownership failures; 404 for missing targets; 409 for non-draft
+survey destinations; 413 for oversized files. Error responses include a description
+when a file fails validation. Question files cannot be imported as form fields.
+
+### Expected question JSON schema
+
+The machine-readable [JSON Schema](schemas/questions.schema.json) and a ready-to-import
+[example question file](examples/questions.json) describe the supported format:
+
+```json
+{
+  "format": "pulse",
+  "version": 1,
+  "kind": "questions",
+  "questions": [
+    {
+      "text": "Which protocol is used for web requests?",
+      "type": "MultipleChoice",
+      "options": ["HTTP", "SMTP"],
+      "correctAnswers": ["HTTP"]
+    }
+  ]
+}
+```
+
+Each question requires `text` and `type`. Supported authoring types are
+`MultipleChoice`, `MultipleAnswer`, `TrueFalse`, and `Matching`. Choice types need
+at least two nonblank options. Matching needs at least two complete
+`{"prompt":"...","match":"..."}` pairs with unique prompts (case-insensitive after
+trimming). Legacy `LegacyLikertScale`/`LegacyOpenEnded` (and their old aliases
+`LikertScale`/`OpenEnded`) can be transferred for compatibility, but remain unavailable
+in authoring editors. Type names and property names are case-sensitive; numeric
+question types are not accepted.
+
+Optional question properties: `options`, `matchingPairs`, `correctAnswers`,
+`explanation`, `sourceId`, `sourceQuote`, `course`, `topic`, `tags`, `triviaEligible`,
+and `moderationStatus` (`Approved`, `Pending`, or `Rejected`; defaults to `Approved`).
+Omitted lists default to empty and omitted text metadata to empty strings; null lists,
+null metadata, null array entries, and blank list values are rejected. Trivia-eligible
+questions require a nonempty answer key whose values exactly match available options
+(or `True`/`False`); matching questions cannot be trivia-eligible. Unique matching
+prompts and answer membership are checked by the API in addition to JSON Schema.
+
+### Survey and form envelopes
+
+Survey files use `kind: "survey"`, require `title`, and contain the same ordered
+`questions` array as question files:
+
+```json
+{
+  "format": "pulse", "version": 1, "kind": "survey",
+  "title": "Networking review",
+  "questions": [
+    { "text": "HTTP is a protocol.", "type": "TrueFalse" }
+  ]
+}
+```
+
+Form files use `kind: "form"`, require `title` and ordered `fields`, and may include
+`description` (up to 5000 characters):
+
+```json
+{
+  "format": "pulse", "version": 1, "kind": "form",
+  "title": "Project interest", "description": "## Tell us about yourself",
+  "fields": [
+    { "label": "Email", "fieldType": "Email", "required": true },
+    { "label": "Track", "fieldType": "Dropdown", "options": ["Web", "Mobile"] }
+  ]
+}
+```
+
+Form fields require `label` and `fieldType`; optional properties are `required`,
+`placeholder`, and `options`. Field types: `Text`, `TextArea`, `Email`, `Phone`,
+`Number`, `Date`, `Dropdown`, `YesNo`, and `Checkbox`. A form supports at most 50 fields.
+Dropdowns need at least one nonblank option. Normal form-definition normalization
+applies: labels/placeholders are trimmed and dropdown options are trimmed and
+deduplicated; non-dropdown options are implicit rather than stored.
+
 ## Sessions
 
 Session payloads use string enum values:

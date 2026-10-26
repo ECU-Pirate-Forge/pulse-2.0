@@ -232,7 +232,7 @@ public static class QuestionBankEndpointHandlers
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-    private static string? ValidateTriviaConfiguration(
+    internal static string? ValidateTriviaConfiguration(
         QuestionType type,
         bool triviaEligible,
         IReadOnlyCollection<string> options,

@@ -52,6 +52,9 @@ public class QuestionBankItem
     public string ContributorAttribution { get; set; } = string.Empty;
     public bool TriviaEligible { get; set; }
     public List<string> CorrectAnswers { get; set; } = [];
+    public string Explanation { get; set; } = string.Empty;
+    public string SourceId { get; set; } = string.Empty;
+    public string SourceQuote { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }

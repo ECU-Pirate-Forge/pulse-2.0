@@ -1,0 +1,118 @@
+@using System.Text
+@using Pulse.Shared.Contracts.V1
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<div class="my-3" aria-label="JSON content transfer">
+    @if (ImportUrl is not null)
+    {
+        <label>
+            @ImportLabel (JSON, up to 2 MiB)
+            <InputFile OnChange="ImportAsync" accept=".json,application/json" disabled="@Busy" />
+        </label>
+    }
+    @if (ExportUrl is not null)
+    {
+        <button type="button" class="pulse-button pulse-button-secondary" disabled="@Busy" @onclick="ExportAsync">
+            Export JSON
+        </button>
+    }
+    @if (Message is not null)
+    {
+        <p role="status">@Message</p>
+    }
+    @if (Error is not null)
+    {
+        <p class="pulse-alert pulse-alert-error" role="alert">@Error</p>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string InstructorCode { get; set; } = string.Empty;
+    [Parameter] public string? ExportUrl { get; set; }
+    [Parameter] public string? ImportUrl { get; set; }
+    [Parameter] public string ImportLabel { get; set; } = "Import";
+    [Parameter] public EventCallback Imported { get; set; }
+
+    private bool Busy;
+    private string? Error;
+    private string? Message;
+
+    private async Task ImportAsync(InputFileChangeEventArgs args)
+    {
+        Busy = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            if (args.File.Size > ContentTransferJson.MaxFileBytes)
+            {
+                Error = "JSON files must be 2 MiB or smaller.";
+                return;
+            }
+            await using var stream = args.File.OpenReadStream(ContentTransferJson.MaxFileBytes);
+            using var reader = new StreamReader(stream, Encoding.UTF8);
+            using var request = Authorized(HttpMethod.Post, ImportUrl!);
+            request.Content = new StringContent(await reader.ReadToEndAsync(), Encoding.UTF8, "application/json");
+            using var response = await Http.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+            {
+                Error = $"Import failed: {await response.Content.ReadAsStringAsync()}";
+                return;
+            }
+            var result = await response.Content.ReadFromJsonAsync<ContentImportResponse>();
+            if (result is null)
+            {
+                Error = "The server returned an empty import result.";
+                return;
+            }
+            Message = $"Imported {result.ImportedCount} item(s). Existing content was not replaced.";
+            await Imported.InvokeAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException or TaskCanceledException or System.Text.Json.JsonException)
+        {
+            Error = $"Import failed: {ex.Message}";
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task ExportAsync()
+    {
+        Busy = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            using var request = Authorized(HttpMethod.Get, ExportUrl!);
+            using var response = await Http.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+            {
+                Error = $"Export failed: {await response.Content.ReadAsStringAsync()}";
+                return;
+            }
+            var bytes = await response.Content.ReadAsByteArrayAsync();
+            var name = response.Content.Headers.ContentDisposition?.FileNameStar
+                ?? response.Content.Headers.ContentDisposition?.FileName?.Trim('"')
+                ?? "pulse-content.json";
+            await JS.InvokeVoidAsync("pulseDownload.saveBase64", name, "application/json", Convert.ToBase64String(bytes));
+        }
+        catch (Exception ex) when (ex is HttpRequestException or JSException or TaskCanceledException)
+        {
+            Error = $"Export failed: {ex.Message}";
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private HttpRequestMessage Authorized(HttpMethod method, string url)
+    {
+        var request = new HttpRequestMessage(method, url);
+        request.Headers.TryAddWithoutValidation("InstructorCode", InstructorCode);
+        return request;
+    }
+}

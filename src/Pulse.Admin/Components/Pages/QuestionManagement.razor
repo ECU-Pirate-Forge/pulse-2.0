@@ -160,6 +160,10 @@
     }
     else
     {
+    <ContentTransfer InstructorCode="@_instructorCode"
+                     ExportUrl="@($"/api/content/questions?sessionId={SessionId}")"
+                     ImportUrl="@(SessionStatus == SessionStatus.Draft ? $"/api/content/import/questions?sessionId={SessionId}" : null)"
+                     ImportLabel="Import questions into this survey" Imported="LoadQuestionsAsync" />
     <SurveyQuestionGenerator SessionId="@Guid.Parse(SessionId)"
                              InstructorCode="@_instructorCode"
                              IsDraft="@(SessionStatus == SessionStatus.Draft)"
@@ -318,6 +322,8 @@
                 <div class="question-card">
                     <div class="question-type">@GetTypeName(q.Type)</div>
                     <div class="question-text">@q.Text</div>
+                    <ContentTransfer InstructorCode="@_instructorCode"
+                                     ExportUrl="@($"/api/content/questions?sessionId={SessionId}&questionId={q.Id}")" />
                     @if (q.CorrectAnswers.Count > 0)
                     {
                         <p>Correct: @string.Join(", ", q.CorrectAnswers)</p>

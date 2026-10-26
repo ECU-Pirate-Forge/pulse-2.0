@@ -37,4 +37,9 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="..\..\docs\examples\questions.json" Link="ContentTransfer\questions.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\docs\schemas\questions.schema.json" Link="ContentTransfer\questions.schema.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

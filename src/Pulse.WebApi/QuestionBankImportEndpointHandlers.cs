@@ -82,6 +82,9 @@ public static class QuestionBankImportEndpointHandlers
                     .ToList(),
                 SortOrder = existingMaxSortOrder + 1 + i,
                 CorrectAnswers = [.. item.CorrectAnswers],
+                Explanation = item.Explanation,
+                SourceId = item.SourceId,
+                SourceQuote = item.SourceQuote,
                 CreatedAt = DateTime.UtcNow
             };
             questionRepo.Insert(question);

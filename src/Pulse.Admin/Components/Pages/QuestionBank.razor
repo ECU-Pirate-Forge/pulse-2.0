@@ -17,6 +17,9 @@
         <p>Build course-aligned questions and moderate anonymous student suggestions before use.</p>
     </header>
 
+    <ContentTransfer InstructorCode="@instructorCode" ExportUrl="/api/content/questions"
+                     ImportUrl="/api/content/import/questions" ImportLabel="Import questions into bank" Imported="LoadAsync" />
+
     @if (!string.IsNullOrWhiteSpace(error))
     {
         <div class="pulse-alert pulse-alert-error" role="alert">@error</div>
@@ -119,6 +122,7 @@
                         <p>@string.Join(" · ", item.MatchingPairs.Select(pair => $"{pair.Prompt} → {pair.Match}"))</p>
                     }
                     <div class="bank-actions">
+                        <ContentTransfer InstructorCode="@instructorCode" ExportUrl="@($"/api/content/questions?questionId={item.Id}")" />
                         <button class="pulse-button pulse-button-primary" @onclick="() => ModerateAsync(item, QuestionModerationStatus.Approved)">Approve and save</button>
                         <button class="pulse-button pulse-button-secondary" @onclick="() => ModerateAsync(item, QuestionModerationStatus.Rejected)">Reject</button>
                     </div>

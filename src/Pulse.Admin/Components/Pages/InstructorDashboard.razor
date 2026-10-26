@@ -239,6 +239,8 @@
         </div>
 
         <!-- Sessions List -->
+        <ContentTransfer InstructorCode="@_instructorCode" ImportUrl="/api/content/import/survey"
+                         ImportLabel="Import survey" Imported="LoadSessionsAsync" />
         <MudText Typo="Typo.h5" Style="font-weight: 700; margin-bottom: 20px;">Your surveys</MudText>
 
         @if (!string.IsNullOrEmpty(DeleteError))
@@ -272,6 +274,7 @@
                             <div class="session-code">@session.JoinCode</div>
                         </div>
                         <div class="session-body">
+                            <ContentTransfer InstructorCode="@_instructorCode" ExportUrl="@($"/api/content/surveys/{session.Id}")" />
                             <div class="session-info">
                                 <div class="session-info-row">
                                     <span class="session-label">Questions:</span>
