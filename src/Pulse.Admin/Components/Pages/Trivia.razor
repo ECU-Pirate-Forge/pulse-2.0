@@ -130,11 +130,18 @@
             {
                 <div class="trivia-question-row">
                     <Pulse.Shared.Components.MarkdownContent Text="@question.Text" />
-                    <button class="pulse-button pulse-button-secondary" @onclick="() => OpenQuestionAsync(question.Id)">Open question</button>
-                    @if (control.State.Status == TriviaGameStatus.Lobby)
-                    {
-                        <button class="pulse-button pulse-button-secondary" @onclick="() => RemoveQuestionAsync(question.Id)">Remove</button>
-                    }
+                    <div class="trivia-question-actions">
+                        <button class="pulse-button pulse-button-secondary" @onclick="() => OpenQuestionAsync(question.Id)">Open</button>
+                        @if (control.State.Status == TriviaGameStatus.QuestionOpen &&
+                             control.State.CurrentQuestion?.Id == question.Id)
+                        {
+                            <button class="pulse-button pulse-button-secondary" @onclick="CloseQuestionAsync">Close</button>
+                        }
+                        @if (control.State.Status == TriviaGameStatus.Lobby)
+                        {
+                            <button class="pulse-button pulse-button-secondary" @onclick="() => RemoveQuestionAsync(question.Id)">Remove</button>
+                        }
+                    </div>
                 </div>
             }
         </section>

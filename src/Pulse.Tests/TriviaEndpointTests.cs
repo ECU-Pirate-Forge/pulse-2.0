@@ -15,6 +15,26 @@ namespace Pulse.Tests.Tests;
 public class TriviaEndpointTests
 {
     [Fact]
+    public void AddQuestion_DoesNotAddTheSameBankQuestionTwice()
+    {
+        using var database = new LiteDatabase("Filename=:memory:");
+        var repository = new TriviaRepository(database);
+        var bank = new QuestionBankRepository(database);
+        var game = repository.InsertGame(Game());
+        var bankQuestion = bank.Insert(BankQuestion("IP address basics"));
+        var request = new AddTriviaQuestionRequest(bankQuestion.Id);
+
+        var first = TriviaEndpointHandlers.AddQuestion(
+            game.Id, request, InstructorContext("INST"), repository, bank);
+        var repeated = TriviaEndpointHandlers.AddQuestion(
+            game.Id, request, InstructorContext("INST"), repository, bank);
+
+        Assert.IsType<Created<TriviaQuestion>>(first);
+        Assert.IsType<Conflict<string>>(repeated);
+        Assert.Single(repository.GetQuestions(game.Id));
+    }
+
+    [Fact]
     public void AddFilteredQuestions_AddsAllApprovedEligibleMatchesOnce()
     {
         using var database = new LiteDatabase("Filename=:memory:");

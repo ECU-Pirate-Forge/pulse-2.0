@@ -100,6 +100,11 @@ public static class TriviaEndpointHandlers
             return Results.NotFound();
         if (game.Status != TriviaGameStatus.Lobby)
             return Results.Conflict("Questions can only be added in the lobby.");
+        if (repository.GetQuestions(gameId)
+            .Any(question => question.QuestionBankItemId == request.QuestionBankItemId))
+        {
+            return Results.Conflict("This question is already in the game.");
+        }
 
         var bankItem = bankRepository.GetById(request.QuestionBankItemId);
         if (bankItem is null ||
