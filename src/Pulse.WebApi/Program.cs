@@ -85,11 +85,10 @@ app.MapDelete("/questions/{id:guid}", QuestionEndpointHandlers.DeleteQuestionFor
 app.MapPut("/api/questions/reorder", QuestionEndpointHandlers.ReorderQuestionsForInstructor);
 
 // Session-specific question endpoints
-app.MapGet("/api/sessions/{sessionId:guid}/questions", (Guid sessionId, QuestionRepository questionRepo) =>
-{
-    var questions = questionRepo.GetBySessionId(sessionId).OrderBy(q => q.SortOrder).ToList();
-    return Results.Ok(questions.Select(StudentQuestionResponse.FromQuestion));
-});
+app.MapGet("/api/sessions/{sessionId:guid}/questions", SurveyQuestionEndpointHandlers.GetStudentQuestions);
+app.MapPut("/api/sessions/{sessionId:guid}/questions/{questionId:guid}/share", SurveyQuestionEndpointHandlers.ShareQuestion);
+app.MapDelete("/api/sessions/{sessionId:guid}/questions/shared", SurveyQuestionEndpointHandlers.ClearSharedQuestion);
+app.MapPut("/api/sessions/{sessionId:guid}/questions/{questionId:guid}/reveal", SurveyQuestionEndpointHandlers.RevealQuestion);
 
 app.MapPost("/api/sessions/{sessionId:guid}/questions", QuestionEndpointHandlers.CreateQuestionForSession);
 app.MapSurveyGeneration();

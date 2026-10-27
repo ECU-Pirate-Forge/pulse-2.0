@@ -4,6 +4,8 @@
 @using Pulse.Shared.Contracts.V1
 @using Pulse.Shared.Resources
 @using Pulse.Shared.Services
+@using Pulse.Shared.Models
+@using Pulse.Domain.Entities
 @implements IAsyncDisposable
 @rendermode InteractiveServer
 @inject HttpClient Http
@@ -51,9 +53,10 @@
         <div class="live-actions">
             <a class="pulse-button pulse-button-secondary" href="@($"/instructor/questions/{SessionId}")">@SurveyText.EditSurvey</a>
             <button class="pulse-button pulse-button-secondary" disabled="@isPerformingAction" @onclick="CloseAsync">Close survey</button>
-            <button class="pulse-button pulse-button-primary" disabled="@isPerformingAction" @onclick="RevealAsync">Reveal results</button>
+            <button class="pulse-button pulse-button-primary" disabled="@isPerformingAction" @onclick="RevealAsync">Reveal all results</button>
             <button class="pulse-button pulse-button-secondary" disabled="@isPerformingAction" @onclick="@(() => confirmReset = true)">@SurveyText.ResetSurvey</button>
         </div>
+        <p>Until you share a question, students can see the full survey. Sharing another question shows only that question.</p>
 
         @if (confirmReset)
         {
@@ -73,14 +76,41 @@
                         <div role="heading" aria-level="2"><Pulse.Shared.Components.MarkdownContent Text="@question.Text" /></div>
                         <span>@question.ResponseCount responses</span>
                     </div>
-                    @foreach (var tally in question.Tallies)
+                    <div class="live-question-actions">
+                        @if (results.SharedQuestionId == question.QuestionId)
+                        {
+                            <span role="status">Currently shared with students</span>
+                            <button class="pulse-button pulse-button-secondary" disabled="@isPerformingAction"
+                                    @onclick="ClearSharedQuestionAsync">Stop sharing</button>
+                        }
+                        else
+                        {
+                            <button class="pulse-button pulse-button-secondary" disabled="@isPerformingAction"
+                                    @onclick="() => ShareQuestionAsync(question.QuestionId)">Share this question</button>
+                        }
+                        @if (results.RevealedQuestionIds?.Contains(question.QuestionId) == true)
+                        {
+                            <span role="status">Results revealed to students</span>
+                        }
+                        else
+                        {
+                            <button class="pulse-button pulse-button-secondary" disabled="@isPerformingAction"
+                                    @onclick="() => RevealQuestionAsync(question.QuestionId)">Reveal this question's results</button>
+                        }
+                    </div>
+                    @foreach (var (tally, tallyIndex) in question.Tallies.Select((tally, index) => (tally, index)))
                     {
                         var percentage = question.ResponseCount == 0
                             ? 0
                             : (int)Math.Round(tally.Count * 100d / question.ResponseCount);
                         <div class="result-row">
                             <div>
-                                <span>@tally.Value
+                                <span>
+                                    @if (question.Type is nameof(QuestionType.MultipleChoice) or nameof(QuestionType.MultipleAnswer))
+                                    {
+                                        <span class="survey-choice-label">@ChoiceLabelFormatter.ForIndex(tallyIndex).</span>
+                                    }
+                                    @tally.Value
                                     @if (question.CorrectAnswers?.Contains(tally.Value, StringComparer.Ordinal) == true)
                                     {
                                         <span class="correct-answer-badge">@SurveyText.CorrectAnswer</span>
@@ -173,6 +203,15 @@
 
     private Task RevealAsync() => PerformActionAsync("unblind", "Pulse could not reveal these results.");
 
+    private Task ShareQuestionAsync(Guid questionId) =>
+        PerformQuestionActionAsync(HttpMethod.Put, $"questions/{questionId}/share", "Pulse could not share this question.");
+
+    private Task ClearSharedQuestionAsync() =>
+        PerformQuestionActionAsync(HttpMethod.Delete, "questions/shared", "Pulse could not stop sharing this question.");
+
+    private Task RevealQuestionAsync(Guid questionId) =>
+        PerformQuestionActionAsync(HttpMethod.Put, $"questions/{questionId}/reveal", "Pulse could not reveal this question's results.");
+
     private async Task ResetAsync()
     {
         await PerformActionAsync("reset", SurveyText.ResetFailed);
@@ -202,6 +241,36 @@
         catch (HttpRequestException ex)
         {
             Logger.LogWarning(ex, "Survey action {Action} failed for {SessionId}", action, SessionId);
+            error = failureMessage;
+        }
+        finally
+        {
+            isPerformingAction = false;
+        }
+    }
+
+    private async Task PerformQuestionActionAsync(HttpMethod method, string path, string failureMessage)
+    {
+        if (isPerformingAction)
+            return;
+
+        isPerformingAction = true;
+        try
+        {
+            using var request = AuthorizedRequest(method, $"/api/sessions/{SessionId}/{path}");
+            using var response = await Http.SendAsync(request, lifetime.Token);
+            if (!response.IsSuccessStatusCode)
+            {
+                error = failureMessage;
+                return;
+            }
+
+            error = null;
+            await RefreshAsync();
+        }
+        catch (HttpRequestException ex)
+        {
+            Logger.LogWarning(ex, "Survey question action {Path} failed for {SessionId}", path, SessionId);
             error = failureMessage;
         }
         finally

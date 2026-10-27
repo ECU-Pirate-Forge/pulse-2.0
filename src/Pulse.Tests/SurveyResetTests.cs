@@ -99,6 +99,20 @@ public class SurveyResetTests : IDisposable
     }
 
     [Fact]
+    public void Reset_ClearsQuestionSharingAndRevealState()
+    {
+        session.SharedQuestionId = question.Id;
+        session.RevealedQuestionIds.Add(question.Id);
+        sessions.Update(session);
+
+        sessions.ResetSurvey(session.Id);
+
+        var reset = sessions.GetById(session.Id)!;
+        Assert.Null(reset.SharedQuestionId);
+        Assert.Empty(reset.RevealedQuestionIds);
+    }
+
+    [Fact]
     public void Reset_IncrementsPersistedVersionOnEveryRun()
     {
         sessions.ResetSurvey(session.Id);

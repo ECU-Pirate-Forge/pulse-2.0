@@ -133,13 +133,29 @@ public class InstructorLiveFlowTests : BunitContext
             Assert.Contains("3", cut.Markup);
             Assert.Contains("Live question", cut.Markup);
         });
-        cut.FindAll("button").Single(button => button.TextContent.Contains("Reveal")).Click();
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Reveal all results").Click();
 
         cut.WaitForAssertion(() =>
         {
             Assert.True(handler.RevealCalled);
             Assert.Equal(InstructorCode, handler.InstructorCode);
         });
+    }
+
+    [Fact]
+    public async Task SurveyLive_SharesAndRevealsQuestionsIndividually()
+    {
+        var handler = new SurveyLiveHandler();
+        await PrepareSurveyAsync(handler);
+        var cut = Render<SurveyLive>(parameters => parameters.Add(page => page.SessionId, SurveyLiveHandler.SessionId));
+
+        cut.WaitForElement(".live-question-actions");
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Share this question").Click();
+        cut.WaitForAssertion(() => Assert.True(handler.ShareCalled));
+        Assert.Equal(SurveyLiveHandler.QuestionId, handler.SharedQuestionId);
+
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Reveal this question's results").Click();
+        cut.WaitForAssertion(() => Assert.Contains(SurveyLiveHandler.QuestionId, handler.RevealedQuestionIds));
     }
 
     [Fact]
@@ -420,7 +436,11 @@ public class InstructorLiveFlowTests : BunitContext
     private sealed class SurveyLiveHandler : HttpMessageHandler
     {
         public static readonly Guid SessionId = Guid.NewGuid();
+        public static readonly Guid QuestionId = Guid.NewGuid();
         public bool RevealCalled { get; private set; }
+        public bool ShareCalled { get; private set; }
+        public Guid? SharedQuestionId { get; private set; }
+        public List<Guid> RevealedQuestionIds { get; } = [];
         public bool ResetCalled { get; set; }
         public int Selections { get; init; } = 3;
         public int Responses { get; init; } = 3;
@@ -439,13 +459,15 @@ public class InstructorLiveFlowTests : BunitContext
                     ResetCalled ? 0 : 7,
                     ResetCalled ? 0 : 3,
                     [new SurveyQuestionResultsResponse(
-                        Guid.NewGuid(),
+                        QuestionId,
                         "Live question",
                         "MultipleChoice",
                         [new OptionTallyResponse("A", ResetCalled ? 0 : Selections),
                          new OptionTallyResponse("B", 0), new OptionTallyResponse("C", 0)],
                         ResetCalled ? 0 : Responses,
-                        ["B"])])));
+                        ["B"])],
+                    SharedQuestionId,
+                    RevealedQuestionIds)));
             }
 
             if (request.Method == HttpMethod.Put &&
@@ -454,6 +476,23 @@ public class InstructorLiveFlowTests : BunitContext
                 RevealCalled = true;
                 InstructorCode = request.Headers.GetValues("InstructorCode").Single();
                 return Task.FromResult(Json(new { resultsVisibility = ResultsVisibility.Revealed }));
+            }
+
+            if (request.Method == HttpMethod.Put &&
+                request.RequestUri!.AbsolutePath == $"/api/sessions/{SessionId}/questions/{QuestionId}/share")
+            {
+                ShareCalled = true;
+                SharedQuestionId = QuestionId;
+                InstructorCode = request.Headers.GetValues("InstructorCode").Single();
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));
+            }
+
+            if (request.Method == HttpMethod.Put &&
+                request.RequestUri!.AbsolutePath == $"/api/sessions/{SessionId}/questions/{QuestionId}/reveal")
+            {
+                RevealedQuestionIds.Add(QuestionId);
+                InstructorCode = request.Headers.GetValues("InstructorCode").Single();
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));
             }
 
             if (request.Method == HttpMethod.Put &&

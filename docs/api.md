@@ -337,9 +337,9 @@ Response codes:
 - 404 Not Found
 - 409 Conflict (invalid lifecycle transition)
 
-## Approved survey V1 contracts
+## Survey submissions and results
 
-The shared V1 contracts are defined for the survey redesign but are not all wired to HTTP endpoints yet. They establish these rules for subsequent phases:
+The V1 contracts define these rules:
 
 - A whole-survey submission contains a device id and a collection of answers.
 - Each answer contains one question id and a list of selected values.
@@ -350,7 +350,9 @@ The shared V1 contracts are defined for the survey redesign but are not all wire
 
 ### POST /api/sessions/{sessionId}/submit
 
-Submit every answer for an Active survey in one atomic request.
+Submit all questions for an Active survey in one atomic request. If the instructor
+has shared a single question, submit that question's answer; subsequent shared
+questions can be submitted separately and accumulate under the same anonymous device.
 
 Protected: No
 
@@ -368,9 +370,10 @@ Request body:
 }
 ```
 
-Each question must appear exactly once. Single-choice and true/false answers
-contain one value, multiple-answer responses contain the selected option set,
-and matching responses contain one selected match per prompt in prompt order.
+Each question in the current submission must appear exactly once. Single-choice
+and true/false answers contain one value; multiple-answer responses contain the
+selected option set; matching responses contain one selected match per prompt in
+prompt order.
 The API validates the complete payload before writing. Repeated submissions
 from the same device replace its current answers and completion marker rather
 than adding duplicate rows.
@@ -421,16 +424,32 @@ Response 200 shape:
 
 ### GET /api/sessions/{id}/results/student
 
-Return only `resultsVisibility` while a survey is blinded. After the instructor
-reveals results, return the aggregate question tallies. This endpoint never
-returns participant identifiers or individual answers.
+Return only `resultsVisibility` while no results have been revealed. After the
+instructor reveals an individual question, return aggregate tallies for revealed
+questions only. The existing session-wide reveal action returns all question
+results. This endpoint never returns participant identifiers or individual answers.
+
+### Per-question sharing and results
+
+| Method | Route | Behavior |
+| --- | --- | --- |
+| PUT | `/api/sessions/{sessionId}/questions/{questionId}/share` | Share one question with students; replaces the previously shared question |
+| DELETE | `/api/sessions/{sessionId}/questions/shared` | Stop sharing a single question; students return to the full survey |
+| PUT | `/api/sessions/{sessionId}/questions/{questionId}/reveal` | Reveal aggregate results for one question |
+
+These instructor routes require `InstructorCode` and ownership of the survey.
+Sharing is available only while a survey is Active. Until a question is selected,
+the existing full-survey flow remains unchanged. In staged mode, each submitted
+answer is retained while students receive subsequent shared questions. Completed
+survey counts increase after responses exist for every question.
 
 Protected: No
 
 ### SignalR /hubs/session
 
 Clients call `JoinSession(sessionId)` to join a session-scoped group. The hub
-publishes `SubmissionUpdated`, `SessionClosed`, and `ResultsRevealed` events.
+publishes `SubmissionUpdated`, `SessionClosed`, `ResultsRevealed`, and
+`QuestionsUpdated` events.
 The Blazor clients also poll the corresponding results endpoint so a temporary
 WebSocket interruption does not leave the classroom view stale.
 
@@ -440,6 +459,8 @@ WebSocket interruption does not leave the classroom view stale.
 
 `GET /questions` and `GET /api/sessions/{sessionId}/questions` return
 student-safe projections without answer keys, explanations, or source quotes.
+The session-specific route returns every question until the instructor shares one;
+while a question is shared, it returns only that question.
 For matching questions, `matchingPairs` contains prompts with empty `match`
 values; `options` contains independently sorted match choices. Clients must
 not interpret array alignment as the correct pairing.
@@ -497,10 +518,12 @@ choices, one matching correct answer, and an exact quote from a retrieved
 passage. The application rejects invalid citations and wrong question counts.
 No survey questions are inserted by generation itself.
 
-The instructor preview supports editing question text, individual multiline choices,
-the correct answer, explanation, and comma-separated tags, plus removing unwanted
-questions. Text and choices render with the existing safe Markdown renderer,
-including fenced code blocks; raw HTML and unsafe link destinations are not rendered.
+The instructor preview supports editing question text, adding, removing, and editing
+individual multiline choices, the correct answer, explanation, and comma-separated
+tags, plus removing unwanted questions. Multiple-choice options use A, B, C, D labels
+in the student survey and authoring views. Text and choices render with the existing
+safe Markdown renderer, including fenced code blocks; raw HTML and unsafe link
+destinations are not rendered.
 Stored/submitted answer values remain the original Markdown source, not rendered HTML.
 Matching choices use radio groups rather than native dropdowns so Markdown and code
 blocks can be displayed for every choice.

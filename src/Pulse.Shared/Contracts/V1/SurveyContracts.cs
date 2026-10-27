@@ -43,7 +43,9 @@ public sealed record InstructorSurveyResultsResponse(
     [property: JsonPropertyName("title")] string Title,
     [property: JsonPropertyName("participantCount")] int ParticipantCount,
     [property: JsonPropertyName("completedCount")] int CompletedCount,
-    [property: JsonPropertyName("questions")] IReadOnlyList<SurveyQuestionResultsResponse> Questions);
+    [property: JsonPropertyName("questions")] IReadOnlyList<SurveyQuestionResultsResponse> Questions,
+    [property: JsonPropertyName("sharedQuestionId")] Guid? SharedQuestionId = null,
+    [property: JsonPropertyName("revealedQuestionIds")] IReadOnlyList<Guid>? RevealedQuestionIds = null);
 
 public sealed record StudentSurveyResultsResponse(
     [property: JsonPropertyName("sessionId")] Guid SessionId,

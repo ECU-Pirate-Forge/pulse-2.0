@@ -64,6 +64,11 @@
     accent-color: var(--pulse-purple-700);
 }
 
+.survey-choice-label {
+    flex: 0 0 1.5rem;
+    color: var(--pulse-purple-900);
+}
+
 .matching-row {
     display: grid;
     gap: 0.5rem;

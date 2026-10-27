@@ -69,7 +69,7 @@
                             var index = i;
                             var choice = question.Options[index];
                             <li>
-                                <label>Choice @(index + 1) (Markdown)
+                                <label>Choice @ChoiceLabelFormatter.ForIndex(index) (Markdown)
                                     <textarea class="preview-option" value="@choice" @oninput="args => SetChoice(question, index, args.Value?.ToString() ?? string.Empty)" rows="3"></textarea>
                                 </label>
                                 <label>
@@ -82,9 +82,11 @@
                                 {
                                     <span>(Correct answer)</span>
                                 }
+                                <button type="button" @onclick="() => RemoveChoice(question, index)">Remove choice</button>
                             </li>
                         }
                     </ul>
+                    <button type="button" @onclick="() => question.Options.Add(string.Empty)">Add choice</button>
                     <label>Tags (comma separated)
                         <input class="preview-tags" value="@string.Join(", ", question.Tags)" @onchange="args => question.Tags = ParseTags(args.Value?.ToString())" />
                     </label>
@@ -239,11 +241,21 @@
         question.Options[index] = value;
     }
 
+    private static void RemoveChoice(GeneratedSurveyQuestion question, int index)
+    {
+        var removedChoice = question.Options[index];
+        question.Options.RemoveAt(index);
+        if (question.CorrectAnswer == removedChoice)
+            question.CorrectAnswer = string.Empty;
+    }
+
     private Task SaveToBankAsync(GeneratedSurveyQuestion question, bool isDraft) => PerformAsync(async () =>
     {
-        if (!isDraft && !question.Options.Contains(question.CorrectAnswer, StringComparer.Ordinal))
+        if (!isDraft &&
+            (question.Options.Count(option => !string.IsNullOrWhiteSpace(option)) < 2 ||
+             !question.Options.Contains(question.CorrectAnswer, StringComparer.Ordinal)))
         {
-            error = "Select a correct answer matching one of the choices before saving.";
+            error = "Add at least two choices and select a correct answer matching one of them before saving.";
             return;
         }
         using var response = await SendRequestAsync(HttpMethod.Post, "/api/questionbank", JsonContent.Create(new

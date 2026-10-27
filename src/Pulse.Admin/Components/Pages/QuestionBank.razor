@@ -47,7 +47,7 @@
                 @for (var i = 0; i < draft.Options.Count; i++)
                 {
                     var index = i;
-                    <label>Choice @(index + 1) (Markdown) <textarea value="@draft.Options[index]" @oninput="args => SetChoice(draft.Options, draft.CorrectAnswers, index, args.Value?.ToString() ?? string.Empty)" rows="3"></textarea>
+                    <label>Choice @ChoiceLabelFormatter.ForIndex(index) (Markdown) <textarea value="@draft.Options[index]" @oninput="args => SetChoice(draft.Options, draft.CorrectAnswers, index, args.Value?.ToString() ?? string.Empty)" rows="3"></textarea>
                         <MarkdownContent Text="@draft.Options[index]" />
                         <button type="button" @onclick="() => RemoveChoice(draft.Options, draft.CorrectAnswers, index)">Remove choice</button>
                     </label>
@@ -146,7 +146,7 @@
                         @for (var i = 0; i < item.Options.Count; i++)
                         {
                             var index = i;
-                            <label>Choice @(index + 1) (Markdown)
+                            <label>Choice @ChoiceLabelFormatter.ForIndex(index) (Markdown)
                                 <textarea class="bank-option" value="@item.Options[index]" @oninput="args => SetChoice(item.Options, item.CorrectAnswers, index, args.Value?.ToString() ?? string.Empty)" rows="3"></textarea>
                             </label>
                             <MarkdownContent Text="@item.Options[index]" />

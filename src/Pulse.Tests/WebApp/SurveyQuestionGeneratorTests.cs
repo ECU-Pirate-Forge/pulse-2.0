@@ -33,6 +33,7 @@ public class SurveyQuestionGeneratorTests : BunitContext
             Assert.Contains("Review before adding", cut.Markup);
             Assert.Contains("(Correct answer)", cut.Markup);
             Assert.Contains("Photosynthesis uses light.", cut.Find("blockquote").TextContent);
+            Assert.Contains("Choice A", cut.Markup);
         });
         Assert.Equal(2, handler.RequestedCount);
         Assert.False(handler.Accepted);
@@ -59,6 +60,20 @@ public class SurveyQuestionGeneratorTests : BunitContext
         Assert.Equal("What is **energy**?", edited.Text);
         Assert.Equal("```csharp\nvar light = true;\n```", edited.CorrectAnswer);
         Assert.Equal(["biology", "code"], edited.Tags);
+    }
+
+    [Fact]
+    public void Preview_AddsAndRemovesChoicesWithLetterLabels()
+    {
+        var cut = RenderPreview();
+        var originalCount = cut.FindAll(".preview-option").Count;
+        Assert.Contains("Choice A", cut.Markup);
+
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Add choice").Click();
+        Assert.Equal(originalCount + 1, cut.FindAll(".preview-option").Count);
+
+        cut.FindAll("button").Last(button => button.TextContent.Trim() == "Remove choice").Click();
+        Assert.Equal(originalCount, cut.FindAll(".preview-option").Count);
     }
 
     [Theory]

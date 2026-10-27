@@ -49,6 +49,14 @@
     padding: 1.5rem;
 }
 
+.live-question-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
 .live-question-title,
 .result-row > div {
     display: flex;

@@ -44,14 +44,24 @@ public static class SessionResultsEndpointHandlers
         if (session is null)
             return Results.NotFound();
 
-        if (session.ResultsVisibility != ResultsVisibility.Revealed)
-            return TypedResults.Ok(new StudentResultsStatusResponse(ResultsVisibility.Blinded, session.ResetVersion, session.Status));
+        if (!session.IsUnblinded &&
+            !questionRepo.GetBySessionId(session.Id)
+                .Any(question => session.RevealedQuestionIds.Contains(question.Id)))
+        {
+            return TypedResults.Ok(new StudentResultsStatusResponse(
+                ResultsVisibility.Blinded,
+                session.ResetVersion,
+                session.Status));
+        }
 
         var instructorResults = BuildInstructorResults(session, questionRepo, responseRepo);
+        var revealedQuestionIds = instructorResults.RevealedQuestionIds ?? [];
         return TypedResults.Ok(new StudentSurveyResultsResponse(
             instructorResults.SessionId,
             instructorResults.Title,
-            instructorResults.Questions,
+            instructorResults.Questions
+                .Where(question => revealedQuestionIds.Contains(question.QuestionId))
+                .ToList(),
             session.ResetVersion));
     }
 
@@ -88,16 +98,25 @@ public static class SessionResultsEndpointHandlers
             .Select(response => response.DeviceId)
             .Distinct(StringComparer.Ordinal)
             .Count();
-        var completedCount = responseRepo.GetSubmissionsBySession(session.Id)
-            .Select(submission => submission.DeviceId)
-            .Distinct(StringComparer.Ordinal)
-            .Count();
+        var completedCount = SurveyProgress.CountCompleted(
+            session.Id,
+            questions.Select(question => question.Id).ToList(),
+            responseRepo.GetSubmissionsBySession(session.Id),
+            responseRepo);
+        var revealedQuestionIds = session.IsUnblinded
+            ? questions.Select(question => question.Id).ToList()
+            : session.RevealedQuestionIds
+                .Where(questionId => questions.Any(question => question.Id == questionId))
+                .Distinct()
+                .ToList();
 
         return new InstructorSurveyResultsResponse(
             session.Id,
             session.Title,
             participantCount,
             completedCount,
-            questionResults);
+            questionResults,
+            session.SharedQuestionId,
+            revealedQuestionIds);
     }
 }
