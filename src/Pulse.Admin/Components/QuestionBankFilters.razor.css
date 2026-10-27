@@ -1,0 +1,22 @@
+.question-filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+.question-filters label {
+    display: grid;
+    gap: 0.35rem;
+    font-weight: 600;
+}
+
+.question-filters input,
+.question-filters select {
+    width: 100%;
+    min-width: 0;
+    padding: 0.65rem;
+    border: 1px solid var(--pulse-border);
+    border-radius: var(--pulse-radius-sm);
+    background: white;
+}

@@ -95,6 +95,18 @@ for authentication/ownership failures; 404 for missing targets; 409 for non-draf
 survey destinations; 413 for oversized files. Error responses include a description
 when a file fails validation. Question files cannot be imported as form fields.
 
+Bank imports also return `importBatchId`. Each successful bank import creates a
+distinct, persistent batch with its UTC timestamp, original question count, and
+filename. Send the optional `X-Import-Filename` header as a URI-escaped filename
+(the instructor UI does this automatically). Paths are stripped and decoded names
+must be at most 255 characters without control characters; omitted names default
+to `questions.json`. Batch metadata and questions commit or roll back together.
+Import IDs are local provenance, not portable JSON properties: exporting and
+reimporting questions creates a new batch, not a link to the original batch.
+Survey/form imports and questions appended directly to surveys do not create bank
+import batches. Existing questions remain usable but cannot be retroactively
+attributed to an import. CSV preview validates only; it does not persist a batch.
+
 ### Expected question JSON schema
 
 The machine-readable [JSON Schema](schemas/questions.schema.json) and a ready-to-import
@@ -563,7 +575,8 @@ Question-bank items include `course`, `topic`, `tags`, `type`,
   with `moderationStatus: 0` (Approved) to publish it after full validation.
   Student suggestions cannot be converted into instructor drafts.
 - `GET /api/questionbank` supports `text`, `type`, `course`, `topic`, `tag`,
-  `moderationStatus`, `source`, `sort`, `page`, `pageSize`, and `isDraft`.
+  `moderationStatus`, `source`, `sort`, `page`, `pageSize`, `isDraft`,
+  `triviaEligible`, `importBatchId`, `correctAnswer`, `correctAnswerPosition`, and `option`.
   `isDraft=true` lists unfinished work. Approved queries exclude drafts unless
   explicitly filtering by `isDraft=true`. Tag matching is case-insensitive; tags
   are trimmed and deduplicated.
@@ -755,14 +768,32 @@ Response codes:
 
 List/search question bank items.
 
-Protected: No
+Protected: Yes (InstructorCode required)
 
 Query params:
 
 - text (optional)
 - type (optional, int)
+- course, topic, tag (optional, case-insensitive exact match)
+- moderationStatus (optional: Approved, Pending, Rejected)
+- source (optional: Legacy, InstructorAuthored, StudentSuggestion, CsvImport, JsonImport)
+- isDraft, triviaEligible (optional booleans)
+- importBatchId (optional, non-empty GUID)
+- correctAnswer (optional, case-insensitive substring in any correct answer)
+- option (optional, case-insensitive substring in any answer option)
+- correctAnswerPosition (optional, 1-based position of any correct answer; 1 = A,
+  2 = B, etc.; True/False uses True at 1 and False at 2)
+- sort (optional: Newest, Oldest, Text)
 - page (optional, default 1)
 - pageSize (optional, default 20)
+
+All supplied filters are combined with AND. Multiple-answer questions match any
+correct answer at the requested position. Missing/out-of-range answer positions
+do not match; positions below 1 and invalid enum/empty import ID values return 400.
+Question text also uses case-insensitive substring matching.
+The bank and trivia picker both support pagination and these filters. The trivia
+picker always adds `moderationStatus=Approved&isDraft=false&triviaEligible=true`;
+filtering or clearing filters cannot broaden this eligibility requirement.
 
 Response 200:
 
@@ -780,6 +811,53 @@ Response 200:
 	"totalCount": 1
 }
 ```
+
+### GET /api/questionbank/imports
+
+Protected: Yes (InstructorCode required)
+
+Returns an array ordered by newest import first. Each entry contains `id`,
+`fileName`, `importedAt` (UTC), `importedCount`, and `remainingCount`. History remains
+after all associated questions are deleted. New JSON imports use source
+`JsonImport` (numeric value 4); existing source values are unchanged.
+
+### POST /api/questionbank/delete/preview
+
+Protected: Yes (InstructorCode required)
+
+Submit a JSON filter using the same property names and semantics as the list query,
+except pagination is not supported. At least one nonblank filter is required;
+sorting alone is not a filter. Enum values in JSON use their numeric values.
+
+```json
+{ "correctAnswerPosition": 1, "source": 4 }
+```
+
+Returns 200 with `{ "questionIds": ["..."] }` for **all** matches across pages
+(possibly an empty list). The UI displays the count and an explicit permanent
+deletion confirmation. To review a complete prior import, use `importBatchId`
+alone; combining it with other filters deletes only the matching subset.
+
+### POST /api/questionbank/delete
+
+Protected: Yes (InstructorCode required)
+
+Submit the applied filter and the exact non-empty list from the preview:
+
+```json
+{
+  "filter": { "correctAnswerPosition": 1, "source": 4 },
+  "expectedIds": ["44444444-4444-4444-4444-444444444444"]
+}
+```
+
+Returns 200 with `{ "deletedCount": 1 }`. Missing/invalid filters, missing or empty
+confirmation lists, and duplicate/empty IDs return 400. If the matching ID set has
+changed since preview, returns 409 and deletes nothing; preview again to continue.
+Deletion is transactional: a write failure rolls back the entire operation.
+Only reusable bank items are deleted, not copies already placed in surveys or
+trivia games. Deletion is permanent; import history is retained with updated
+remaining counts.
 
 ### POST /api/questionbank/import/preview
 

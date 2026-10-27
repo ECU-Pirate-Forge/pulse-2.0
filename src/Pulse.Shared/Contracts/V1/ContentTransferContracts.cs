@@ -42,7 +42,7 @@ public sealed class PortableFormField
     public List<string> Options { get; init; } = [];
 }
 
-public sealed record ContentImportResponse(string Kind, Guid? Id, int ImportedCount);
+public sealed record ContentImportResponse(string Kind, Guid? Id, int ImportedCount, Guid? ImportBatchId = null);
 
 public static class ContentTransferJson
 {

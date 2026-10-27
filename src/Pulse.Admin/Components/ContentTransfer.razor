@@ -53,6 +53,7 @@
             await using var stream = args.File.OpenReadStream(ContentTransferJson.MaxFileBytes);
             using var reader = new StreamReader(stream, Encoding.UTF8);
             using var request = Authorized(HttpMethod.Post, ImportUrl!);
+            request.Headers.Add("X-Import-Filename", Uri.EscapeDataString(args.File.Name));
             request.Content = new StringContent(await reader.ReadToEndAsync(), Encoding.UTF8, "application/json");
             using var response = await Http.SendAsync(request);
             if (!response.IsSuccessStatusCode)

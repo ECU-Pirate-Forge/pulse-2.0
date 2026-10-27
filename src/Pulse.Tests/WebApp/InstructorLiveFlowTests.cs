@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.JSInterop;
 using MudBlazor.Services;
 using Pulse.Admin.Components.Pages;
+using Pulse.Admin.Components;
 using Pulse.Domain.Entities;
 using Pulse.Shared.Contracts.V1;
 using Pulse.Shared.Models;
@@ -17,6 +18,100 @@ namespace Pulse.Tests.Tests.WebApp;
 public class InstructorLiveFlowTests : BunitContext
 {
     private const string InstructorCode = "INSTRUCTOR";
+
+    [Fact]
+    public async Task QuestionBank_ImportDeletionPreviewsAllPagesAndRequiresConfirmation()
+    {
+        await AddInstructorStorageAsync();
+        var handler = new BankManagementHandler();
+        Services.AddSingleton(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+        var cut = Render<QuestionBank>();
+        cut.WaitForElement(".bank-import-row button").Click();
+        cut.WaitForAssertion(() => Assert.Contains($"importBatchId={handler.BatchId}", handler.Query));
+        Assert.False(handler.DeleteCalled);
+        cut.FindAll("button").Single(button => button.TextContent == "Preview deletion of all matches").Click();
+        cut.WaitForAssertion(() => Assert.Contains("all 105 matching", cut.Markup));
+        Assert.False(handler.DeleteCalled);
+        cut.FindAll("button").Single(button => button.TextContent == "Cancel").Click();
+        Assert.DoesNotContain("Confirm permanent deletion", cut.Markup);
+        Assert.False(handler.DeleteCalled);
+        cut.FindAll("button").Single(button => button.TextContent == "Preview deletion of all matches").Click();
+        cut.WaitForElement(".pulse-alert button").Click();
+        cut.WaitForAssertion(() =>
+        {
+            Assert.True(handler.DeleteCalled);
+            Assert.Contains("Deleted 105 question(s)", cut.Markup);
+            Assert.Contains("0 of 105 remaining", cut.Markup);
+        });
+        Assert.Equal(105, handler.DeleteRequest!.ExpectedIds!.Count);
+        Assert.Equal(handler.BatchId, handler.DeleteRequest.Filter!.ImportBatchId);
+    }
+
+    [Fact]
+    public async Task QuestionBank_ChangedPreviewShowsErrorWithoutSuccess()
+    {
+        await AddInstructorStorageAsync();
+        var handler = new BankManagementHandler { StalePreview = true };
+        Services.AddSingleton(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+        var cut = Render<QuestionBank>();
+        cut.WaitForElement(".bank-import-row button").Click();
+        cut.FindAll("button").Single(button => button.TextContent == "Preview deletion of all matches").Click();
+        cut.WaitForElement(".pulse-alert button").Click();
+        cut.WaitForAssertion(() => Assert.Contains("Preview again", cut.Find("[role='alert']").TextContent));
+        Assert.DoesNotContain("Deleted 105", cut.Markup);
+        Assert.DoesNotContain("Confirm permanent deletion", cut.Markup);
+    }
+
+    [Fact]
+    public async Task QuestionBank_PaginatesMatchingResults()
+    {
+        await AddInstructorStorageAsync();
+        var handler = new BankManagementHandler();
+        Services.AddSingleton(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+        var cut = Render<QuestionBank>();
+        cut.WaitForElement(".bank-item");
+        cut.FindAll("nav button")[1].Click();
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("page=2", handler.Query);
+            Assert.Contains("Page 2 of 6", cut.Markup);
+        });
+    }
+
+    private sealed class BankManagementHandler : HttpMessageHandler
+    {
+        public Guid BatchId { get; } = Guid.NewGuid();
+        private readonly List<Guid> ids = Enumerable.Range(1, 105).Select(_ => Guid.NewGuid()).ToList();
+        public bool StalePreview { get; init; }
+        public bool DeleteCalled { get; private set; }
+        public DeleteQuestionBankRequest? DeleteRequest { get; private set; }
+        public string Query { get; private set; } = string.Empty;
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Assert.Equal(InstructorCode, request.Headers.GetValues("InstructorCode").Single());
+            var path = request.RequestUri!.AbsolutePath;
+            if (path == "/api/questionbank/imports")
+                return Json(new[] { new QuestionImportSummary(BatchId, "bad-import.json", DateTime.UtcNow, 105, DeleteCalled && !StalePreview ? 0 : 105) });
+            if (path == "/api/questionbank/delete/preview")
+                return Json(new QuestionBankDeletePreview(ids));
+            if (path == "/api/questionbank/delete")
+            {
+                DeleteCalled = true;
+                DeleteRequest = await request.Content!.ReadFromJsonAsync<DeleteQuestionBankRequest>(cancellationToken);
+                return StalePreview
+                    ? new HttpResponseMessage(HttpStatusCode.Conflict) { Content = new StringContent("Preview again: questions changed.") }
+                    : Json(new QuestionBankDeleteResponse(105));
+            }
+            Query = request.RequestUri.Query;
+            return Json(new
+            {
+                Items = DeleteCalled && !StalePreview ? Array.Empty<QuestionBankItem>() :
+                    new[] { new QuestionBankItem { Text = "Bad import", Type = QuestionType.TrueFalse, ImportBatchId = BatchId } },
+                TotalCount = DeleteCalled && !StalePreview ? 0 : 105
+            });
+        }
+    }
 
     [Fact]
     public async Task QuestionBank_ReopensEditsAndFiltersDrafts()
@@ -41,7 +136,7 @@ public class InstructorLiveFlowTests : BunitContext
         Assert.Equal(choice, handler.Saved.Value.GetProperty("correctAnswers")[0].GetString());
         Assert.Equal("review", handler.Saved.Value.GetProperty("tags")[1].GetString());
 
-        cut.Find(".bank-filters select").Change("Draft");
+        cut.Find(".bank-filters select[data-testid='bank-status-filter']").Change("Draft");
         cut.FindAll("button").Single(button => button.TextContent == "Apply filters").Click();
         cut.WaitForAssertion(() => Assert.Contains("isDraft=true", handler.Query));
         Assert.DoesNotContain("moderationStatus=Draft", handler.Query);
@@ -70,6 +165,8 @@ public class InstructorLiveFlowTests : BunitContext
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Assert.Equal(InstructorCode, request.Headers.GetValues("InstructorCode").Single());
+            if (request.RequestUri!.AbsolutePath == "/api/questionbank/imports")
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(Array.Empty<QuestionImportSummary>()) };
             if (request.Method != HttpMethod.Get)
             {
                 Saved = await request.Content!.ReadFromJsonAsync<JsonElement>(cancellationToken);
@@ -111,6 +208,32 @@ public class InstructorLiveFlowTests : BunitContext
                 $"/api/trivia/{TriviaControlHandler.GameId}/questions/{TriviaControlHandler.QuestionId}/open",
                 handler.ControlPath);
             Assert.Equal(InstructorCode, handler.InstructorCode);
+        });
+    }
+
+    [Fact]
+    public async Task TriviaControl_AppliesSharedFiltersAndPaginatesEligibleQuestions()
+    {
+        var handler = new TriviaControlHandler();
+        await AddInstructorStorageAsync();
+        Services.AddSingleton(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+        var cut = Render<Trivia>();
+        cut.WaitForElement(".trivia-game-choice").Click();
+        var filters = cut.WaitForElement(".question-filters");
+        filters.QuerySelector("input")!.Change("network");
+        cut.FindAll("button").Single(button => button.TextContent == "Apply filters").Click();
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("text=network", handler.BankQuery);
+            Assert.Contains("moderationStatus=Approved", handler.BankQuery);
+            Assert.Contains("triviaEligible=true", handler.BankQuery);
+            Assert.Contains("isDraft=false", handler.BankQuery);
+        });
+        cut.FindAll("nav button")[1].Click();
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("page=2", handler.BankQuery);
+            Assert.Contains("text=network", handler.BankQuery);
         });
     }
 
@@ -389,6 +512,7 @@ public class InstructorLiveFlowTests : BunitContext
         public static readonly Guid QuestionId = Guid.NewGuid();
         public string? ControlPath { get; private set; }
         public string? InstructorCode { get; private set; }
+        public string BankQuery { get; private set; } = string.Empty;
 
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
@@ -397,8 +521,13 @@ public class InstructorLiveFlowTests : BunitContext
             var path = request.RequestUri!.PathAndQuery;
             if (request.Method == HttpMethod.Get && path == "/api/trivia")
                 return Task.FromResult(Json(new[] { Game() }));
+            if (request.Method == HttpMethod.Get && path == "/api/questionbank/imports")
+                return Task.FromResult(Json(Array.Empty<QuestionImportSummary>()));
             if (request.Method == HttpMethod.Get && path.StartsWith("/api/questionbank", StringComparison.Ordinal))
-                return Task.FromResult(Json(new { items = Array.Empty<QuestionBankItem>(), totalCount = 0 }));
+            {
+                BankQuery = request.RequestUri.Query;
+                return Task.FromResult(Json(new { items = Array.Empty<QuestionBankItem>(), totalCount = 101 }));
+            }
             if (request.Method == HttpMethod.Get && path == $"/api/trivia/{GameId}/control")
                 return Task.FromResult(Json(Control()));
             if (request.Method == HttpMethod.Put)

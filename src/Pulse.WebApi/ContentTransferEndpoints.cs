@@ -119,6 +119,13 @@ public static class ContentTransferEndpoints
         if (sessionId.HasValue && kind != "questions")
             return Results.BadRequest("Only question files can be appended to an existing survey.");
 
+        var fileName = Uri.UnescapeDataString(context.Request.Headers["X-Import-Filename"].ToString());
+        if (fileName.Length > 255 || fileName.Any(char.IsControl))
+            return Results.BadRequest("Import filename must be at most 255 characters without control characters.");
+        fileName = fileName.Replace('\\', '/').Split('/').Last();
+        if (string.IsNullOrWhiteSpace(fileName))
+            fileName = $"{kind}.json";
+
         Session? target = null;
         if (sessionId.HasValue)
         {
@@ -155,7 +162,7 @@ public static class ContentTransferEndpoints
         if (error is not null)
             return Results.BadRequest(error);
         // Validation above checks the complete document before any writes.
-        return Persist(document!, target, code, database, questions, bank, forms, joinCodes);
+        return Persist(document!, target, code, database, questions, bank, forms, joinCodes, fileName);
     }
 
     private static string? Validate(ContentTransferDocument? document, string kind, QuestionService validation, bool forSurvey)
@@ -223,7 +230,8 @@ public static class ContentTransferEndpoints
 
     private static IResult Persist(
         ContentTransferDocument document, Session? target, string code, LiteDatabase database,
-        QuestionRepository questions, IQuestionBankRepository bank, FormRepository forms, IJoinCodeGenerator joinCodes)
+        QuestionRepository questions, IQuestionBankRepository bank, FormRepository forms, IJoinCodeGenerator joinCodes,
+        string fileName)
     {
         if (!database.BeginTrans())
             throw new InvalidOperationException("Unable to start content import transaction.");
@@ -231,6 +239,12 @@ public static class ContentTransferEndpoints
         {
             Guid? id = target?.Id;
             var count = document.Questions?.Count ?? document.Fields!.Count;
+            QuestionImportBatch? batch = null;
+            if (document.Kind == "questions" && target is null)
+            {
+                batch = new QuestionImportBatch { FileName = fileName, ImportedCount = count };
+                database.GetCollection<QuestionImportBatch>("question_imports").Insert(batch);
+            }
             if (document.Kind == "form")
             {
                 string joinCode;
@@ -279,14 +293,15 @@ public static class ContentTransferEndpoints
                             CorrectAnswers = q.CorrectAnswers, Course = q.Course, Topic = q.Topic, Tags = q.Tags,
                             Explanation = q.Explanation, SourceId = q.SourceId, SourceQuote = q.SourceQuote,
                             TriviaEligible = q.TriviaEligible, IsDraft = q.IsDraft, ModerationStatus = Enum.Parse<QuestionModerationStatus>(q.ModerationStatus),
-                            Source = QuestionSource.InstructorAuthored, ContributorAttribution = "Instructor"
+                            Source = QuestionSource.JsonImport, ContributorAttribution = "Instructor",
+                            ImportBatchId = batch!.Id
                         });
                     }
                 }
             }
             if (!database.Commit())
                 throw new InvalidOperationException("Unable to commit content import transaction.");
-            return Results.Ok(new ContentImportResponse(document.Kind, id, count));
+            return Results.Ok(new ContentImportResponse(document.Kind, id, count, batch?.Id));
         }
         catch
         {

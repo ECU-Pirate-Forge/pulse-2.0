@@ -93,6 +93,7 @@ app.MapPut("/api/sessions/{sessionId:guid}/questions/{questionId:guid}/reveal", 
 app.MapPost("/api/sessions/{sessionId:guid}/questions", QuestionEndpointHandlers.CreateQuestionForSession);
 app.MapSurveyGeneration();
 app.MapContentTransfer();
+app.MapQuestionBankManagement();
 
 app.MapPost("/api/questionbank", QuestionBankEndpointHandlers.CreateQuestionBankItem);
 app.MapGet("/api/questionbank", QuestionBankEndpointHandlers.GetQuestionBankItems);

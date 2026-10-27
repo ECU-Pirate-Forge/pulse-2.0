@@ -35,6 +35,7 @@ public sealed class ContentTransferComponentTests : BunitContext
             Assert.Equal("INST", handler.Code);
             Assert.Equal("""{"format":"pulse"}""", handler.Body);
             Assert.Equal("/api/content/import/questions", handler.Path);
+            Assert.Equal("questions.json", handler.FileName);
             Assert.Contains("Imported 2 item(s)", cut.Find("[role='status']").TextContent);
         });
     }
@@ -99,11 +100,13 @@ public sealed class ContentTransferComponentTests : BunitContext
         public string? Code { get; private set; }
         public string? Path { get; private set; }
         public string? Body { get; private set; }
+        public string? FileName { get; private set; }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Code = request.Headers.GetValues("InstructorCode").Single();
             Path = request.RequestUri!.AbsolutePath;
+            FileName = request.Headers.TryGetValues("X-Import-Filename", out var names) ? names.Single() : null;
             Body = request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken);
             var response = new HttpResponseMessage(status);
             if (status != HttpStatusCode.OK)

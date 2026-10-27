@@ -109,6 +109,42 @@ public class QuestionBankRepositoryTests
     }
 
     [Fact]
+    public void Search_AnswerPositionSupportsTrueFalseMultipleAnswerAndMissingPositions()
+    {
+        var repo = CreateRepository();
+        var tf = repo.Insert(new QuestionBankItem { Text = "True/false", Type = QuestionType.TrueFalse, CorrectAnswers = ["False"] });
+        var multiple = repo.Insert(new QuestionBankItem
+        {
+            Text = "Multiple answers", Type = QuestionType.MultipleAnswer, Options = ["A", "B", "C"], CorrectAnswers = ["A", "C"]
+        });
+        repo.Insert(new QuestionBankItem { Text = "No answers", Type = QuestionType.MultipleChoice, Options = ["A", "B"] });
+
+        Assert.Equal(tf.Id, Assert.Single(repo.Search(new QuestionBankQuery(CorrectAnswerPosition: 2))).Id);
+        Assert.Equal(multiple.Id, Assert.Single(repo.Search(new QuestionBankQuery(CorrectAnswerPosition: 3))).Id);
+        Assert.Empty(repo.Search(new QuestionBankQuery(CorrectAnswerPosition: 4)));
+        Assert.Equal(tf.Id, Assert.Single(repo.Search(new QuestionBankQuery(Option: "FALSE"))).Id);
+    }
+
+    [Fact]
+    public void ImportMetadata_PersistsWhenDatabaseReopens()
+    {
+        using var stream = new MemoryStream();
+        var batch = new QuestionImportBatch { FileName = "questions.json", ImportedCount = 1 };
+        Guid itemId;
+        byte[] persisted;
+        using (var db = new LiteDatabase(stream, new BsonMapper()))
+        {
+            db.GetCollection<QuestionImportBatch>("question_imports").Insert(batch);
+            itemId = new QuestionBankRepository(db).Insert(new QuestionBankItem { Text = "Imported", ImportBatchId = batch.Id }).Id;
+            db.Checkpoint();
+            persisted = stream.ToArray();
+        }
+        using var reopened = new LiteDatabase(new MemoryStream(persisted), new BsonMapper());
+        Assert.Equal(batch.Id, new QuestionBankRepository(reopened).GetById(itemId)!.ImportBatchId);
+        Assert.Equal("questions.json", reopened.GetCollection<QuestionImportBatch>("question_imports").FindById(batch.Id).FileName);
+    }
+
+    [Fact]
     public void Search_ByType_ReturnsMatchingItems()
     {
         // Arrange

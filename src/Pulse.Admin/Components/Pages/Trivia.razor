@@ -79,13 +79,24 @@
 
             <article class="pulse-card trivia-panel">
                 <h2>Add approved questions</h2>
+                <QuestionBankFilters Value="@bankFilter" ValueChanged="ApplyBankFiltersAsync" Imports="@imports" TriviaOnly="true" Disabled="@isLoadingBank" />
+                <p aria-live="polite">@bankTotalCount eligible questions match the applied filters.</p>
+                @if (eligibleQuestions.Count == 0 && !isLoadingBank)
+                {
+                    <p>No eligible questions match these filters.</p>
+                }
                 @foreach (var item in eligibleQuestions)
                 {
                     <div class="trivia-bank-row">
                         <span>@item.Text</span>
-                        <button @onclick="() => AddQuestionAsync(item.Id)">Add</button>
+                        <button disabled="@(control.State.Status != TriviaGameStatus.Lobby)" @onclick="() => AddQuestionAsync(item.Id)">Add</button>
                     </div>
                 }
+                <nav aria-label="Trivia question pages">
+                    <button disabled="@(bankPage == 1 || isLoadingBank)" @onclick="() => ChangeBankPageAsync(-1)">Previous</button>
+                    <span>Page @bankPage of @Math.Max(1, (int)Math.Ceiling(bankTotalCount / (double)BankPageSize))</span>
+                    <button disabled="@((long)bankPage * BankPageSize >= bankTotalCount || isLoadingBank)" @onclick="() => ChangeBankPageAsync(1)">Next</button>
+                </nav>
             </article>
         </section>
 
@@ -124,6 +135,13 @@
     private string? error;
     private List<TriviaGame> games = [];
     private List<QuestionBankItem> eligibleQuestions = [];
+    private const int BankPageSize = 20;
+    private QuestionBankQuery bankFilter = new(
+        ModerationStatus: QuestionModerationStatus.Approved, TriviaEligible: true, IsDraft: false);
+    private List<QuestionImportSummary> imports = [];
+    private int bankPage = 1;
+    private int bankTotalCount;
+    private bool isLoadingBank;
     private TriviaGame? selectedGame;
     private InstructorTriviaStateResponse? control;
 
@@ -155,12 +173,47 @@
 
     private async Task LoadBankAsync()
     {
-        using var request = Authorized(HttpMethod.Get, "/api/questionbank?moderationStatus=Approved&triviaEligible=true&pageSize=100");
-        var response = await Http.SendAsync(request, lifetime.Token);
-        var payload = response.IsSuccessStatusCode
-            ? await response.Content.ReadFromJsonAsync<QuestionBankResponse>(cancellationToken: lifetime.Token)
-            : null;
-        eligibleQuestions = payload?.Items.Where(item => item.TriviaEligible).ToList() ?? [];
+        isLoadingBank = true;
+        error = null;
+        try
+        {
+            using var historyRequest = Authorized(HttpMethod.Get, "/api/questionbank/imports");
+            using var historyResponse = await Http.SendAsync(historyRequest, lifetime.Token);
+            historyResponse.EnsureSuccessStatusCode();
+            imports = await historyResponse.Content.ReadFromJsonAsync<List<QuestionImportSummary>>(cancellationToken: lifetime.Token)
+                ?? throw new System.Text.Json.JsonException("The server returned empty import history.");
+            using var request = Authorized(HttpMethod.Get, $"/api/questionbank?{bankFilter.ToQueryString(bankPage, BankPageSize)}");
+            using var response = await Http.SendAsync(request, lifetime.Token);
+            response.EnsureSuccessStatusCode();
+            var payload = await response.Content.ReadFromJsonAsync<QuestionBankResponse>(cancellationToken: lifetime.Token)
+                ?? throw new System.Text.Json.JsonException("The server returned an empty question bank.");
+            eligibleQuestions = payload.Items;
+            bankTotalCount = payload.TotalCount;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
+        {
+            error = $"Pulse could not load trivia questions: {ex.Message}";
+            eligibleQuestions = [];
+            bankTotalCount = 0;
+        }
+        finally
+        {
+            isLoadingBank = false;
+            StateHasChanged();
+        }
+    }
+
+    private Task ApplyBankFiltersAsync(QuestionBankQuery value)
+    {
+        bankFilter = value with { ModerationStatus = QuestionModerationStatus.Approved, TriviaEligible = true, IsDraft = false };
+        bankPage = 1;
+        return LoadBankAsync();
+    }
+
+    private Task ChangeBankPageAsync(int direction)
+    {
+        bankPage += direction;
+        return LoadBankAsync();
     }
 
     private async Task CreateGameAsync()
