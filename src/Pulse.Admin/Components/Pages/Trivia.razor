@@ -22,6 +22,10 @@
     {
         <div class="pulse-alert pulse-alert-error" role="alert">@error</div>
     }
+    @if (!string.IsNullOrWhiteSpace(statusMessage))
+    {
+        <p role="status">@statusMessage</p>
+    }
 
     <section class="pulse-card trivia-create">
         <h2>Create a trivia game</h2>
@@ -63,6 +67,16 @@
                 <p class="pulse-eyebrow-alternate">Join code @control.State.JoinCode</p>
                 <h2>@control.State.Title</h2>
                 <p>@control.ParticipantCount players · @control.State.Status</p>
+                @if (confirmDeleteGame)
+                {
+                    <p role="alert">Delete this game and all of its trivia data?</p>
+                    <button class="pulse-button pulse-button-primary" @onclick="DeleteGameAsync">Confirm delete game</button>
+                    <button class="pulse-button pulse-button-secondary" @onclick="() => confirmDeleteGame = false">Cancel</button>
+                }
+                else
+                {
+                    <button class="pulse-button pulse-button-secondary" @onclick="() => confirmDeleteGame = true">Delete game</button>
+                }
                 @if (control.State.CompetitionMode == TriviaCompetitionMode.Team &&
                      control.State.Status == TriviaGameStatus.Lobby)
                 {
@@ -81,6 +95,9 @@
                 <h2>Add approved questions</h2>
                 <QuestionBankFilters Value="@bankFilter" ValueChanged="ApplyBankFiltersAsync" Imports="@imports" TriviaOnly="true" Disabled="@isLoadingBank" />
                 <p aria-live="polite">@bankTotalCount eligible questions match the applied filters.</p>
+                <button class="pulse-button pulse-button-primary"
+                        disabled="@(control.State.Status != TriviaGameStatus.Lobby || isLoadingBank || bankTotalCount == 0)"
+                        @onclick="AddFilteredQuestionsAsync">Add all filtered questions</button>
                 @if (eligibleQuestions.Count == 0 && !isLoadingBank)
                 {
                     <p>No eligible questions match these filters.</p>
@@ -89,7 +106,14 @@
                 {
                     <div class="trivia-bank-row">
                         <span>@item.Text</span>
-                        <button disabled="@(control.State.Status != TriviaGameStatus.Lobby)" @onclick="() => AddQuestionAsync(item.Id)">Add</button>
+                        @if (control.Questions.Any(question => question.QuestionBankItemId == item.Id))
+                        {
+                            <span>Added</span>
+                        }
+                        else
+                        {
+                            <button disabled="@(control.State.Status != TriviaGameStatus.Lobby || isLoadingBank)" @onclick="() => AddQuestionAsync(item.Id)">Add</button>
+                        }
                     </div>
                 }
                 <nav aria-label="Trivia question pages">
@@ -107,6 +131,10 @@
                 <div class="trivia-question-row">
                     <Pulse.Shared.Components.MarkdownContent Text="@question.Text" />
                     <button class="pulse-button pulse-button-secondary" @onclick="() => OpenQuestionAsync(question.Id)">Open question</button>
+                    @if (control.State.Status == TriviaGameStatus.Lobby)
+                    {
+                        <button class="pulse-button pulse-button-secondary" @onclick="() => RemoveQuestionAsync(question.Id)">Remove</button>
+                    }
                 </div>
             }
         </section>
@@ -133,6 +161,7 @@
     private int durationSeconds = 20;
     private string teamName = string.Empty;
     private string? error;
+    private string? statusMessage;
     private List<TriviaGame> games = [];
     private List<QuestionBankItem> eligibleQuestions = [];
     private const int BankPageSize = 20;
@@ -142,6 +171,7 @@
     private int bankPage = 1;
     private int bankTotalCount;
     private bool isLoadingBank;
+    private bool confirmDeleteGame;
     private TriviaGame? selectedGame;
     private InstructorTriviaStateResponse? control;
 
@@ -235,6 +265,7 @@
     private async Task SelectGameAsync(TriviaGame game)
     {
         selectedGame = game;
+        confirmDeleteGame = false;
         await RefreshControlAsync();
     }
 
@@ -246,6 +277,57 @@
 
     private Task AddQuestionAsync(Guid bankItemId) =>
         SendControlAsync(HttpMethod.Post, "questions", new AddTriviaQuestionRequest(bankItemId));
+
+    private async Task AddFilteredQuestionsAsync()
+    {
+        if (selectedGame is null)
+            return;
+
+        using var request = Authorized(
+            HttpMethod.Post,
+            $"/api/trivia/{selectedGame.Id}/questions/bulk",
+            new AddTriviaQuestionsRequest(bankFilter));
+        using var response = await Http.SendAsync(request, lifetime.Token);
+        if (!response.IsSuccessStatusCode)
+        {
+            error = await response.Content.ReadAsStringAsync(lifetime.Token);
+            statusMessage = null;
+        }
+        else
+        {
+            var result = await response.Content.ReadFromJsonAsync<AddTriviaQuestionsResponse>(
+                cancellationToken: lifetime.Token)
+                ?? throw new System.Text.Json.JsonException("The server returned an empty bulk-add result.");
+            error = null;
+            statusMessage = $"Added {result.AddedCount} questions; {result.AlreadyIncludedCount} were already in this game.";
+        }
+        await RefreshControlAsync();
+    }
+
+    private async Task DeleteGameAsync()
+    {
+        if (selectedGame is null)
+            return;
+
+        var title = selectedGame.Title;
+        using var request = Authorized(HttpMethod.Delete, $"/api/trivia/{selectedGame.Id}");
+        using var response = await Http.SendAsync(request, lifetime.Token);
+        if (!response.IsSuccessStatusCode)
+        {
+            error = await response.Content.ReadAsStringAsync(lifetime.Token);
+            return;
+        }
+
+        selectedGame = null;
+        control = null;
+        confirmDeleteGame = false;
+        error = null;
+        statusMessage = $"Deleted trivia game \"{title}\".";
+        await LoadGamesAsync();
+    }
+
+    private Task RemoveQuestionAsync(Guid questionId) =>
+        SendControlAsync(HttpMethod.Delete, $"questions/{questionId}");
 
     private Task OpenQuestionAsync(Guid questionId) =>
         SendControlAsync(HttpMethod.Put, $"questions/{questionId}/open");
@@ -260,9 +342,12 @@
     {
         if (selectedGame is null)
             return;
+        statusMessage = null;
         using var request = Authorized(method, $"/api/trivia/{selectedGame.Id}/{path}", body);
         var response = await Http.SendAsync(request, lifetime.Token);
         error = response.IsSuccessStatusCode ? null : await response.Content.ReadAsStringAsync(lifetime.Token);
+        if (!response.IsSuccessStatusCode)
+            statusMessage = null;
         await RefreshControlAsync();
     }
 

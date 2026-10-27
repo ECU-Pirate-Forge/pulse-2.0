@@ -599,9 +599,16 @@ Trivia is stored separately from anonymous survey sessions. Instructor routes
 require `InstructorCode`; join, player-state, and answer routes are public.
 
 - `GET|POST /api/trivia` lists or creates games.
+- `DELETE /api/trivia/{gameId}` deletes an owned game and its related trivia data.
 - `POST /api/trivia/{gameId}/teams` creates an instructor-defined team.
 - `POST /api/trivia/{gameId}/questions` copies an approved, trivia-eligible
   bank item into the game.
+- `POST /api/trivia/{gameId}/questions/bulk` accepts an `AddTriviaQuestionsRequest`
+  with a `filter` and adds every matching approved, non-draft, trivia-eligible
+  bank item, regardless of the picker page. Existing items are skipped; the
+  response reports `addedCount` and `alreadyIncludedCount`.
+- `DELETE /api/trivia/{gameId}/questions/{questionId}` removes an individual
+  question while the game is in the lobby.
 - `GET|POST /api/trivia/join/{joinCode}` returns join information or joins a
   player. Reusing a device ID reconnects to the original participant.
 - `PUT /api/trivia/{gameId}/questions/{questionId}/open` starts the
@@ -794,6 +801,7 @@ Question text also uses case-insensitive substring matching.
 The bank and trivia picker both support pagination and these filters. The trivia
 picker always adds `moderationStatus=Approved&isDraft=false&triviaEligible=true`;
 filtering or clearing filters cannot broaden this eligibility requirement.
+The bulk trivia action uses the applied filters across all pages.
 
 Response 200:
 

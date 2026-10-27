@@ -56,6 +56,17 @@ public static class TriviaEndpointHandlers
             : Results.Ok(repository.GetGames(instructorCode));
     }
 
+    public static IResult DeleteGame(
+        Guid gameId,
+        HttpContext context,
+        TriviaRepository repository)
+    {
+        var game = OwnedGame(gameId, context, repository);
+        return game is null || !repository.DeleteGame(gameId)
+            ? Results.NotFound()
+            : Results.NoContent();
+    }
+
     public static IResult AddTeam(
         Guid gameId,
         CreateTriviaTeamRequest request,
@@ -99,19 +110,70 @@ public static class TriviaEndpointHandlers
             return Results.BadRequest("Select an approved, trivia-eligible question with a correct answer.");
         }
 
-        var question = new TriviaQuestion
-        {
-            GameId = gameId,
-            QuestionBankItemId = bankItem.Id,
-            Text = bankItem.Text,
-            Type = bankItem.Type,
-            Options = bankItem.Type == QuestionType.TrueFalse
-                ? ["True", "False"]
-                : [.. bankItem.Options],
-            CorrectAnswers = [.. bankItem.CorrectAnswers],
-            SortOrder = repository.GetQuestions(gameId).Count
-        };
+        var question = CreateTriviaQuestion(bankItem, gameId, repository.GetQuestions(gameId).Count);
         return Results.Created($"/api/trivia/{gameId}/questions/{question.Id}", repository.InsertQuestion(question));
+    }
+
+    public static IResult AddFilteredQuestions(
+        Guid gameId,
+        AddTriviaQuestionsRequest request,
+        HttpContext context,
+        TriviaRepository repository,
+        IQuestionBankRepository bankRepository)
+    {
+        var game = OwnedGame(gameId, context, repository);
+        if (game is null)
+            return Results.NotFound();
+        if (game.Status != TriviaGameStatus.Lobby)
+            return Results.Conflict("Questions can only be added in the lobby.");
+        if (request.Filter is null)
+            return Results.BadRequest("A question filter is required.");
+        if (request.Filter.Validate() is { } validationError)
+            return Results.BadRequest(validationError);
+
+        var filter = request.Filter with
+        {
+            ModerationStatus = QuestionModerationStatus.Approved,
+            TriviaEligible = true,
+            IsDraft = false
+        };
+        var matchingItems = bankRepository.Search(filter).ToList();
+        if (matchingItems.Any(item => item.CorrectAnswers.Count == 0))
+            return Results.BadRequest("Every matching question must have a correct answer before adding them.");
+
+        var existingItemIds = repository.GetQuestions(gameId)
+            .Select(question => question.QuestionBankItemId)
+            .ToHashSet();
+        var addedCount = 0;
+        var sortOrder = repository.GetQuestions(gameId).Count;
+        foreach (var item in matchingItems)
+        {
+            if (!existingItemIds.Add(item.Id))
+                continue;
+
+            repository.InsertQuestion(CreateTriviaQuestion(item, gameId, sortOrder++));
+            addedCount++;
+        }
+
+        return Results.Ok(new AddTriviaQuestionsResponse(
+            addedCount,
+            matchingItems.Count - addedCount));
+    }
+
+    public static IResult RemoveQuestion(
+        Guid gameId,
+        Guid questionId,
+        HttpContext context,
+        TriviaRepository repository)
+    {
+        var game = OwnedGame(gameId, context, repository);
+        if (game is null)
+            return Results.NotFound();
+        if (game.Status != TriviaGameStatus.Lobby)
+            return Results.Conflict("Questions can only be removed in the lobby.");
+        return repository.DeleteQuestion(gameId, questionId)
+            ? Results.NoContent()
+            : Results.NotFound();
     }
 
     public static IResult Join(
@@ -355,4 +417,20 @@ public static class TriviaEndpointHandlers
 
     private static string? InstructorCode(HttpContext context) =>
         context.Items[InstructorCodeMiddleware.HeaderName]?.ToString();
+
+    private static TriviaQuestion CreateTriviaQuestion(
+        QuestionBankItem bankItem,
+        Guid gameId,
+        int sortOrder) => new()
+    {
+        GameId = gameId,
+        QuestionBankItemId = bankItem.Id,
+        Text = bankItem.Text,
+        Type = bankItem.Type,
+        Options = bankItem.Type == QuestionType.TrueFalse
+            ? ["True", "False"]
+            : [.. bankItem.Options],
+        CorrectAnswers = [.. bankItem.CorrectAnswers],
+        SortOrder = sortOrder
+    };
 }
