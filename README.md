@@ -36,6 +36,8 @@ The shared `/join/{code}` path checks surveys first, then trivia games if no
 survey matches. Trivia codes continue to `/trivia/{code}` with the game already
 loaded; students enter a display name and, for team games, select a team.
 Students can also enter their game code directly on `/trivia`.
+Late trivia answers are still rejected by the server; students see the deadline
+message in a styled alert box and can select **Close** after reading it.
 
 ### Markdown in forms
 

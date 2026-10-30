@@ -20,7 +20,11 @@
 
     @if (!string.IsNullOrWhiteSpace(error))
     {
-        <div class="pulse-alert pulse-alert-error" role="alert">@error</div>
+        <div class="pulse-alert pulse-alert-error trivia-message" role="alert">
+            <p>@error</p>
+            <button type="button" class="pulse-button pulse-button-outline"
+                    aria-label="Close message" @onclick="() => error = null">Close</button>
+        </div>
     }
 
     @if (participantId == Guid.Empty)
