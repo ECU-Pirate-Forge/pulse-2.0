@@ -21,7 +21,12 @@ if (!string.IsNullOrWhiteSpace(publicJoinBaseUrl))
     publicJoinBaseUrl = PublicJoinUrl.Normalize(publicJoinBaseUrl);
 
     var options = builder.Configuration.GetSection("DevTunnels").Get<DevTunnelOptions>() ?? new();
-    options.Validate();
+    
+    if(options.Enabled)
+    {
+        options.Validate();
+    }
+
     if (options.Enabled && (builder.ExecutionContext.IsPublishMode || !builder.Environment.IsDevelopment()))
         throw new InvalidOperationException("DevTunnels can only be enabled for local Development runs, not publishing or production.");
 
@@ -29,7 +34,10 @@ if (!string.IsNullOrWhiteSpace(publicJoinBaseUrl))
     var logger = logging.CreateLogger("Pulse.DevTunnels");
     using var http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(5) };
     await using var tunnels = new DevTunnelManager(options, new DevTunnelCli(options.CliPath, logger), http, logger);
-    await tunnels.PrepareAsync(CancellationToken.None);
+    if (options.Enabled)
+    {
+        await tunnels.PrepareAsync(CancellationToken.None);
+    }
 
     builder.AddProject<Projects.Pulse_MigrationManager>("migration");
 
