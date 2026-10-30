@@ -32,6 +32,9 @@ public class Session
 
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public int ResetVersion { get; set; }
+    public Guid? SharedQuestionId { get; set; }
+    public List<Guid> RevealedQuestionIds { get; set; } = [];
 
     [JsonIgnore]
     public bool IsUnblinded { get; set; }

@@ -62,6 +62,46 @@ public sealed class SurveyGenerationRepository(LiteDatabase database)
         }
     }
 
+    public void UpdatePreview(Guid sessionId, Guid previewId, List<GeneratedSurveyQuestion> questions)
+    {
+        if (!database.BeginTrans())
+            throw new InvalidOperationException("Could not start preview-edit transaction.");
+        try
+        {
+            var collection = database.GetCollection<SurveyGenerationPreview>("survey_generation_previews");
+            var preview = collection.FindById(previewId);
+            if (preview is null || preview.SessionId != sessionId ||
+                preview.Revision != GetGrounding(sessionId).Revision ||
+                preview.CreatedAt.ToUniversalTime() < DateTime.UtcNow.AddHours(-1))
+                throw new GroundingConflictException("This preview is out of date. Generate a new preview.");
+            if (questions.Count is < 1 or > 20 || questions.Select(q => q.Id).Distinct().Count() != questions.Count)
+                throw new GroundingValidationException("Keep between 1 and 20 distinct questions.");
+            var originals = preview.Questions.ToDictionary(q => q.Id);
+            foreach (var question in questions)
+            {
+                if (!originals.TryGetValue(question.Id, out var original))
+                    throw new GroundingValidationException("Only questions from this preview can be saved.");
+                if (string.IsNullOrWhiteSpace(question.Text) || question.Options is null ||
+                    question.Options.Count < 2 || question.Options.Any(string.IsNullOrWhiteSpace) ||
+                    question.Options.Distinct(StringComparer.Ordinal).Count() != question.Options.Count ||
+                    !question.Options.Contains(question.CorrectAnswer, StringComparer.Ordinal))
+                    throw new GroundingValidationException("Each question needs text, at least two distinct choices, and a correct answer matching a choice.");
+                question.SourceId = original.SourceId;
+                question.SourceQuote = original.SourceQuote;
+                question.Tags = (question.Tags ?? []).Where(tag => !string.IsNullOrWhiteSpace(tag))
+                    .Select(tag => tag.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            }
+            preview.Questions = questions;
+            if (!collection.Update(preview) || !database.Commit())
+                throw new InvalidOperationException("Could not save preview edits.");
+        }
+        catch
+        {
+            database.Rollback();
+            throw;
+        }
+    }
+
     public IReadOnlyList<Question> Accept(Guid sessionId, Guid previewId)
     {
         if (!database.BeginTrans())
@@ -84,6 +124,7 @@ public sealed class SurveyGenerationRepository(LiteDatabase database)
             {
                 SessionId = sessionId, Text = question.Text, Type = QuestionType.MultipleChoice,
                 Options = question.Options, CorrectAnswers = [question.CorrectAnswer],
+                Tags = question.Tags,
                 Explanation = question.Explanation, SourceId = question.SourceId,
                 SourceQuote = question.SourceQuote, SortOrder = sortOrder + index
             }).ToList();

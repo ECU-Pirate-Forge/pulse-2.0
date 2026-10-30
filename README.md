@@ -36,6 +36,57 @@ The shared `/join/{code}` path checks surveys first, then trivia games if no
 survey matches. Trivia codes continue to `/trivia/{code}` with the game already
 loaded; students enter a display name and, for team games, select a team.
 Students can also enter their game code directly on `/trivia`.
+Late trivia answers are still rejected by the server; students see the deadline
+message in a styled alert box and can select **Close** after reading it.
+
+### Markdown in forms
+
+Form descriptions and field labels (questions) accept standard CommonMark Markdown,
+including **bold**, *italic*, headings, lists, links, images, block quotes, and code
+blocks. Enter Markdown directly in the form editor's description and label inputs;
+it renders on participant forms and in instructor monitoring. For example:
+
+```markdown
+## Before you begin
+
+- Read the [instructions](https://example.com).
+- Tell us **what you learned**.
+```
+
+Existing plain text continues to work. Raw HTML is displayed as text, and unsafe
+link/image destinations (such as `javascript:` and `data:` URLs) are not rendered
+as links or images. Titles, placeholders, dropdown options, submitted answers, and
+survey/trivia prompts remain plain text. Existing description and label length
+limits still apply, and exports retain the original Markdown source.
+
+### Reusing content with JSON
+
+Instructors can export and import survey definitions, form definitions, and question
+files using the JSON controls in their management pages. Imports create new draft
+surveys/forms or reusable bank questions; question files can also be appended to a
+draft survey. Responses and credentials are never included. Existing form response
+CSV downloads are unchanged.
+
+See the [import/export API and examples](docs/api.md#portable-json-import-and-export),
+[question JSON Schema](docs/schemas/questions.schema.json), and
+[ready-to-import question file](docs/examples/questions.json). Files are limited to
+2 MiB and are validated and saved atomically.
+
+### Filtering and cleaning up the question bank
+
+The Question Bank and trivia question picker support combined question text, type,
+course, topic, tag, source, import, answer text, and correct-answer-position filters,
+with paging through all results. Trivia still shows only approved, non-draft,
+trivia-eligible questions.
+
+New JSON bank imports appear in **Import history** with a filename, timestamp,
+original count, and remaining count. Choose **Filter this import** to review one
+batch, or combine filters to find problems such as every correct answer being in
+position 1 (choice A). Choose **Preview deletion of all matches**, review the count,
+then explicitly confirm permanent deletion. This deletes all matches, not just
+the current page. Existing survey/trivia copies are unaffected, and import history
+is retained. Questions imported before batch tracking was added have no historical
+batch association.
 
 ## Fully Implemented Features
 
@@ -77,18 +128,20 @@ Current future-work themes:
 ## Local document-grounded question generation
 
 Ollama runs separately from Aspire on the same machine as Pulse.WebApi.
-The defaults are `http://localhost:11434`, `gemma4:latest` for generation,
-and `all-minilm:latest` for embeddings. Install Ollama, then prepare both models:
+The OpenAI-compatible API base URL is `http://localhost:11434/v1`, with `gemma4:latest` for generation
+and `embeddinggemma:latest` for embeddings. Install Ollama, then prepare both models:
 
 ```powershell
 ollama pull gemma4:latest
-ollama pull all-minilm:latest
+ollama pull embeddinggemma:latest
 ollama serve
 ```
 
 If the Ollama desktop service is already running, do not start a second server.
 Settings are in `src/Pulse.WebApi/appsettings.json`; environment overrides are
 `Ollama__BaseUrl`, `Ollama__Model`, and `Ollama__EmbeddingModel`.
+AppHost passes its `Ollama:BaseUrl` to the API. Ollama is not exposed or checked
+through a dev tunnel; generation uses `/v1/chat/completions` and `/v1/embeddings`.
 Only loopback HTTP/HTTPS inference endpoints are accepted. No cloud inference
 or embedding service is used.
 
@@ -110,6 +163,11 @@ Embeddings are computed locally during generation. Retrieval selects up to
 it does not promise exhaustive coverage of every document. Changing saved
 grounding invalidates previews; previews expire after one hour. Approving a
 preview is transactional and cannot insert that batch twice.
+
+The model selects a retrieved passage by ID rather than transcribing a quote.
+The server rejects missing or unknown passage IDs and copies the original passage
+into the citation, preserving code, punctuation, and whitespace exactly.
+Instructors must still verify that the cited passage supports the answer.
 
 Generation has a five-minute inference timeout and does not automatically
 retry POST requests. Missing models, invalid output, unsupported documents,
@@ -166,6 +224,7 @@ High-level repository layout:
 ### Prerequisites
 
 - .NET SDK 10.0+
+- Aspire CLI 13.1.x (matching this repository's AppHost; see [onboarding](docs/onboarding.md#7-persistent-anonymous-dev-tunnels))
 - Git
 - (Optional) Visual Studio 2022 or VS Code with C# Dev Kit
 
@@ -196,9 +255,16 @@ dotnet test .\Pulse.slnx
 
 ### 5. Run the Full Local Stack (Recommended)
 
-```bash
-dotnet run --project src/Pulse.AppHost/Pulse.AppHost.csproj
+```powershell
+aspire run --project .\src\Pulse.AppHost\Pulse.AppHost.csproj
 ```
+
+For testing from phones or other machines, AppHost can create/start named persistent
+anonymous dev tunnels for WebApp, Admin, WebApi, and Scalar. This is **disabled by
+default**. See [configuration and lifecycle instructions](docs/onboarding.md#7-persistent-anonymous-dev-tunnels).
+In tunnel mode, API requests and QR join links use public HTTPS tunnel addresses;
+the Aspire dashboard stays private. Anonymous tunnels expose the selected services
+to the internet: use test data and retain application authorization.
 
 ### 6. Test on a Phone through a Dev Tunnel
 

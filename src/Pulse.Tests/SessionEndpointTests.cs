@@ -85,6 +85,12 @@ public class SessionEndpointTests
         {
             return Task.FromResult(_store.Remove(id));
         }
+
+        public bool ResetSurvey(Guid id) =>
+            throw new NotSupportedException("Survey reset tests require a database-backed repository.");
+
+        public bool BeginSurveyEdit(Guid id, bool clearResponses) =>
+            throw new NotSupportedException("Survey editing tests require a database-backed repository.");
     }
 
     private HttpClient CreateClient(ISessionRepository? repo = null)

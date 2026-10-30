@@ -39,13 +39,33 @@ public class ResponseRepository : IResponseRepository
         return response;
     }
 
-    public void SubmitSurvey(IReadOnlyCollection<Response> responses, SurveySubmission submission)
+    public void SubmitSurvey(IReadOnlyCollection<Response> responses, SurveySubmission submission) =>
+        SubmitSurveyCore(responses, submission, null);
+
+    /// <summary>Atomically rejects submissions for a paused or replaced survey run.</summary>
+    public bool TrySubmitSurvey(IReadOnlyCollection<Response> responses, SurveySubmission submission, int expectedResetVersion) =>
+        SubmitSurveyCore(responses, submission, expectedResetVersion);
+
+    private bool SubmitSurveyCore(IReadOnlyCollection<Response> responses, SurveySubmission submission, int? expectedResetVersion)
     {
         if (!_db.BeginTrans())
             throw new InvalidOperationException("Could not start the survey submission transaction.");
 
         try
         {
+            if (expectedResetVersion is not null)
+            {
+                var sessions = _db.GetCollection<Session>("sessions");
+                // Lock the session before reading it, using the same lock order as editing/reset transactions.
+                sessions.UpdateMany("{ Status: $.Status }", Query.EQ("_id", submission.SessionId));
+                var session = sessions.FindById(submission.SessionId);
+                if (session is null || session.Status != SessionStatus.Active || session.ResetVersion != expectedResetVersion)
+                {
+                    _db.Rollback();
+                    return false;
+                }
+            }
+
             foreach (var response in responses)
                 Upsert(response);
 
@@ -64,6 +84,7 @@ public class ResponseRepository : IResponseRepository
 
             if (!_db.Commit())
                 throw new InvalidOperationException("Could not commit the survey submission transaction.");
+            return true;
         }
         catch
         {

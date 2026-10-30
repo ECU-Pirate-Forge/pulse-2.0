@@ -42,6 +42,18 @@ public interface ISessionRepository
     bool Update(Session session);
 
     /// <summary>
+    /// Clears survey responses and submissions, then reopens the survey with results hidden.
+    /// Questions, answer keys, and the join code are preserved.
+    /// </summary>
+    bool ResetSurvey(Guid id);
+
+    /// <summary>
+    /// Pauses a survey for editing, preserving questions and its join code.
+    /// Returns false without changing the survey if responses exist and clearing was not confirmed.
+    /// </summary>
+    bool BeginSurveyEdit(Guid id, bool clearResponses);
+
+    /// <summary>
     /// Deletes a session by its id.
     /// </summary>
     /// <param name="id">The session id to delete</param>

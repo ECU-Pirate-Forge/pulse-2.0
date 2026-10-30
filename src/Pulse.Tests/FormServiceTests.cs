@@ -13,6 +13,37 @@ public class FormServiceTests
         Assert.Equal("Request body is required.", FormService.ValidateDefinition(null));
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2000)]
+    [InlineData(2001)]
+    [InlineData(4999)]
+    [InlineData(5000)]
+    public void ValidateDefinition_AcceptsDescriptionWithinMaximum(int length)
+    {
+        var request = new SaveFormRequest("Signup", new string('a', length));
+
+        Assert.Null(FormService.ValidateDefinition(request));
+    }
+
+    [Fact]
+    public void ValidateDefinition_AcceptsNullDescription()
+    {
+        var request = new SaveFormRequest("Signup", null);
+
+        Assert.Null(FormService.ValidateDefinition(request));
+    }
+
+    [Theory]
+    [InlineData(5001)]
+    [InlineData(6000)]
+    public void ValidateDefinition_RejectsDescriptionAboveMaximum(int length)
+    {
+        var request = new SaveFormRequest("Signup", new string('a', length));
+
+        Assert.Equal("Description must be 5000 characters or fewer.", FormService.ValidateDefinition(request));
+    }
+
     [Fact]
     public void ValidateDefinition_RequiresFieldLabels()
     {

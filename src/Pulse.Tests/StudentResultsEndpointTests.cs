@@ -60,6 +60,35 @@ public class StudentResultsEndpointTests
         var ok = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.Ok<StudentSurveyResultsResponse>>(result);
         Assert.Equal(1, ok.Value!.Questions.Single().Tallies.Single(tally => tally.Value == "A").Count);
         Assert.Equal(1, ok.Value.Questions.Single().Tallies.Single(tally => tally.Value == "C").Count);
+        Assert.Equal(0, ok.Value.Questions.Single().Tallies.Single(tally => tally.Value == "B").Count);
+        Assert.Equal(1, ok.Value.Questions.Single().ResponseCount);
+    }
+
+    [Fact]
+    public async Task GetStudentResults_WhenOneQuestionIsRevealed_ReturnsOnlyThatQuestion()
+    {
+        using var database = new LiteDatabase("Filename=:memory:");
+        var session = CreateSession(ResultsVisibility.Blinded);
+        var questionRepo = new QuestionRepository(database);
+        var first = questionRepo.Insert(new Question
+        {
+            SessionId = session.Id, Text = "First", Type = QuestionType.MultipleChoice, Options = ["A", "B"]
+        });
+        var second = questionRepo.Insert(new Question
+        {
+            SessionId = session.Id, Text = "Second", Type = QuestionType.MultipleChoice, Options = ["C", "D"]
+        });
+        session.RevealedQuestionIds.Add(second.Id);
+
+        var result = await SessionResultsEndpointHandlers.GetStudentResults(
+            session.Id,
+            CreateSessionRepository(session).Object,
+            questionRepo,
+            new ResponseRepository(database));
+
+        var ok = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.Ok<StudentSurveyResultsResponse>>(result);
+        Assert.Equal(second.Id, Assert.Single(ok.Value!.Questions).QuestionId);
+        Assert.DoesNotContain(ok.Value.Questions, question => question.QuestionId == first.Id);
     }
 
     [Fact]

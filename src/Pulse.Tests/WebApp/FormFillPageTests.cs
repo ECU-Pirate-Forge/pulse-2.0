@@ -51,6 +51,83 @@ public class FormFillPageTests : BunitContext
     }
 
     [Fact]
+    public void OpenForm_RendersMarkdownDescriptionAndQuestions()
+    {
+        var form = SampleForm() with
+        {
+            Description = "## Welcome\n\n- Read **carefully**\n- Ask for help",
+            Fields =
+            [
+                new PublicFormField(FirstNameId, "**First** name", FormFieldType.Text, true, "*plain placeholder*", []),
+                new PublicFormField(MajorId, "Choose a *major*", FormFieldType.Dropdown, false, null, ["**CS**", "IT"]),
+                new PublicFormField(OpenSourceId, "Like `open source`?", FormFieldType.Checkbox, false, null, [])
+            ]
+        };
+        UseHandler(new FormHandler { Form = form });
+
+        var cut = Render<FormFill>(p => p.Add(x => x.JoinCode, "ABC123"));
+
+        Assert.Equal("Welcome", cut.WaitForElement(".pulse-markdown h2").TextContent);
+        Assert.Equal(2, cut.FindAll(".pulse-markdown ul li").Count);
+        Assert.Equal("First", cut.Find($"#field-{FirstNameId}-label strong").TextContent);
+        Assert.Contains("*", cut.Find($"#field-{FirstNameId}-label").TextContent);
+        Assert.Equal("major", cut.Find($"#field-{MajorId}-label em").TextContent);
+        Assert.Equal("open source", cut.Find($"#field-{OpenSourceId}-label code").TextContent);
+        foreach (var field in form.Fields)
+        {
+            Assert.Equal($"field-{field.Id}-label", cut.Find($"#field-{field.Id}").GetAttribute("aria-labelledby"));
+        }
+        Assert.Equal("*plain placeholder*", cut.Find($"#field-{FirstNameId}").GetAttribute("placeholder"));
+        Assert.Equal("**CS**", cut.FindAll($"#field-{MajorId} option")[1].TextContent);
+    }
+
+    [Theory]
+    [InlineData(FormFieldType.Text)]
+    [InlineData(FormFieldType.TextArea)]
+    [InlineData(FormFieldType.Email)]
+    [InlineData(FormFieldType.Phone)]
+    [InlineData(FormFieldType.Number)]
+    [InlineData(FormFieldType.Date)]
+    [InlineData(FormFieldType.Dropdown)]
+    [InlineData(FormFieldType.YesNo)]
+    [InlineData(FormFieldType.Checkbox)]
+    public void EveryFieldType_HasAnAccessibleMarkdownQuestion(FormFieldType type)
+    {
+        UseHandler(new FormHandler
+        {
+            Form = SampleForm() with
+            {
+                Fields = [new PublicFormField(FirstNameId, "**Question**\n\n- Detail", type, false, null, [])]
+            }
+        });
+
+        var cut = Render<FormFill>(p => p.Add(x => x.JoinCode, "ABC123"));
+
+        Assert.Equal("Question", cut.WaitForElement($"#field-{FirstNameId}-label strong").TextContent);
+        Assert.Equal("Detail", cut.Find($"#field-{FirstNameId}-label li").TextContent);
+        Assert.Equal($"field-{FirstNameId}-label", cut.Find($"#field-{FirstNameId}").GetAttribute("aria-labelledby"));
+    }
+
+    [Fact]
+    public void OpenForm_DoesNotExecuteMarkupInDescriptionsOrQuestions()
+    {
+        UseHandler(new FormHandler
+        {
+            Form = SampleForm() with
+            {
+                Description = "<script>alert(1)</script>\n\n[bad](javascript:alert%281%29)",
+                Fields = [new PublicFormField(FirstNameId, "<img src=x onerror=alert(1)>", FormFieldType.Text, false, null, [])]
+            }
+        });
+        var cut = Render<FormFill>(p => p.Add(x => x.JoinCode, "ABC123"));
+
+        cut.WaitForElement("form");
+
+        Assert.Empty(cut.FindAll("script, img, iframe, [onerror], a[href^='javascript:']"));
+        Assert.Contains("<script>alert(1)</script>", cut.Find(".pulse-markdown").TextContent);
+    }
+
+    [Fact]
     public void Submit_SendsValuesAndShowsThanks()
     {
         var handler = new FormHandler { Form = SampleForm() };

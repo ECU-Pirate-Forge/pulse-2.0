@@ -57,7 +57,7 @@ public class SessionResultsEndpointTests
 
         using var db = new LiteDB.LiteDatabase("Filename=:memory:");
         var questionRepo = new QuestionRepository(db);
-        questionRepo.Insert(new Question { Id = questionId, SessionId = sessionId, Text = "Q1", Type = QuestionType.MultipleChoice, Options = ["A", "B"] });
+        questionRepo.Insert(new Question { Id = questionId, SessionId = sessionId, Text = "Q1", Type = QuestionType.MultipleChoice, Options = ["A", "B", "C"], CorrectAnswers = ["C"] });
 
         var context = BuildContext("INST001");
 
@@ -71,6 +71,9 @@ public class SessionResultsEndpointTests
         var questionTally = okResult.Value.Questions[0];
         Assert.Equal(2, questionTally.Tallies.First(t => t.Value == "A").Count);
         Assert.Equal(1, questionTally.Tallies.First(t => t.Value == "B").Count);
+        Assert.Equal(0, questionTally.Tallies.First(t => t.Value == "C").Count);
+        Assert.Equal(["A", "B", "C"], questionTally.Tallies.Select(tally => tally.Value));
+        Assert.Equal(["C"], questionTally.CorrectAnswers);
     }
 
     [Fact]

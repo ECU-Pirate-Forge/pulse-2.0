@@ -15,6 +15,27 @@
     margin: 0.25rem 0;
 }
 
+.trivia-message {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-top: 1rem;
+    padding: 1rem;
+    color: var(--pulse-danger);
+    background: var(--pulse-surface);
+    border: 0.125rem solid var(--pulse-danger);
+    border-radius: var(--pulse-radius-md);
+    box-shadow: var(--pulse-shadow-sm);
+}
+
+.trivia-message p {
+    flex: 1 1 15rem;
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
 .trivia-join,
 .trivia-question,
 .trivia-wait,

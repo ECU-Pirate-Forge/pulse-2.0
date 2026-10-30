@@ -8,6 +8,7 @@ public interface ISessionClient
     Task SubmissionUpdated(SessionProgressUpdate update);
     Task SessionClosed();
     Task ResultsRevealed();
+    Task QuestionsUpdated();
 }
 
 public sealed class SessionHub : Hub<ISessionClient>
@@ -30,6 +31,10 @@ public interface ISessionEventPublisher
         CancellationToken cancellationToken = default);
 
     Task PublishResultsRevealedAsync(
+        Guid sessionId,
+        CancellationToken cancellationToken = default);
+
+    Task PublishQuestionsUpdatedAsync(
         Guid sessionId,
         CancellationToken cancellationToken = default);
 }
@@ -55,4 +60,10 @@ public sealed class SignalRSessionEventPublisher(IHubContext<SessionHub, ISessio
         CancellationToken cancellationToken = default) =>
         hubContext.Clients.Group(SessionHub.GroupName(sessionId))
             .ResultsRevealed();
+
+    public Task PublishQuestionsUpdatedAsync(
+        Guid sessionId,
+        CancellationToken cancellationToken = default) =>
+        hubContext.Clients.Group(SessionHub.GroupName(sessionId))
+            .QuestionsUpdated();
 }

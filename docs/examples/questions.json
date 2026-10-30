@@ -1,0 +1,37 @@
+{
+  "format": "pulse",
+  "version": 1,
+  "kind": "questions",
+  "questions": [
+    {
+      "text": "Which protocol is used for web requests?",
+      "type": "MultipleChoice",
+      "options": ["HTTP", "SMTP", "SSH"],
+      "correctAnswers": ["HTTP"],
+      "explanation": "HTTP is the Hypertext Transfer Protocol.",
+      "course": "CSCI 3000",
+      "topic": "Networking",
+      "tags": ["web", "protocols"],
+      "triviaEligible": true
+    },
+    {
+      "text": "Select the prime numbers.",
+      "type": "MultipleAnswer",
+      "options": ["2", "3", "4"],
+      "correctAnswers": ["2", "3"]
+    },
+    {
+      "text": "HTTP is a network protocol.",
+      "type": "TrueFalse",
+      "correctAnswers": ["True"]
+    },
+    {
+      "text": "Match each technology to its role.",
+      "type": "Matching",
+      "matchingPairs": [
+        { "prompt": "HTTP", "match": "Protocol" },
+        { "prompt": "HTML", "match": "Markup language" }
+      ]
+    }
+  ]
+}

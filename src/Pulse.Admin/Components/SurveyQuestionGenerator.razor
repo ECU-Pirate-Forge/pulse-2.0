@@ -2,6 +2,9 @@
 @using System.Text.Json
 @using Microsoft.AspNetCore.Components.Forms
 @using Pulse.Shared.Contracts.V1
+@using Pulse.Shared.Components
+@using Pulse.Shared.Models
+@using Pulse.Domain.Entities
 @implements IDisposable
 @inject IHttpClientFactory Clients
 @inject ILogger<SurveyQuestionGenerator> Logger
@@ -51,23 +54,52 @@
     {
         <section aria-label="Generated question preview">
             <h3>Review before adding to the survey</h3>
-            <p>Check correctness and source support. AI output can be wrong. Nothing is saved as a survey question until you approve.</p>
+            <p>Check correctness and source support. AI output can be wrong. Edit Markdown text and choices below, remove unwanted questions, or save individual questions to the bank for later review.</p>
             @foreach (var question in preview.Questions)
             {
-                <article class="question-card">
-                    <h4>@question.Text</h4>
+                <article class="question-card" @key="question.Id">
+                    <fieldset disabled="@(busy || !IsDraft)">
+                    <label>Question (Markdown)
+                        <textarea class="preview-text" @bind="question.Text" @bind:event="oninput" rows="3"></textarea>
+                    </label>
+                    <MarkdownContent Text="@question.Text" />
                     <ul>
-                        @foreach (var choice in question.Options)
+                        @for (var i = 0; i < question.Options.Count; i++)
                         {
-                            <li>@choice @(choice == question.CorrectAnswer ? "(Correct answer)" : "")</li>
+                            var index = i;
+                            var choice = question.Options[index];
+                            <li>
+                                <label>Choice @ChoiceLabelFormatter.ForIndex(index) (Markdown)
+                                    <textarea class="preview-option" value="@choice" @oninput="args => SetChoice(question, index, args.Value?.ToString() ?? string.Empty)" rows="3"></textarea>
+                                </label>
+                                <label>
+                                    <input type="radio" name="@($"correct-{question.Id}")" checked="@(choice == question.CorrectAnswer)"
+                                           @onchange="() => question.CorrectAnswer = question.Options[index]" />
+                                    Correct answer
+                                </label>
+                                <MarkdownContent Text="@choice" />
+                                @if (choice == question.CorrectAnswer)
+                                {
+                                    <span>(Correct answer)</span>
+                                }
+                                <button type="button" @onclick="() => RemoveChoice(question, index)">Remove choice</button>
+                            </li>
                         }
                     </ul>
-                    <p>@question.Explanation</p>
+                    <button type="button" @onclick="() => question.Options.Add(string.Empty)">Add choice</button>
+                    <label>Tags (comma separated)
+                        <input class="preview-tags" value="@string.Join(", ", question.Tags)" @onchange="args => question.Tags = ParseTags(args.Value?.ToString())" />
+                    </label>
+                    <label>Explanation <textarea @bind="question.Explanation" rows="2"></textarea></label>
                     <p>Source: @SourceName(question.SourceId)</p>
                     <blockquote>@question.SourceQuote</blockquote>
+                    <button type="button" @onclick="() => SaveToBankAsync(question, false)">Save question to bank</button>
+                    <button type="button" @onclick="() => SaveToBankAsync(question, true)">Save as draft</button>
+                    <button type="button" @onclick="() => RemoveQuestion(question)">Remove question</button>
+                    </fieldset>
                 </article>
             }
-            <button type="button" class="pulse-button pulse-button-primary" disabled="@(busy || !IsDraft)" @onclick="AcceptAsync">
+            <button type="button" class="pulse-button pulse-button-primary" disabled="@(busy || !IsDraft || preview.Questions.Count == 0)" @onclick="AcceptAsync">
                 Approve and add @preview.Questions.Count questions
             </button>
             <button type="button" disabled="@busy" @onclick="() => preview = null">Discard preview</button>
@@ -179,6 +211,10 @@
             return;
         if (!await SaveContextCoreAsync())
             return;
+        using var update = await SendAsync(HttpMethod.Put, $"questions/generated/{preview.Id}",
+            JsonContent.Create(new UpdateGeneratedSurveyPreviewRequest(preview.Questions.ToList())));
+        if (!await CheckResponseAsync(update))
+            return;
         using var response = await SendAsync(HttpMethod.Post, $"questions/generated/{preview.Id}/accept");
         if (await CheckResponseAsync(response))
         {
@@ -188,10 +224,60 @@
         }
     });
 
-    private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string suffix, HttpContent? content = null)
+    private void RemoveQuestion(GeneratedSurveyQuestion question)
+    {
+        if (preview is not null)
+            preview = preview with { Questions = preview.Questions.Where(item => item.Id != question.Id).ToList() };
+    }
+
+    private static List<string> ParseTags(string? value) => (value ?? string.Empty)
+        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+    private static void SetChoice(GeneratedSurveyQuestion question, int index, string value)
+    {
+        if (question.CorrectAnswer == question.Options[index])
+            question.CorrectAnswer = value;
+        question.Options[index] = value;
+    }
+
+    private static void RemoveChoice(GeneratedSurveyQuestion question, int index)
+    {
+        var removedChoice = question.Options[index];
+        question.Options.RemoveAt(index);
+        if (question.CorrectAnswer == removedChoice)
+            question.CorrectAnswer = string.Empty;
+    }
+
+    private Task SaveToBankAsync(GeneratedSurveyQuestion question, bool isDraft) => PerformAsync(async () =>
+    {
+        if (!isDraft &&
+            (question.Options.Count(option => !string.IsNullOrWhiteSpace(option)) < 2 ||
+             !question.Options.Contains(question.CorrectAnswer, StringComparer.Ordinal)))
+        {
+            error = "Add at least two choices and select a correct answer matching one of them before saving.";
+            return;
+        }
+        using var response = await SendRequestAsync(HttpMethod.Post, "/api/questionbank", JsonContent.Create(new
+        {
+            question.Text, Type = QuestionType.MultipleChoice, question.Options, question.Tags,
+            CorrectAnswers = new[] { question.CorrectAnswer }, question.Explanation,
+            question.SourceId, question.SourceQuote, IsDraft = isDraft
+        }));
+        if (!await CheckResponseAsync(response))
+            return;
+        RemoveQuestion(question);
+        notice = isDraft ? "Draft saved. Open Question Bank to review and edit it later."
+            : "Question saved to Question Bank.";
+    });
+
+    private Task<HttpResponseMessage> SendAsync(HttpMethod method, string suffix, HttpContent? content = null) =>
+        SendRequestAsync(method, $"/api/sessions/{SessionId}/{suffix}", content);
+
+    private async Task<HttpResponseMessage> SendRequestAsync(HttpMethod method, string path, HttpContent? content = null)
     {
         using var client = Clients.CreateClient("survey-generation");
-        using var request = new HttpRequestMessage(method, $"/api/sessions/{SessionId}/{suffix}") { Content = content };
+        using var request = new HttpRequestMessage(method, path) { Content = content };
         request.Headers.TryAddWithoutValidation("InstructorCode", InstructorCode);
         return await client.SendAsync(request, lifetime.Token);
     }

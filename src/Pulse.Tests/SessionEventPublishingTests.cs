@@ -29,6 +29,7 @@ public class SessionEventPublishingTests
         var questionRepo = new QuestionRepository(database);
         questionRepo.Insert(question);
         var responseRepo = new ResponseRepository(database);
+        database.GetCollection<Session>("sessions").Insert(new Session { Id = sessionId, Status = SessionStatus.Active });
         var sessionRepo = SessionRepository(new Session
         {
             Id = sessionId,

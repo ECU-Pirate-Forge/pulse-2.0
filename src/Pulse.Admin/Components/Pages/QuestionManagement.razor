@@ -4,6 +4,7 @@
 @using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
 @using System.Net.Http.Json
 @using Pulse.Shared.Models
+@using Pulse.Shared.Resources
 @using Pulse.Domain.Entities
 @rendermode InteractiveServer
 @inject NavigationManager NavManager
@@ -159,6 +160,10 @@
     }
     else
     {
+    <ContentTransfer InstructorCode="@_instructorCode"
+                     ExportUrl="@($"/api/content/questions?sessionId={SessionId}")"
+                     ImportUrl="@(SessionStatus == SessionStatus.Draft ? $"/api/content/import/questions?sessionId={SessionId}" : null)"
+                     ImportLabel="Import questions into this survey" Imported="LoadQuestionsAsync" />
     <SurveyQuestionGenerator SessionId="@Guid.Parse(SessionId)"
                              InstructorCode="@_instructorCode"
                              IsDraft="@(SessionStatus == SessionStatus.Draft)"
@@ -171,8 +176,25 @@
         @if (SessionStatus != SessionStatus.Draft)
         {
             <MudAlert Severity="Severity.Info" Class="mb-3">
-                This survey is @SessionStatus. Questions can only be changed while it is in Draft.
+                @SurveyText.EditHelp
             </MudAlert>
+            @if (ConfirmClearResponses)
+            {
+                <section role="alertdialog" aria-labelledby="edit-survey-title" class="mb-3">
+                    <h2 id="edit-survey-title">@SurveyText.EditSurvey</h2>
+                    <p>@SurveyText.EditConfirmation</p>
+                    <button type="button" class="pulse-button pulse-button-primary" data-testid="confirm-edit-survey" disabled="@IsOpeningForEdit" @onclick="@(() => BeginEditingAsync(true))">@SurveyText.ConfirmEdit</button>
+                    <button type="button" class="pulse-button pulse-button-secondary" data-testid="cancel-edit-survey" disabled="@IsOpeningForEdit" @onclick="@(() => ConfirmClearResponses = false)">@SurveyText.CancelReset</button>
+                </section>
+            }
+            else
+            {
+                <button type="button" class="pulse-button pulse-button-primary mb-3" data-testid="begin-edit-survey" disabled="@IsOpeningForEdit" @onclick="@(() => BeginEditingAsync())">@SurveyText.EditSurvey</button>
+            }
+        }
+        else if (ReopenedForEditing)
+        {
+            <MudAlert Severity="Severity.Info" Class="mb-3">@SurveyText.EditingReady</MudAlert>
         }
         
         @if (!string.IsNullOrEmpty(SaveError))
@@ -182,10 +204,11 @@
         
         <MudStack Spacing="3">
             <MudTextField @bind-Value="NewQuestion.Text"
-                          Label="Question Text"
+                          Label="Question Text (Markdown)"
                           Placeholder="Enter your question here"
                           Variant="Variant.Outlined"
                           Lines="3" />
+            <Pulse.Shared.Components.MarkdownContent Text="@NewQuestion.Text" />
 
             <MudSelect @bind-Value="NewQuestion.Type"
                        Label="Question Type"
@@ -224,7 +247,7 @@
                         <label style="display: block;">
                             <input type="checkbox" checked="@NewQuestion.CorrectAnswers.Contains(choice)"
                                    @onchange="_ => ToggleCorrectAnswer(choice)" />
-                            @choice
+                            <Pulse.Shared.Components.MarkdownContent Text="@choice" />
                         </label>
                     }
                 </div>
@@ -299,7 +322,9 @@
             {
                 <div class="question-card">
                     <div class="question-type">@GetTypeName(q.Type)</div>
-                    <div class="question-text">@q.Text</div>
+                    <div class="question-text"><Pulse.Shared.Components.MarkdownContent Text="@q.Text" /></div>
+                    <ContentTransfer InstructorCode="@_instructorCode"
+                                     ExportUrl="@($"/api/content/questions?sessionId={SessionId}&questionId={q.Id}")" />
                     @if (q.CorrectAnswers.Count > 0)
                     {
                         <p>Correct: @string.Join(", ", q.CorrectAnswers)</p>
@@ -310,9 +335,9 @@
                     {
                         <div class="question-options">
                             <strong>Options:</strong><br />
-                            @foreach (var opt in q.Options)
+                            @foreach (var (opt, optionIndex) in q.Options.Select((option, index) => (option, index)))
                             {
-                                <div>• @opt</div>
+                                <div><strong>@ChoiceLabelFormatter.ForIndex(optionIndex).</strong> <Pulse.Shared.Components.MarkdownContent Text="@opt" /></div>
                             }
                         </div>
                     }
@@ -322,7 +347,8 @@
                             <strong>Pairs:</strong><br />
                             @foreach (var pair in q.MatchingPairs)
                             {
-                                <div>@pair.Prompt → @pair.Match</div>
+                                <Pulse.Shared.Components.MarkdownContent Text="@pair.Prompt" />
+                                <Pulse.Shared.Components.MarkdownContent Text="@pair.Match" />
                             }
                         </div>
                     }
@@ -366,7 +392,7 @@
     else
     {
         <MudTextField @bind-Value="BankSearch"
-                      Label="Search question bank"
+                      Label="Search question text or tags"
                       Variant="Variant.Outlined"
                       Adornment="Adornment.Start"
                       AdornmentIcon="@Icons.Material.Filled.Search"
@@ -385,14 +411,15 @@
                 {
                     <div class="question-card">
                         <div class="question-type">@GetTypeName((int)item.Type)</div>
-                        <div class="question-text">@item.Text</div>
+                        <div class="question-text"><Pulse.Shared.Components.MarkdownContent Text="@item.Text" /></div>
+                        <p>@string.Join(", ", item.Tags)</p>
                         @if (item.Type is QuestionType.MultipleChoice or QuestionType.MultipleAnswer && item.Options?.Count > 0)
                         {
                             <div class="question-options">
                                 <strong>Options:</strong><br />
                                 @foreach (var opt in item.Options)
                                 {
-                                    <div>• @opt</div>
+                                    <Pulse.Shared.Components.MarkdownContent Text="@opt" />
                                 }
                             </div>
                         }
@@ -426,6 +453,9 @@
     private string _instructorCode = string.Empty;
     private SessionStatus SessionStatus = SessionStatus.Draft;
     private bool IsLoaded;
+    private bool IsOpeningForEdit;
+    private bool ConfirmClearResponses;
+    private bool ReopenedForEditing;
 
     private List<QuestionBankItem> BankItems = new();
     private string BankSearch = string.Empty;
@@ -441,7 +471,8 @@
     private IEnumerable<QuestionBankItem> FilteredBankItems =>
         string.IsNullOrWhiteSpace(BankSearch)
             ? BankItems
-            : BankItems.Where(i => i.Text.Contains(BankSearch, StringComparison.OrdinalIgnoreCase));
+            : BankItems.Where(i => i.Text.Contains(BankSearch, StringComparison.OrdinalIgnoreCase) ||
+                i.Tags.Any(tag => tag.Contains(BankSearch, StringComparison.OrdinalIgnoreCase)));
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -461,6 +492,46 @@
         await LoadQuestionBankAsync();
         IsLoaded = true;
         StateHasChanged();
+    }
+
+    private async Task BeginEditingAsync(bool clearResponses = false)
+    {
+        if (IsOpeningForEdit)
+            return;
+
+        IsOpeningForEdit = true;
+        SaveError = null;
+        try
+        {
+            var path = $"/api/sessions/{SessionId}/edit" + (clearResponses ? "?clearResponses=true" : string.Empty);
+            using var request = CreateInstructorRequest(HttpMethod.Put, path);
+            using var response = await Http.SendAsync(request);
+            if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+            {
+                ConfirmClearResponses = true;
+                return;
+            }
+            if (!response.IsSuccessStatusCode)
+            {
+                SaveError = SurveyText.EditFailed;
+                return;
+            }
+
+            SessionStatus = SessionStatus.Draft;
+            ConfirmClearResponses = false;
+            ReopenedForEditing = true;
+            CancelEdit();
+            await LoadQuestionsAsync();
+        }
+        catch (HttpRequestException ex)
+        {
+            Logger.LogWarning(ex, "Unable to open survey {SessionId} for editing", SessionId);
+            SaveError = SurveyText.EditFailed;
+        }
+        finally
+        {
+            IsOpeningForEdit = false;
+        }
     }
 
     private async Task LoadSessionAsync()

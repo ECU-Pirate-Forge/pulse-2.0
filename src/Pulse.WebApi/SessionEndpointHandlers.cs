@@ -2,6 +2,8 @@ using Pulse.Application.Services;
 using Pulse.Shared.Models;
 using Pulse.Shared.Services;
 using Pulse.Common.Services;
+using Pulse.Shared.Contracts.V1;
+using Pulse.Shared.Resources;
 using Pulse.WebApi.Middleware;
 using QRCoder;
 
@@ -76,7 +78,7 @@ public static class SessionEndpointHandlers
         if (session.Status != SessionStatus.Active)
             return Results.Conflict(new { error = "This survey is not accepting responses." });
 
-        return Results.Ok(new { id = session.Id, title = session.Title, joinCode = session.JoinCode });
+        return Results.Ok(new { id = session.Id, title = session.Title, joinCode = session.JoinCode, resetVersion = session.ResetVersion });
     }
 
     public static async Task<IResult> CreateSession(
@@ -170,6 +172,61 @@ public static class SessionEndpointHandlers
             await eventPublisher.PublishResultsRevealedAsync(id, context.RequestAborted);
 
         return Results.Ok(session);
+    }
+
+    /// <summary>Clears a survey run for its owning instructor while preserving reusable content.</summary>
+    public static async Task<IResult> ResetSurveyAsync(
+        Guid id,
+        HttpContext context,
+        ISessionRepository repo,
+        ISessionEventPublisher? eventPublisher = null)
+    {
+        var instructorCode = context.Items[InstructorCodeMiddleware.HeaderName]?.ToString();
+        if (string.IsNullOrWhiteSpace(instructorCode))
+            return Results.Unauthorized();
+
+        var session = await repo.GetByIdAsync(id);
+        if (session is null)
+            return Results.NotFound();
+        if (!string.Equals(session.InstructorCode, instructorCode, StringComparison.Ordinal))
+            return Results.StatusCode(StatusCodes.Status403Forbidden);
+        if (session.Mode != SessionMode.Survey)
+            return Results.BadRequest(new { error = SurveyText.SurveyOnlyReset });
+        if (!repo.ResetSurvey(id))
+            return Results.Problem(SurveyText.ResetFailed, statusCode: StatusCodes.Status500InternalServerError);
+
+        if (eventPublisher is not null)
+            await eventPublisher.PublishSubmissionUpdatedAsync(id, new SessionProgressUpdate(0, 0), context.RequestAborted);
+
+        return Results.NoContent();
+    }
+
+    /// <summary>Pauses an instructor-owned survey for editing, requiring consent before clearing responses.</summary>
+    public static async Task<IResult> BeginSurveyEditAsync(
+        Guid id,
+        HttpContext context,
+        ISessionRepository repo,
+        bool clearResponses = false,
+        ISessionEventPublisher? eventPublisher = null)
+    {
+        var instructorCode = context.Items[InstructorCodeMiddleware.HeaderName]?.ToString();
+        if (string.IsNullOrWhiteSpace(instructorCode))
+            return Results.Unauthorized();
+
+        var session = await repo.GetByIdAsync(id);
+        if (session is null)
+            return Results.NotFound();
+        if (!string.Equals(session.InstructorCode, instructorCode, StringComparison.Ordinal))
+            return Results.StatusCode(StatusCodes.Status403Forbidden);
+        if (session.Mode != SessionMode.Survey)
+            return Results.BadRequest(new { error = SurveyText.SurveyOnlyEdit });
+        if (!repo.BeginSurveyEdit(id, clearResponses))
+            return Results.Conflict(new { error = SurveyText.EditConfirmation });
+
+        if (eventPublisher is not null)
+            await eventPublisher.PublishSubmissionUpdatedAsync(id, new SessionProgressUpdate(0, 0), context.RequestAborted);
+
+        return Results.NoContent();
     }
 
     public static Task<IResult> ActivateSession(

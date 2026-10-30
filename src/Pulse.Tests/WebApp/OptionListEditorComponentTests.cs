@@ -14,14 +14,14 @@ public class OptionListEditorComponentTests : BunitContext
         Services.AddMudServices();
 
         // Configure JSInterop to allow all MudBlazor JS calls
-        JSInterop.SetupVoid("mudElementRef.addOnBlurEvent", _ => true);
-        JSInterop.SetupVoid("mudElementRef.addOnFocusEvent", _ => true);
-        JSInterop.SetupVoid("mudElementRef.removeOnBlurEvent", _ => true);
-        JSInterop.SetupVoid("mudElementRef.removeOnFocusEvent", _ => true);
-        JSInterop.SetupVoid("mudPopoverFactory.initialize", _ => true);
-        JSInterop.SetupVoid("scrollManager.initialize", _ => true);
-        JSInterop.SetupVoid("scrollManager.unlock", _ => true);
-        JSInterop.SetupVoid("scrollManager.lock", _ => true);
+        JSInterop.SetupVoid("mudElementRef.addOnBlurEvent", _ => true).SetVoidResult();
+        JSInterop.SetupVoid("mudElementRef.addOnFocusEvent", _ => true).SetVoidResult();
+        JSInterop.SetupVoid("mudElementRef.removeOnBlurEvent", _ => true).SetVoidResult();
+        JSInterop.SetupVoid("mudElementRef.removeOnFocusEvent", _ => true).SetVoidResult();
+        JSInterop.SetupVoid("mudPopoverFactory.initialize", _ => true).SetVoidResult();
+        JSInterop.SetupVoid("scrollManager.initialize", _ => true).SetVoidResult();
+        JSInterop.SetupVoid("scrollManager.unlock", _ => true).SetVoidResult();
+        JSInterop.SetupVoid("scrollManager.lock", _ => true).SetVoidResult();
     }
     [Fact]
     public void Renders_Initial_Empty_Option()
@@ -31,7 +31,7 @@ public class OptionListEditorComponentTests : BunitContext
             .Add(p => p.Options, new List<string>()));
 
         // Act & Assert
-        var optionInputs = component.FindAll("input[type='text']");
+        var optionInputs = component.FindAll("textarea");
         Assert.NotEmpty(optionInputs);
     }
 
@@ -44,7 +44,7 @@ public class OptionListEditorComponentTests : BunitContext
             .Add(p => p.Options, options));
 
         // Act & Assert
-        var optionInputs = component.FindAll("input[type='text']");
+        var optionInputs = component.FindAll("textarea");
         Assert.Equal(3, optionInputs.Count);
     }
 
@@ -62,12 +62,12 @@ public class OptionListEditorComponentTests : BunitContext
         await addButton.ClickAsync(new Microsoft.AspNetCore.Components.Web.MouseEventArgs());
         component.WaitForAssertion(() =>
         {
-            var optionInputs = component.FindAll("input[type='text']");
+            var optionInputs = component.FindAll("textarea");
             Assert.Equal(2, optionInputs.Count);
         });
 
         // Assert
-        var finalInputs = component.FindAll("input[type='text']");
+        var finalInputs = component.FindAll("textarea");
         Assert.Equal(2, finalInputs.Count);
     }
 
@@ -85,12 +85,12 @@ public class OptionListEditorComponentTests : BunitContext
         await removeButtons.First().ClickAsync(new Microsoft.AspNetCore.Components.Web.MouseEventArgs());
         component.WaitForAssertion(() =>
         {
-            var optionInputs = component.FindAll("input[type='text']");
+            var optionInputs = component.FindAll("textarea");
             Assert.Single(optionInputs);
         });
 
         // Assert
-        var finalInputs = component.FindAll("input[type='text']");
+        var finalInputs = component.FindAll("textarea");
         Assert.Single(finalInputs);
     }
 
@@ -144,7 +144,7 @@ public class OptionListEditorComponentTests : BunitContext
         var component = Render<OptionListEditor>(parameters => parameters
             .Add(p => p.Options, options));
 
-        var optionInputs = component.FindAll("input[type='text']");
+        var optionInputs = component.FindAll("textarea");
 
         // Act
         await optionInputs.First().ChangeAsync(new ChangeEventArgs { Value = "Updated Option 1" });
@@ -215,7 +215,7 @@ public class OptionListEditorComponentTests : BunitContext
             .Add(p => p.OptionsChanged, EventCallback.Factory.Create<List<string>>(
                 this, (opts) => changedOptions = opts)));
 
-        var optionInputs = component.FindAll("input[type='text']");
+        var optionInputs = component.FindAll("textarea");
 
         // Act
         await optionInputs.First().ChangeAsync(new ChangeEventArgs { Value = "New Value" });

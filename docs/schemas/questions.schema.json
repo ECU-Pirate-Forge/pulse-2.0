@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Pulse question import/export file (version 1)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "version", "kind", "questions"],
+  "properties": {
+    "format": { "const": "pulse" },
+    "version": { "const": 1 },
+    "kind": { "const": "questions" },
+    "questions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/question" }
+    }
+  },
+  "$defs": {
+    "nonBlank": { "type": "string", "pattern": "\\S" },
+    "stringList": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/nonBlank" },
+      "default": []
+    },
+    "question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "type"],
+      "properties": {
+        "text": { "$ref": "#/$defs/nonBlank" },
+        "type": {
+          "enum": [
+            "MultipleChoice", "MultipleAnswer", "TrueFalse", "Matching",
+            "LegacyLikertScale", "LegacyOpenEnded", "LikertScale", "OpenEnded"
+          ]
+        },
+        "options": { "$ref": "#/$defs/stringList" },
+        "matchingPairs": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["prompt", "match"],
+            "properties": {
+              "prompt": { "type": "string" },
+              "match": { "type": "string" }
+            }
+          }
+        },
+        "correctAnswers": { "$ref": "#/$defs/stringList" },
+        "explanation": { "type": "string", "default": "" },
+        "sourceId": { "type": "string", "default": "" },
+        "sourceQuote": { "type": "string", "default": "" },
+        "course": { "type": "string", "default": "" },
+        "topic": { "type": "string", "default": "" },
+        "tags": { "$ref": "#/$defs/stringList" },
+        "triviaEligible": { "type": "boolean", "default": false },
+        "isDraft": { "type": "boolean", "default": false },
+        "moderationStatus": {
+          "enum": ["Approved", "Pending", "Rejected"],
+          "default": "Approved"
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "enum": ["MultipleChoice", "MultipleAnswer"] } }, "not": { "properties": { "isDraft": { "const": true } }, "required": ["isDraft"] } },
+          "then": {
+            "required": ["options"],
+            "properties": { "options": { "minItems": 2 } }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "Matching" } }, "not": { "properties": { "isDraft": { "const": true } }, "required": ["isDraft"] } },
+          "then": {
+            "required": ["matchingPairs"],
+            "properties": {
+              "matchingPairs": {
+                "minItems": 2,
+                "items": {
+                  "properties": {
+                    "prompt": { "$ref": "#/$defs/nonBlank" },
+                    "match": { "$ref": "#/$defs/nonBlank" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "triviaEligible": { "const": true } }, "required": ["triviaEligible"], "not": { "properties": { "isDraft": { "const": true } }, "required": ["isDraft"] } },
+          "then": {
+            "required": ["correctAnswers"],
+            "properties": {
+              "type": { "not": { "const": "Matching" } },
+              "correctAnswers": { "minItems": 1 }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

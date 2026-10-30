@@ -1,5 +1,6 @@
 @using Pulse.Domain.Entities
 @using System.Collections.Generic
+@using Pulse.Shared.Models
 
 <div class="draggable-question-list">
     @if (LocalQuestions == null || LocalQuestions.Count == 0)
@@ -32,11 +33,14 @@
                             <span class="question-number">@(index + 1)</span>
                             <span class="question-type">@GetTypeName(question.Type)</span>
                         </div>
-                        <div class="question-text">@question.Text</div>
+                        <div class="question-text"><Pulse.Shared.Components.MarkdownContent Text="@question.Text" /></div>
                         @if (question.Type == QuestionType.MultipleChoice && question.Options?.Count > 0)
                         {
                             <div class="question-options">
-                                @string.Join(", ", question.Options)
+                                @foreach (var (option, optionIndex) in question.Options.Select((option, index) => (option, index)))
+                                {
+                                    <div><strong>@ChoiceLabelFormatter.ForIndex(optionIndex).</strong> <Pulse.Shared.Components.MarkdownContent Text="@option" /></div>
+                                }
                             </div>
                         }
                     </div>

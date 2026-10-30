@@ -39,10 +39,26 @@ public class SurveyContractTests
     [Fact]
     public void StudentResultsStatus_DoesNotContainAggregateResults()
     {
-        var status = new StudentResultsStatusResponse(ResultsVisibility.Blinded);
+        var status = new StudentResultsStatusResponse(ResultsVisibility.Blinded, 3);
 
         var json = JsonSerializer.Serialize(status);
 
-        Assert.Equal("{\"resultsVisibility\":\"Blinded\"}", json);
+        Assert.Equal("{\"resultsVisibility\":\"Blinded\",\"resetVersion\":3,\"status\":\"Active\"}", json);
+    }
+
+    [Fact]
+    public void StudentResultsStatus_LegacyPayloadDefaultsToInitialRun()
+    {
+        var status = JsonSerializer.Deserialize<StudentResultsStatusResponse>("{\"resultsVisibility\":\"Blinded\"}");
+
+        Assert.Equal(0, status?.ResetVersion);
+    }
+
+    [Fact]
+    public void StudentResultsStatus_LegacyPayloadDefaultsToActive()
+    {
+        var status = JsonSerializer.Deserialize<StudentResultsStatusResponse>("{\"resultsVisibility\":\"Blinded\"}");
+
+        Assert.Equal(SessionStatus.Active, status?.Status);
     }
 }
