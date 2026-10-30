@@ -21,11 +21,12 @@ if (!string.IsNullOrWhiteSpace(publicJoinBaseUrl))
     publicJoinBaseUrl = PublicJoinUrl.Normalize(publicJoinBaseUrl);
 
     var options = builder.Configuration.GetSection("DevTunnels").Get<DevTunnelOptions>() ?? new();
+
     if(options.Enabled)
     {
         options.Validate();
     }
-    
+
     if (options.Enabled && (builder.ExecutionContext.IsPublishMode || !builder.Environment.IsDevelopment()))
     {
         throw new InvalidOperationException("DevTunnels can only be enabled for local Development runs, not publishing or production.");
