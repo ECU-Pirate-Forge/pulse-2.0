@@ -92,6 +92,30 @@ public class SurveySubmissionEndpointTests
     }
 
     [Fact]
+    public async Task SubmitSurvey_WhenQuestionIsShared_StoresOnlyThatQuestionAndAccumulatesProgress()
+    {
+        using var database = new LiteDatabase("Filename=:memory:");
+        var questionRepo = CreateQuestions(database);
+        var responseRepo = new ResponseRepository(database);
+        var sessionRepo = CreateSessionRepository(SessionStatus.Active, QuestionId(2)).Object;
+
+        var result = await SurveySubmissionEndpointHandlers.SubmitSurvey(
+            _sessionId,
+            new SubmitSurveyRequest(_deviceId, [new SurveyAnswerRequest(QuestionId(2), ["False"])]),
+            sessionRepo,
+            questionRepo,
+            responseRepo,
+            new DeviceIdValidationService(),
+            LoggerFactory.Create(_ => { }),
+            new DefaultHttpContext());
+
+        Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.Ok<SubmitSurveyResponse>>(result);
+        var answer = Assert.Single(responseRepo.GetBySessionAndDevice(_sessionId, _deviceId));
+        Assert.Equal(QuestionId(2), answer.QuestionId);
+        Assert.Single(responseRepo.GetSubmissionsBySession(_sessionId));
+    }
+
+    [Fact]
     public async Task SubmitSurvey_MissingAnswer_ReturnsBadRequestWithoutWritingAnything()
     {
         using var database = new LiteDatabase("Filename=:memory:");
@@ -166,11 +190,18 @@ public class SurveySubmissionEndpointTests
         Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.Conflict<string>>(result);
     }
 
-    private Mock<ISessionRepository> CreateSessionRepository(SessionStatus status)
+    private Mock<ISessionRepository> CreateSessionRepository(
+        SessionStatus status,
+        Guid? sharedQuestionId = null)
     {
         var repository = new Mock<ISessionRepository>();
         repository.Setup(repo => repo.GetByIdAsync(_sessionId))
-            .ReturnsAsync(new Session { Id = _sessionId, Status = status });
+            .ReturnsAsync(new Session
+            {
+                Id = _sessionId,
+                Status = status,
+                SharedQuestionId = sharedQuestionId
+            });
         return repository;
     }
 

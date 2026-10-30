@@ -8,11 +8,113 @@ using Pulse.Shared.Contracts.V1;
 using Pulse.Shared.Models;
 using Pulse.Shared.Services;
 using Pulse.WebApi;
+using Pulse.WebApi.Middleware;
 
 namespace Pulse.Tests.Tests;
 
 public class TriviaEndpointTests
 {
+    [Fact]
+    public void AddFilteredQuestions_AddsAllApprovedEligibleMatchesOnce()
+    {
+        using var database = new LiteDatabase("Filename=:memory:");
+        var repository = new TriviaRepository(database);
+        var bank = new QuestionBankRepository(database);
+        var game = repository.InsertGame(Game());
+        var matchingQuestions = new[]
+        {
+            BankQuestion("IP address basics"),
+            BankQuestion("IP routing")
+        };
+        foreach (var question in matchingQuestions)
+            bank.Insert(question);
+        bank.Insert(BankQuestion("Unrelated question"));
+        bank.Insert(BankQuestion("IP pending", QuestionModerationStatus.Pending));
+
+        var request = new AddTriviaQuestionsRequest(new QuestionBankQuery(Text: "IP"));
+        var first = TriviaEndpointHandlers.AddFilteredQuestions(
+            game.Id, request, InstructorContext("INST"), repository, bank);
+        var repeated = TriviaEndpointHandlers.AddFilteredQuestions(
+            game.Id, request, InstructorContext("INST"), repository, bank);
+
+        var firstResponse = Assert.IsType<Ok<AddTriviaQuestionsResponse>>(first).Value!;
+        var repeatedResponse = Assert.IsType<Ok<AddTriviaQuestionsResponse>>(repeated).Value!;
+        Assert.Equal(2, firstResponse.AddedCount);
+        Assert.Equal(0, firstResponse.AlreadyIncludedCount);
+        Assert.Equal(0, repeatedResponse.AddedCount);
+        Assert.Equal(2, repeatedResponse.AlreadyIncludedCount);
+        Assert.Equal(2, repository.GetQuestions(game.Id).Count);
+    }
+
+    [Fact]
+    public void RemoveQuestion_RemovesOnlyTheOwnedLobbyQuestionAndResequences()
+    {
+        using var database = new LiteDatabase("Filename=:memory:");
+        var repository = new TriviaRepository(database);
+        var game = repository.InsertGame(Game());
+        var removed = repository.InsertQuestion(new TriviaQuestion
+        {
+            GameId = game.Id,
+            SortOrder = 0,
+            Text = "Remove me"
+        });
+        var remaining = repository.InsertQuestion(new TriviaQuestion
+        {
+            GameId = game.Id,
+            SortOrder = 1,
+            Text = "Keep me"
+        });
+
+        var result = TriviaEndpointHandlers.RemoveQuestion(
+            game.Id, removed.Id, InstructorContext("INST"), repository);
+
+        Assert.IsType<NoContent>(result);
+        var question = Assert.Single(repository.GetQuestions(game.Id));
+        Assert.Equal(remaining.Id, question.Id);
+        Assert.Equal(0, question.SortOrder);
+        Assert.IsType<NotFound>(TriviaEndpointHandlers.RemoveQuestion(
+            Guid.NewGuid(), remaining.Id, InstructorContext("INST"), repository));
+        game.Status = TriviaGameStatus.QuestionOpen;
+        repository.UpdateGame(game);
+        Assert.IsType<Conflict<string>>(TriviaEndpointHandlers.RemoveQuestion(
+            game.Id, remaining.Id, InstructorContext("INST"), repository));
+        Assert.Single(repository.GetQuestions(game.Id));
+    }
+
+    [Fact]
+    public void DeleteGame_DeletesOwnedGameAndItsRelatedRecords()
+    {
+        using var database = new LiteDatabase("Filename=:memory:");
+        var repository = new TriviaRepository(database);
+        var game = repository.InsertGame(Game());
+        var team = repository.InsertTeam(new TriviaTeam { GameId = game.Id, Name = "Gold" });
+        var participant = repository.GetOrCreateParticipant(game.Id, "device", "Ada", team.Id);
+        var question = repository.InsertQuestion(new TriviaQuestion
+        {
+            GameId = game.Id,
+            Text = "Choose"
+        });
+        repository.InsertAnswer(new TriviaAnswer
+        {
+            GameId = game.Id,
+            QuestionId = question.Id,
+            ParticipantId = participant.Id
+        });
+
+        var forbidden = TriviaEndpointHandlers.DeleteGame(
+            game.Id, InstructorContext("OTHER"), repository);
+        var deleted = TriviaEndpointHandlers.DeleteGame(
+            game.Id, InstructorContext("INST"), repository);
+
+        Assert.IsType<NotFound>(forbidden);
+        Assert.IsType<NoContent>(deleted);
+        Assert.Null(repository.GetGame(game.Id));
+        Assert.Empty(repository.GetQuestions(game.Id));
+        Assert.Empty(repository.GetTeams(game.Id));
+        Assert.Empty(repository.GetParticipants(game.Id));
+        Assert.Empty(repository.GetAnswers(game.Id));
+    }
+
     [Fact]
     public void Join_WithSameDevice_ReconnectsToExistingParticipant()
     {
@@ -174,4 +276,23 @@ public class TriviaEndpointTests
         JoinCode = "ABC123",
         CompetitionMode = TriviaCompetitionMode.Individual
     };
+
+    private static QuestionBankItem BankQuestion(
+        string text,
+        QuestionModerationStatus moderationStatus = QuestionModerationStatus.Approved) => new()
+    {
+        Text = text,
+        Type = QuestionType.MultipleChoice,
+        Options = ["Yes", "No"],
+        CorrectAnswers = ["Yes"],
+        ModerationStatus = moderationStatus,
+        TriviaEligible = true
+    };
+
+    private static DefaultHttpContext InstructorContext(string instructorCode)
+    {
+        var context = new DefaultHttpContext();
+        context.Items[InstructorCodeMiddleware.HeaderName] = instructorCode;
+        return context;
+    }
 }

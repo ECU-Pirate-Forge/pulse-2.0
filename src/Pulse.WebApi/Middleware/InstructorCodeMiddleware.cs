@@ -94,6 +94,13 @@ public static class InstructorOnlyEndpointMatcher
             return true;
         }
 
+        if (path.Equals("/api/questionbank/imports", StringComparison.OrdinalIgnoreCase) ||
+            path.Equals("/api/questionbank/delete", StringComparison.OrdinalIgnoreCase) ||
+            path.Equals("/api/questionbank/delete/preview", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
         if (HttpMethods.IsGet(method) && path.StartsWith("/questions", StringComparison.OrdinalIgnoreCase))
         {
             return false;

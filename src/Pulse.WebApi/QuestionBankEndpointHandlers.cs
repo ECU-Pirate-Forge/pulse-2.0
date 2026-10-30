@@ -89,7 +89,11 @@ public static class QuestionBankEndpointHandlers
         QuestionBankSort sort = QuestionBankSort.Newest,
         int page = 1,
         int pageSize = 20,
-        bool? isDraft = null)
+        bool? isDraft = null,
+        Guid? importBatchId = null,
+        string? correctAnswer = null,
+        int? correctAnswerPosition = null,
+        string? option = null)
     {
         if (page < 1)
             return TypedResults.BadRequest("Page must be greater than 0.");
@@ -97,7 +101,7 @@ public static class QuestionBankEndpointHandlers
         if (pageSize < 1)
             return TypedResults.BadRequest("PageSize must be greater than 0.");
 
-        var filtered = repo.Search(new QuestionBankQuery(
+        var query = new QuestionBankQuery(
             text,
             type,
             course,
@@ -107,7 +111,15 @@ public static class QuestionBankEndpointHandlers
             source,
             triviaEligible,
             sort,
-            isDraft)).ToList();
+            isDraft,
+            importBatchId,
+            correctAnswer,
+            correctAnswerPosition,
+            option);
+        if (query.Validate() is { } error)
+            return TypedResults.BadRequest(error);
+
+        var filtered = repo.Search(query).ToList();
         var totalCount = filtered.Count;
         var items = filtered
             .Skip((page - 1) * pageSize)

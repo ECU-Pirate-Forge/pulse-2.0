@@ -164,6 +164,8 @@ public class SessionRepository : ISessionRepository
             submissions.DeleteMany(submission => submission.SessionId == id);
             session.Status = targetStatus;
             session.ResultsVisibility = ResultsVisibility.Blinded;
+            session.SharedQuestionId = null;
+            session.RevealedQuestionIds = [];
             session.ResetVersion = checked(session.ResetVersion + 1);
             session.UpdatedAt = DateTime.UtcNow;
             if (!_sessions.Update(session))

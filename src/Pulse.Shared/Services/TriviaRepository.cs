@@ -48,6 +48,15 @@ public sealed class TriviaRepository
 
     public bool UpdateGame(TriviaGame game) => games.Update(game);
     public TriviaGame? GetGame(Guid id) => games.FindById(id);
+    public bool DeleteGame(Guid id)
+    {
+        answers.DeleteMany(answer => answer.GameId == id);
+        participants.DeleteMany(participant => participant.GameId == id);
+        teams.DeleteMany(team => team.GameId == id);
+        questions.DeleteMany(question => question.GameId == id);
+        return games.DeleteMany(game => game.Id == id) > 0;
+    }
+
     public TriviaGame? GetGameByJoinCode(string joinCode) =>
         games.FindOne(game => game.JoinCode == joinCode);
     public IReadOnlyList<TriviaGame> GetGames(string instructorCode) =>
@@ -74,6 +83,26 @@ public sealed class TriviaRepository
         questions.Find(question => question.GameId == gameId)
             .OrderBy(question => question.SortOrder)
             .ToList();
+
+    public bool DeleteQuestion(Guid gameId, Guid questionId)
+    {
+        if (questions.FindOne(question =>
+                question.GameId == gameId && question.Id == questionId) is null)
+        {
+            return false;
+        }
+
+        answers.DeleteMany(answer => answer.GameId == gameId && answer.QuestionId == questionId);
+        questions.DeleteMany(question => question.GameId == gameId && question.Id == questionId);
+
+        var remainingQuestions = GetQuestions(gameId);
+        for (var index = 0; index < remainingQuestions.Count; index++)
+        {
+            remainingQuestions[index].SortOrder = index;
+            questions.Update(remainingQuestions[index]);
+        }
+        return true;
+    }
 
     public TriviaParticipant GetOrCreateParticipant(
         Guid gameId,

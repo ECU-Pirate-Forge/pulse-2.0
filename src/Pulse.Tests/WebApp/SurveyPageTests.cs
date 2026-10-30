@@ -39,6 +39,7 @@ public class SurveyPageTests : BunitContext
         Assert.Equal("carefully", cut.Find("strong").TextContent);
         Assert.Empty(cut.FindAll("script"));
         Assert.Contains("Console.WriteLine", cut.Find("pre code").TextContent);
+        Assert.Equal(["A.", "B."], cut.FindAll(".survey-choice-label").Select(label => label.TextContent).ToArray());
         cut.Find("input[type=radio]").Change(choice);
         cut.Find("[data-testid='submit-survey']").Click();
         cut.WaitForAssertion(() => Assert.NotNull(handler.SubmittedRequest));
@@ -107,7 +108,7 @@ public class SurveyPageTests : BunitContext
 
         cut.WaitForAssertion(() =>
         {
-            Assert.Contains("Survey submitted", cut.Markup);
+            Assert.Contains("Response recorded", cut.Markup);
             Assert.Contains("results are currently hidden", cut.Markup, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("Choose one", cut.Markup);
         });
@@ -117,6 +118,33 @@ public class SurveyPageTests : BunitContext
         var answer = Assert.Single(submitted.Answers);
         Assert.Equal(question.Id, answer.QuestionId);
         Assert.Equal(["A"], answer.Values);
+    }
+
+    [Fact]
+    public void SharedQuestions_RefreshesToTheNextQuestionAfterSubmission()
+    {
+        var first = new Question
+        {
+            Id = Guid.NewGuid(), SessionId = _sessionId, Text = "First question",
+            Type = QuestionType.MultipleChoice, Options = ["A", "B"]
+        };
+        var second = new Question
+        {
+            Id = Guid.NewGuid(), SessionId = _sessionId, Text = "Second question",
+            Type = QuestionType.MultipleChoice, Options = ["C", "D"]
+        };
+        var handler = new SurveyHandler(_sessionId, [first, second]) { SharedQuestionId = first.Id };
+        Services.AddSingleton(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+        var cut = Render<QuizPage>(parameters => parameters.Add(page => page.JoinCode, "ABC123"));
+        cut.WaitForElement("input[value='A']").Change("A");
+        cut.Find("[data-testid='submit-survey']").Click();
+        cut.WaitForAssertion(() => Assert.Contains("Response recorded", cut.Markup));
+
+        handler.SharedQuestionId = second.Id;
+        cut.WaitForElement("input[value='C']", TimeSpan.FromSeconds(8));
+        Assert.Contains("Second question", cut.Markup);
+        Assert.Single(cut.FindAll("[data-testid='submit-survey']"));
+        Assert.DoesNotContain("First question", cut.Markup);
     }
 
     [Fact]
@@ -152,7 +180,7 @@ public class SurveyPageTests : BunitContext
     [Fact]
     public void ActiveSurvey_DoesNotDisplayAnswerKey()
     {
-        var handler = new SurveyHandler(_sessionId, [SingleQuestion()]) { RevealResults = true };
+        var handler = new SurveyHandler(_sessionId, [SingleQuestion()]);
         Services.AddSingleton(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
 
         var cut = Render<QuizPage>(parameters => parameters.Add(page => page.JoinCode, "ABC123"));
@@ -171,7 +199,7 @@ public class SurveyPageTests : BunitContext
         cut.WaitForElement("input[value='A']").Change("A");
 
         cut.Find("[data-testid='submit-survey']").Click();
-        cut.WaitForAssertion(() => Assert.Contains("Survey submitted", cut.Markup));
+        cut.WaitForAssertion(() => Assert.Contains("Response recorded", cut.Markup));
 
         Assert.Empty(cut.FindAll(".survey-answer-key"));
         Assert.Empty(cut.FindAll(".correct-answer-badge"));
@@ -215,6 +243,19 @@ public class SurveyPageTests : BunitContext
         cut.WaitForElement(".survey-result-row");
         Assert.Equal(hasAnswerKey ? 2 : 0, cut.FindAll(".correct-answer-badge").Count);
         Assert.Empty(cut.FindAll(".survey-answer-key"));
+    }
+
+    [Fact]
+    public void RevealedQuestionResults_AppearWhileTheStudentIsStillAnswering()
+    {
+        var handler = new SurveyHandler(_sessionId, [SingleQuestion()]) { RevealResults = true };
+        Services.AddSingleton(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+
+        var cut = Render<QuizPage>(parameters => parameters.Add(page => page.JoinCode, "ABC123"));
+
+        cut.WaitForElement(".survey-result-row");
+        Assert.Single(cut.FindAll("[data-testid='submit-survey']"));
+        Assert.Contains("Results revealed", cut.Markup);
     }
 
     [Theory]
@@ -331,6 +372,7 @@ public class SurveyPageTests : BunitContext
     private sealed class SurveyHandler(Guid sessionId, List<Question> questions) : HttpMessageHandler
     {
         public SubmitSurveyRequest? SubmittedRequest { get; private set; }
+        public Guid? SharedQuestionId { get; set; }
         public bool RevealResults { get; set; }
         public int ResetVersion { get; set; }
         public int SubmissionCount { get; private set; }
@@ -355,7 +397,10 @@ public class SurveyPageTests : BunitContext
             if (request.Method == HttpMethod.Get &&
                 request.RequestUri?.AbsolutePath == $"/api/sessions/{sessionId}/questions")
             {
-                return JsonResponse(HttpStatusCode.OK, questions.Select(StudentQuestionResponse.FromQuestion));
+                var available = SharedQuestionId is Guid sharedQuestionId
+                    ? questions.Where(question => question.Id == sharedQuestionId)
+                    : questions;
+                return JsonResponse(HttpStatusCode.OK, available.Select(StudentQuestionResponse.FromQuestion));
             }
 
             if (request.Method == HttpMethod.Post &&

@@ -6,6 +6,7 @@
 @using Pulse.Shared.Contracts.V1
 @using Pulse.Shared.Resources
 @using Pulse.Shared.Services
+@using Pulse.Shared.Models
 @using Pulse.WebApp.Services
 @implements IAsyncDisposable
 @rendermode InteractiveServer
@@ -46,9 +47,10 @@
         {
             <section class="pulse-card survey-status" aria-live="polite">
                 <p class="pulse-eyebrow">Response received</p>
-                <h1>Survey submitted</h1>
+                <h1>Response recorded</h1>
                 <p>Your anonymous responses have been recorded.</p>
                 <p>The results are currently hidden. This page will update when your instructor reveals aggregate results.</p>
+                <p>This page will also update if your instructor shares another question.</p>
             </section>
         }
         else
@@ -64,14 +66,19 @@
                     <article class="pulse-card survey-result">
                         <div role="heading" aria-level="2"><Pulse.Shared.Components.MarkdownContent Text="@question.Text" /></div>
                         <p>@question.ResponseCount responses</p>
-                        @foreach (var tally in question.Tallies)
+                        @foreach (var (tally, tallyIndex) in question.Tallies.Select((tally, index) => (tally, index)))
                         {
                             var percentage = question.ResponseCount == 0
                                 ? 0
                                 : (int)Math.Round(tally.Count * 100d / question.ResponseCount);
                             <div class="survey-result-row">
                                 <div>
-                                    <div><Pulse.Shared.Components.MarkdownContent Text="@tally.Value" />
+                                    <div>
+                                        @if (question.Type is nameof(QuestionType.MultipleChoice) or nameof(QuestionType.MultipleAnswer))
+                                        {
+                                            <span class="survey-choice-label">@ChoiceLabelFormatter.ForIndex(tallyIndex).</span>
+                                        }
+                                        <Pulse.Shared.Components.MarkdownContent Text="@tally.Value" />
                                         @if (question.CorrectAnswers?.Contains(tally.Value, StringComparer.Ordinal) == true)
                                         {
                                             <span class="correct-answer-badge">@SurveyText.CorrectAnswer</span>
@@ -92,7 +99,7 @@
         <header class="survey-header">
             <p class="pulse-eyebrow">Anonymous survey</p>
             <h1>@surveyTitle</h1>
-            <p>Answer every question, review your selections, and submit once at the end.</p>
+            <p>Answer the question(s) currently shared by your instructor, review your selections, and submit.</p>
         </header>
 
         @if (!string.IsNullOrWhiteSpace(submissionError))
@@ -110,7 +117,7 @@
                         @switch (question.Type)
                         {
                             case QuestionType.MultipleChoice:
-                                @foreach (var option in question.Options)
+                                @foreach (var (option, optionIndex) in question.Options.Select((option, index) => (option, index)))
                                 {
                                     <label class="survey-option">
                                         <input type="radio"
@@ -118,19 +125,21 @@
                                                value="@option"
                                                checked="@(singleAnswers.GetValueOrDefault(question.Id) == option)"
                                                @onchange="@(_ => SetSingleAnswer(question.Id, option))" />
+                                        <strong class="survey-choice-label">@ChoiceLabelFormatter.ForIndex(optionIndex).</strong>
                                         <Pulse.Shared.Components.MarkdownContent Text="@option" />
                                     </label>
                                 }
                                 break;
 
                             case QuestionType.MultipleAnswer:
-                                @foreach (var option in question.Options)
+                                @foreach (var (option, optionIndex) in question.Options.Select((option, index) => (option, index)))
                                 {
                                     <label class="survey-option">
                                         <input type="checkbox"
                                                value="@option"
                                                checked="@GetMultipleAnswers(question.Id).Contains(option)"
                                                @onchange="@(_ => ToggleMultipleAnswer(question.Id, option))" />
+                                        <strong class="survey-choice-label">@ChoiceLabelFormatter.ForIndex(optionIndex).</strong>
                                         <Pulse.Shared.Components.MarkdownContent Text="@option" />
                                     </label>
                                 }
@@ -179,6 +188,44 @@
                 @(isSubmitting ? "Submitting..." : "Submit survey")
             </button>
         </form>
+
+        @if (revealedResults is { Questions.Count: > 0 })
+        {
+            <section class="survey-results" aria-label="Revealed survey results">
+                <h2>Results revealed</h2>
+                <p>These aggregate results include responses from the class.</p>
+                @foreach (var question in revealedResults.Questions)
+                {
+                    <article class="pulse-card survey-result">
+                        <div role="heading" aria-level="3"><Pulse.Shared.Components.MarkdownContent Text="@question.Text" /></div>
+                        <p>@question.ResponseCount responses</p>
+                        @foreach (var (tally, tallyIndex) in question.Tallies.Select((tally, index) => (tally, index)))
+                        {
+                            var percentage = question.ResponseCount == 0
+                                ? 0
+                                : (int)Math.Round(tally.Count * 100d / question.ResponseCount);
+                            <div class="survey-result-row">
+                                <div>
+                                    <div>
+                                        @if (question.Type is nameof(QuestionType.MultipleChoice) or nameof(QuestionType.MultipleAnswer))
+                                        {
+                                            <span class="survey-choice-label">@ChoiceLabelFormatter.ForIndex(tallyIndex).</span>
+                                        }
+                                        <Pulse.Shared.Components.MarkdownContent Text="@tally.Value" />
+                                        @if (question.CorrectAnswers?.Contains(tally.Value, StringComparer.Ordinal) == true)
+                                        {
+                                            <span class="correct-answer-badge">@SurveyText.CorrectAnswer</span>
+                                        }
+                                    </div>
+                                    <strong>@tally.Count (@percentage%)</strong>
+                                </div>
+                                <progress aria-label="@tally.Value" value="@tally.Count" max="@Math.Max(1, question.ResponseCount)">@percentage%</progress>
+                            </div>
+                        }
+                    </article>
+                }
+            </section>
+        }
     }
 </main>
 
@@ -377,7 +424,8 @@
             realtimeConnection = factory.Create(
                 _ => InvokeAsync(LoadStudentResultsAsync),
                 () => InvokeAsync(StateHasChanged),
-                () => InvokeAsync(LoadStudentResultsAsync));
+                () => InvokeAsync(LoadStudentResultsAsync),
+                () => InvokeAsync(ReloadQuestionsAsync));
             try
             {
                 await realtimeConnection.StartAsync(sessionId, lifetime.Token);
@@ -397,7 +445,10 @@
         try
         {
             while (await timer.WaitForNextTickAsync(lifetime.Token))
+            {
+                await InvokeAsync(ReloadQuestionsAsync);
                 await InvokeAsync(LoadStudentResultsAsync);
+            }
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
         {
@@ -471,7 +522,12 @@
         if (updated is not { Count: > 0 })
             return;
 
-        questions = updated.OrderBy(question => question.SortOrder).ToList();
+        var ordered = updated.OrderBy(question => question.SortOrder).ToList();
+        var questionSetChanged = !questions.Select(question => question.Id)
+            .SequenceEqual(ordered.Select(question => question.Id));
+        questions = ordered;
+        if (isSubmitted && questionSetChanged)
+            isSubmitted = false;
         questionsNeedRefresh = false;
         isPaused = false;
     }

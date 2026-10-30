@@ -335,9 +335,9 @@
                     {
                         <div class="question-options">
                             <strong>Options:</strong><br />
-                            @foreach (var opt in q.Options)
+                            @foreach (var (opt, optionIndex) in q.Options.Select((option, index) => (option, index)))
                             {
-                                <Pulse.Shared.Components.MarkdownContent Text="@opt" />
+                                <div><strong>@ChoiceLabelFormatter.ForIndex(optionIndex).</strong> <Pulse.Shared.Components.MarkdownContent Text="@opt" /></div>
                             }
                         </div>
                     }

@@ -65,6 +65,33 @@ public class StudentResultsEndpointTests
     }
 
     [Fact]
+    public async Task GetStudentResults_WhenOneQuestionIsRevealed_ReturnsOnlyThatQuestion()
+    {
+        using var database = new LiteDatabase("Filename=:memory:");
+        var session = CreateSession(ResultsVisibility.Blinded);
+        var questionRepo = new QuestionRepository(database);
+        var first = questionRepo.Insert(new Question
+        {
+            SessionId = session.Id, Text = "First", Type = QuestionType.MultipleChoice, Options = ["A", "B"]
+        });
+        var second = questionRepo.Insert(new Question
+        {
+            SessionId = session.Id, Text = "Second", Type = QuestionType.MultipleChoice, Options = ["C", "D"]
+        });
+        session.RevealedQuestionIds.Add(second.Id);
+
+        var result = await SessionResultsEndpointHandlers.GetStudentResults(
+            session.Id,
+            CreateSessionRepository(session).Object,
+            questionRepo,
+            new ResponseRepository(database));
+
+        var ok = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.Ok<StudentSurveyResultsResponse>>(result);
+        Assert.Equal(second.Id, Assert.Single(ok.Value!.Questions).QuestionId);
+        Assert.DoesNotContain(ok.Value.Questions, question => question.QuestionId == first.Id);
+    }
+
+    [Fact]
     public async Task GetInstructorResults_UsesUniqueParticipantAndCompletionCounts()
     {
         using var database = new LiteDatabase("Filename=:memory:");

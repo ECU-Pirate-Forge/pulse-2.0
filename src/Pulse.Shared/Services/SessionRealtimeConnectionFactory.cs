@@ -10,7 +10,8 @@ public sealed class SessionRealtimeConnectionFactory(
     public SessionRealtimeConnection Create(
         Func<SessionProgressUpdate, Task> submissionUpdated,
         Func<Task> sessionClosed,
-        Func<Task> resultsRevealed)
+        Func<Task> resultsRevealed,
+        Func<Task>? questionsUpdated = null)
     {
         var baseUrl = configuredBaseUrl.StartsWith("https+http://", StringComparison.OrdinalIgnoreCase)
             ? $"http://{configuredBaseUrl["https+http://".Length..]}"
@@ -27,6 +28,8 @@ public sealed class SessionRealtimeConnectionFactory(
         connection.On<SessionProgressUpdate>("SubmissionUpdated", submissionUpdated);
         connection.On("SessionClosed", sessionClosed);
         connection.On("ResultsRevealed", resultsRevealed);
+        if (questionsUpdated is not null)
+            connection.On("QuestionsUpdated", questionsUpdated);
 
         return new SessionRealtimeConnection(connection);
     }

@@ -1,5 +1,5 @@
-# @Pulse_WebApi = http://localhost:5062
-@Pulse_WebApi = https://9ld5ckvn-5062.usw3.devtunnels.ms
+# @Pulse_WebApi = https://9ld5ckvn-5062.usw3.devtunnels.ms
+@Pulse_WebApi = http://localhost:5062
 
 GET {{Pulse_WebApi}}/weatherforecast/
 Accept: application/json

@@ -306,6 +306,219 @@ public sealed class ContentTransferTests : IDisposable
     }
 
     [Fact]
+    public async Task BankImport_TracksSeparateBatchesAndSanitizesFilename()
+    {
+        client.DefaultRequestHeaders.Add("X-Import-Filename", Uri.EscapeDataString(@"C:\uploads\quiz notes.json"));
+        using var first = await Import(Questions(Question("First"), Question("Second")));
+        first.EnsureSuccessStatusCode();
+        var firstResult = (await first.Content.ReadFromJsonAsync<ContentImportResponse>(TestContext.Current.CancellationToken))!;
+        using var second = await Import(Questions(Question("Third")));
+        second.EnsureSuccessStatusCode();
+        var secondResult = (await second.Content.ReadFromJsonAsync<ContentImportResponse>(TestContext.Current.CancellationToken))!;
+        Assert.NotNull(firstResult.ImportBatchId);
+        Assert.NotEqual(firstResult.ImportBatchId, secondResult.ImportBatchId);
+        var history = await client.GetFromJsonAsync<List<QuestionImportSummary>>(
+            "/api/questionbank/imports", TestContext.Current.CancellationToken);
+        Assert.Equal(2, history!.Count);
+        Assert.All(history, batch =>
+        {
+            Assert.Equal("quiz notes.json", batch.FileName);
+            Assert.InRange(batch.ImportedAt, DateTime.UtcNow.AddMinutes(-1), DateTime.UtcNow);
+            Assert.Equal(batch.ImportedCount, batch.RemainingCount);
+        });
+        var bank = factory.Services.GetRequiredService<IQuestionBankRepository>();
+        Assert.Equal(2, bank.Search(new QuestionBankQuery(ImportBatchId: firstResult.ImportBatchId)).Count());
+        Assert.All(bank.GetAll(), item => Assert.Equal(QuestionSource.JsonImport, item.Source));
+    }
+
+    [Fact]
+    public async Task FilteredDeletion_RemovesEntireImportAcrossPagesAndRetainsOtherContent()
+    {
+        using var imported = await Import(Questions(Enumerable.Range(1, 105).Select(i => Question($"Batch {i}")).ToArray()));
+        imported.EnsureSuccessStatusCode();
+        var result = (await imported.Content.ReadFromJsonAsync<ContentImportResponse>(TestContext.Current.CancellationToken))!;
+        using var otherImport = await Import(Questions(Question("Keep")));
+        otherImport.EnsureSuccessStatusCode();
+        var bank = factory.Services.GetRequiredService<IQuestionBankRepository>();
+        var original = bank.Insert(new QuestionBankItem { Text = "Legacy question" });
+        var session = CreateSession();
+        var surveyCopy = factory.Services.GetRequiredService<QuestionRepository>().Insert(
+            new Question { Text = "Batch 1", SessionId = session.Id });
+        var triviaCopy = factory.Services.GetRequiredService<TriviaRepository>().InsertQuestion(
+            new TriviaQuestion { GameId = Guid.NewGuid(), Text = "Batch 1", QuestionBankItemId = bank.GetAll().First().Id });
+        var filter = new QuestionBankQuery(ImportBatchId: result.ImportBatchId);
+        using var previewResponse = await client.PostAsJsonAsync(
+            "/api/questionbank/delete/preview", filter, TestContext.Current.CancellationToken);
+        previewResponse.EnsureSuccessStatusCode();
+        var preview = (await previewResponse.Content.ReadFromJsonAsync<QuestionBankDeletePreview>(TestContext.Current.CancellationToken))!;
+        Assert.Equal(105, preview.QuestionIds.Count);
+        using var deleteResponse = await client.PostAsJsonAsync("/api/questionbank/delete",
+            new DeleteQuestionBankRequest(filter, preview.QuestionIds), TestContext.Current.CancellationToken);
+        deleteResponse.EnsureSuccessStatusCode();
+        Assert.Equal(105, (await deleteResponse.Content.ReadFromJsonAsync<QuestionBankDeleteResponse>(TestContext.Current.CancellationToken))!.DeletedCount);
+        Assert.Equal(2, bank.GetAll().Count());
+        Assert.NotNull(bank.GetById(original.Id));
+        Assert.Single(factory.Services.GetRequiredService<QuestionRepository>().GetBySessionId(session.Id),
+            item => item.Id == surveyCopy.Id);
+        Assert.Single(factory.Services.GetRequiredService<TriviaRepository>().GetQuestions(triviaCopy.GameId),
+            item => item.Id == triviaCopy.Id);
+        var history = await client.GetFromJsonAsync<List<QuestionImportSummary>>(
+            "/api/questionbank/imports", TestContext.Current.CancellationToken);
+        var batch = Assert.Single(history!, entry => entry.Id == result.ImportBatchId);
+        Assert.Equal(105, batch.ImportedCount);
+        Assert.Equal(0, batch.RemainingCount);
+    }
+
+    [Fact]
+    public async Task BankQuery_CombinesImportAnswerAndTriviaFiltersWithPagination()
+    {
+        var bank = factory.Services.GetRequiredService<IQuestionBankRepository>();
+        var batchId = Guid.NewGuid();
+        foreach (var i in Enumerable.Range(1, 25))
+            bank.Insert(new QuestionBankItem
+            {
+                Text = $"Question {i}", Type = QuestionType.MultipleChoice, Options = ["Wrong", "HTTP"],
+                CorrectAnswers = ["HTTP"], TriviaEligible = true, Course = "CSCI", Topic = "Web",
+                Tags = ["network"], ImportBatchId = batchId, Source = QuestionSource.JsonImport
+            });
+        bank.Insert(new QuestionBankItem
+        {
+            Text = "Draft", Options = ["Wrong", "HTTP"], CorrectAnswers = ["HTTP"], TriviaEligible = true,
+            Course = "CSCI", Topic = "Web", Tags = ["network"], ImportBatchId = batchId, IsDraft = true
+        });
+        var query = new QuestionBankQuery(
+            Course: "csci", Topic: "web", Tag: "NETWORK", ImportBatchId: batchId,
+            CorrectAnswer: "http", CorrectAnswerPosition: 2, Option: "wrong",
+            TriviaEligible: true, ModerationStatus: QuestionModerationStatus.Approved,
+            Source: QuestionSource.JsonImport, Type: (int)QuestionType.MultipleChoice);
+        var page = await client.GetFromJsonAsync<QuestionBankListResponse>(
+            $"/api/questionbank?{query.ToQueryString(page: 2, pageSize: 20)}", TestContext.Current.CancellationToken);
+        Assert.Equal(25, page!.TotalCount);
+        Assert.Equal(5, page.Items.Count);
+        Assert.All(page.Items, item => Assert.False(item.IsDraft));
+        var empty = await client.GetFromJsonAsync<QuestionBankListResponse>(
+            $"/api/questionbank?{(query with { CorrectAnswerPosition = 1 }).ToQueryString()}", TestContext.Current.CancellationToken);
+        Assert.Equal(0, empty!.TotalCount);
+    }
+
+    [Theory]
+    [InlineData("added")]
+    [InlineData("removed")]
+    [InlineData("changed")]
+    public async Task FilteredDeletion_RejectsStalePreviewWithoutDeletingAnythingElse(string change)
+    {
+        var bank = factory.Services.GetRequiredService<IQuestionBankRepository>();
+        var item = bank.Insert(new QuestionBankItem { Text = "Bad question", CorrectAnswers = ["Wrong"] });
+        var keep = bank.Insert(new QuestionBankItem { Text = "Keep", CorrectAnswers = ["Right"] });
+        var filter = new QuestionBankQuery(CorrectAnswer: "Wrong");
+        using var previewResponse = await client.PostAsJsonAsync(
+            "/api/questionbank/delete/preview", filter, TestContext.Current.CancellationToken);
+        var preview = (await previewResponse.Content.ReadFromJsonAsync<QuestionBankDeletePreview>(TestContext.Current.CancellationToken))!;
+        if (change == "added")
+            bank.Insert(new QuestionBankItem { Text = "Another", CorrectAnswers = ["Wrong"] });
+        else if (change == "removed")
+            bank.Delete(item.Id);
+        else
+        {
+            item.CorrectAnswers = ["Fixed"];
+            bank.Update(item);
+        }
+        var expectedCount = bank.GetAll().Count();
+        using var response = await client.PostAsJsonAsync("/api/questionbank/delete",
+            new DeleteQuestionBankRequest(filter, preview.QuestionIds), TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal(expectedCount, bank.GetAll().Count());
+        Assert.NotNull(bank.GetById(keep.Id));
+    }
+
+    [Fact]
+    public async Task FilteredDeletion_RequiresFilterAndExplicitNonEmptyConfirmation()
+    {
+        var bank = factory.Services.GetRequiredService<IQuestionBankRepository>();
+        var item = bank.Insert(new QuestionBankItem { Text = "Keep" });
+        var filter = new QuestionBankQuery(Text: "Keep");
+        foreach (var request in new[]
+        {
+            new DeleteQuestionBankRequest(null, [item.Id]),
+            new DeleteQuestionBankRequest(new QuestionBankQuery(), [item.Id]),
+            new DeleteQuestionBankRequest(filter, null),
+            new DeleteQuestionBankRequest(filter, []),
+            new DeleteQuestionBankRequest(filter, [item.Id, item.Id]),
+            new DeleteQuestionBankRequest(filter with { CorrectAnswerPosition = 0 }, [item.Id])
+        })
+        {
+            using var response = await client.PostAsJsonAsync("/api/questionbank/delete", request, TestContext.Current.CancellationToken);
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        }
+        using var preview = await client.PostAsJsonAsync("/api/questionbank/delete/preview",
+            new QuestionBankQuery(Sort: QuestionBankSort.Text), TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.BadRequest, preview.StatusCode);
+        Assert.NotNull(bank.GetById(item.Id));
+    }
+
+    [Theory]
+    [InlineData(null, HttpStatusCode.Unauthorized)]
+    [InlineData("WRONG", HttpStatusCode.Forbidden)]
+    public async Task BankManagementRoutes_RequireInstructorCode(string? code, HttpStatusCode expected)
+    {
+        client.DefaultRequestHeaders.Remove("InstructorCode");
+        if (code is not null)
+            client.DefaultRequestHeaders.Add("InstructorCode", code);
+        using var history = await client.GetAsync("/api/questionbank/imports", TestContext.Current.CancellationToken);
+        Assert.Equal(expected, history.StatusCode);
+        using var preview = await client.PostAsJsonAsync("/api/questionbank/delete/preview",
+            new QuestionBankQuery(Text: "Test"), TestContext.Current.CancellationToken);
+        Assert.Equal(expected, preview.StatusCode);
+        using var deletion = await client.PostAsJsonAsync("/api/questionbank/delete",
+            new DeleteQuestionBankRequest(new QuestionBankQuery(Text: "Test"), [Guid.NewGuid()]),
+            TestContext.Current.CancellationToken);
+        Assert.Equal(expected, deletion.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("correctAnswerPosition=0")]
+    [InlineData("type=999")]
+    [InlineData("source=999")]
+    [InlineData("importBatchId=00000000-0000-0000-0000-000000000000")]
+    public async Task BankQuery_RejectsInvalidFilters(string query)
+    {
+        using var response = await client.GetAsync($"/api/questionbank?{query}", TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public void FilteredDeletion_WriteFailureRollsBackAllDeletes()
+    {
+        var bank = factory.Services.GetRequiredService<IQuestionBankRepository>();
+        var first = bank.Insert(new QuestionBankItem { Text = "Bad first" });
+        var second = bank.Insert(new QuestionBankItem { Text = "Bad second" });
+        var filter = new QuestionBankQuery(Text: "Bad");
+        var failing = new Mock<IQuestionBankRepository>();
+        failing.Setup(repo => repo.Search(filter)).Returns(() => bank.Search(filter));
+        var count = 0;
+        failing.Setup(repo => repo.Delete(It.IsAny<Guid>())).Returns((Guid id) =>
+        {
+            if (++count == 2)
+                throw new InvalidOperationException("Simulated deletion failure");
+            return bank.Delete(id);
+        });
+
+        Assert.Throws<InvalidOperationException>(() => QuestionBankManagementEndpoints.Delete(
+            new DeleteQuestionBankRequest(filter, [first.Id, second.Id]), database, failing.Object));
+
+        Assert.NotNull(bank.GetById(first.Id));
+        Assert.NotNull(bank.GetById(second.Id));
+    }
+
+    [Fact]
+    public async Task InvalidImport_DoesNotCreateHistory()
+    {
+        using var response = await Import(Questions(Question(), new PortableQuestion { Text = "", Type = "TrueFalse" }));
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Empty(database.GetCollection<QuestionImportBatch>("question_imports").FindAll());
+    }
+
+    [Fact]
     public async Task PersistenceFailure_RollsBackEntireBatch()
     {
         var bank = new Mock<IQuestionBankRepository>();
@@ -326,5 +539,6 @@ public sealed class ContentTransferTests : IDisposable
             factory.Services.GetRequiredService<QuestionRepository>(), bank.Object,
             factory.Services.GetRequiredService<FormRepository>(), new JoinCodeGenerator(), new QuestionService()));
         Assert.Empty(realBank.GetAll());
+        Assert.Empty(database.GetCollection<QuestionImportBatch>("question_imports").FindAll());
     }
 }

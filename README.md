@@ -70,6 +70,22 @@ See the [import/export API and examples](docs/api.md#portable-json-import-and-ex
 [ready-to-import question file](docs/examples/questions.json). Files are limited to
 2 MiB and are validated and saved atomically.
 
+### Filtering and cleaning up the question bank
+
+The Question Bank and trivia question picker support combined question text, type,
+course, topic, tag, source, import, answer text, and correct-answer-position filters,
+with paging through all results. Trivia still shows only approved, non-draft,
+trivia-eligible questions.
+
+New JSON bank imports appear in **Import history** with a filename, timestamp,
+original count, and remaining count. Choose **Filter this import** to review one
+batch, or combine filters to find problems such as every correct answer being in
+position 1 (choice A). Choose **Preview deletion of all matches**, review the count,
+then explicitly confirm permanent deletion. This deletes all matches, not just
+the current page. Existing survey/trivia copies are unaffected, and import history
+is retained. Questions imported before batch tracking was added have no historical
+batch association.
+
 ## Fully Implemented Features
 
 The following are currently implemented in this repository (and covered by project tests):

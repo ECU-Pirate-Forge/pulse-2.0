@@ -47,7 +47,7 @@
                 @for (var i = 0; i < draft.Options.Count; i++)
                 {
                     var index = i;
-                    <label>Choice @(index + 1) (Markdown) <textarea value="@draft.Options[index]" @oninput="args => SetChoice(draft.Options, draft.CorrectAnswers, index, args.Value?.ToString() ?? string.Empty)" rows="3"></textarea>
+                    <label>Choice @ChoiceLabelFormatter.ForIndex(index) (Markdown) <textarea value="@draft.Options[index]" @oninput="args => SetChoice(draft.Options, draft.CorrectAnswers, index, args.Value?.ToString() ?? string.Empty)" rows="3"></textarea>
                         <MarkdownContent Text="@draft.Options[index]" />
                         <button type="button" @onclick="() => RemoveChoice(draft.Options, draft.CorrectAnswers, index)">Remove choice</button>
                     </label>
@@ -77,29 +77,33 @@
 
     <section class="pulse-card bank-filters" aria-labelledby="filter-title">
         <h2 id="filter-title">Find and moderate questions</h2>
-        <div class="bank-filter-grid">
-            <label>Search <input @bind="search" /></label>
-            <label>Course <input @bind="course" /></label>
-            <label>Topic <input @bind="topic" /></label>
-            <label>Tag <input @bind="tag" /></label>
-            <label>Status
-                <select @bind="status">
-                    <option value="">All statuses</option>
-                    <option value="Draft">Draft</option>
-                    <option value="Pending">Pending</option>
-                    <option value="Approved">Approved</option>
-                    <option value="Rejected">Rejected</option>
-                </select>
-            </label>
-            <label>Sort
-                <select @bind="sort">
-                    <option value="Newest">Newest</option>
-                    <option value="Oldest">Oldest</option>
-                    <option value="Text">Question text</option>
-                </select>
-            </label>
-        </div>
-        <button class="pulse-button pulse-button-secondary" @onclick="LoadAsync">Apply filters</button>
+        <QuestionBankFilters Value="@filter" ValueChanged="ApplyFiltersAsync" Imports="@imports" Disabled="@(isLoading || isDeleting)" />
+        <p aria-live="polite">@totalCount questions match the applied filters.</p>
+        <button class="pulse-button pulse-button-secondary" disabled="@(!filter.HasFilters || isLoading || isDeleting || totalCount == 0)" @onclick="PreviewDeleteAsync">Preview deletion of all matches</button>
+        @if (deletePreview is not null)
+        {
+            <div class="pulse-alert" role="alert">
+                <p>Permanently delete all @deletePreview.QuestionIds.Count matching bank questions, including other pages? Existing survey and trivia copies will not change. This cannot be undone.</p>
+                <button class="pulse-button pulse-button-primary" disabled="@(isDeleting || deletePreview.QuestionIds.Count == 0)" @onclick="DeleteAsync">Confirm permanent deletion</button>
+                <button class="pulse-button pulse-button-secondary" disabled="@isDeleting" @onclick="() => deletePreview = null">Cancel</button>
+            </div>
+        }
+        @if (deletionMessage is not null)
+        {
+            <p role="status">@deletionMessage</p>
+        }
+    </section>
+
+    <section class="pulse-card bank-filters" aria-labelledby="imports-title">
+        <h2 id="imports-title">Import history</h2>
+        <p>New bank imports are tracked separately, even when filenames repeat. Older questions have no import history.</p>
+        @foreach (var batch in imports)
+        {
+            <div class="bank-import-row">
+                <span><strong>@batch.FileName</strong> - @batch.ImportedAt.ToLocalTime().ToString("g") - @batch.RemainingCount of @batch.ImportedCount remaining - @batch.Id</span>
+                <button class="pulse-button pulse-button-secondary" disabled="@(isLoading || isDeleting)" @onclick="() => ApplyFiltersAsync(new QuestionBankQuery(ImportBatchId: batch.Id))">Filter this import</button>
+            </div>
+        }
     </section>
 
     @if (isLoading)
@@ -146,7 +150,7 @@
                         @for (var i = 0; i < item.Options.Count; i++)
                         {
                             var index = i;
-                            <label>Choice @(index + 1) (Markdown)
+                            <label>Choice @ChoiceLabelFormatter.ForIndex(index) (Markdown)
                                 <textarea class="bank-option" value="@item.Options[index]" @oninput="args => SetChoice(item.Options, item.CorrectAnswers, index, args.Value?.ToString() ?? string.Empty)" rows="3"></textarea>
                             </label>
                             <MarkdownContent Text="@item.Options[index]" />
@@ -188,16 +192,23 @@
             }
         </section>
     }
+    <nav aria-label="Question bank pages">
+        <button class="pulse-button pulse-button-secondary" disabled="@(page == 1 || isLoading || isDeleting)" @onclick="() => ChangePageAsync(-1)">Previous</button>
+        <span>Page @(page) of @Math.Max(1, (int)Math.Ceiling(totalCount / (double)PageSize))</span>
+        <button class="pulse-button pulse-button-secondary" disabled="@((long)page * PageSize >= totalCount || isLoading || isDeleting)" @onclick="() => ChangePageAsync(1)">Next</button>
+    </nav>
 </main>
 
 @code {
     private string instructorCode = string.Empty;
-    private string search = string.Empty;
-    private string course = string.Empty;
-    private string topic = string.Empty;
-    private string tag = string.Empty;
-    private string status = string.Empty;
-    private string sort = "Newest";
+    private const int PageSize = 20;
+    private QuestionBankQuery filter = new();
+    private List<QuestionImportSummary> imports = [];
+    private QuestionBankDeletePreview? deletePreview;
+    private string? deletionMessage;
+    private bool isDeleting;
+    private int page = 1;
+    private int totalCount;
     private string? error;
     private bool isLoading = true;
     private List<QuestionBankItem> items = [];
@@ -223,34 +234,115 @@
     {
         isLoading = true;
         error = null;
-        var query = new Dictionary<string, object?>
+        deletePreview = null;
+        try
         {
-            ["text"] = search,
-            ["course"] = course,
-            ["topic"] = topic,
-            ["tag"] = tag,
-            ["moderationStatus"] = status == "Draft" ? null : status,
-            ["isDraft"] = status == "Draft" ? "true" : status.Length > 0 ? "false" : null,
-            ["sort"] = sort,
-            ["pageSize"] = 100
-        };
-        var queryString = string.Join("&", query
-            .Where(pair => !string.IsNullOrWhiteSpace(pair.Value?.ToString()))
-            .Select(pair => $"{pair.Key}={Uri.EscapeDataString(pair.Value!.ToString()!)}"));
-        using var request = Authorized(HttpMethod.Get, $"/api/questionbank?{queryString}");
-        var response = await Http.SendAsync(request);
-        if (response.IsSuccessStatusCode)
-        {
-            var payload = await response.Content.ReadFromJsonAsync<QuestionBankResponse>();
-            items = payload?.Items ?? [];
+            using var historyRequest = Authorized(HttpMethod.Get, "/api/questionbank/imports");
+            using var historyResponse = await Http.SendAsync(historyRequest);
+            historyResponse.EnsureSuccessStatusCode();
+            imports = await historyResponse.Content.ReadFromJsonAsync<List<QuestionImportSummary>>()
+                ?? throw new System.Text.Json.JsonException("The server returned empty import history.");
+            using var request = Authorized(HttpMethod.Get, $"/api/questionbank?{filter.ToQueryString(page, PageSize)}");
+            using var response = await Http.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+            {
+                error = $"Pulse could not load the question bank: {await response.Content.ReadAsStringAsync()}";
+                items = [];
+                totalCount = 0;
+                return;
+            }
+            var payload = await response.Content.ReadFromJsonAsync<QuestionBankResponse>()
+                ?? throw new System.Text.Json.JsonException("The server returned an empty question bank.");
+            items = payload.Items;
+            totalCount = payload.TotalCount;
         }
-        else
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
         {
-            error = "Pulse could not load the question bank.";
+            error = $"Pulse could not load the question bank: {ex.Message}";
+            items = [];
+            totalCount = 0;
         }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
 
-        isLoading = false;
-        StateHasChanged();
+    private Task ApplyFiltersAsync(QuestionBankQuery value)
+    {
+        filter = value;
+        page = 1;
+        deletionMessage = null;
+        return LoadAsync();
+    }
+
+    private Task ChangePageAsync(int direction)
+    {
+        page += direction;
+        return LoadAsync();
+    }
+
+    private async Task PreviewDeleteAsync()
+    {
+        error = null;
+        deletionMessage = null;
+        deletePreview = null;
+        isDeleting = true;
+        try
+        {
+            using var request = Authorized(HttpMethod.Post, "/api/questionbank/delete/preview", filter);
+            using var response = await Http.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+            {
+                error = await response.Content.ReadAsStringAsync();
+                return;
+            }
+            deletePreview = await response.Content.ReadFromJsonAsync<QuestionBankDeletePreview>()
+                ?? throw new System.Text.Json.JsonException("The server returned an empty deletion preview.");
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
+        {
+            error = $"Could not preview deletion: {ex.Message}";
+        }
+        finally
+        {
+            isDeleting = false;
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (deletePreview is null)
+            return;
+        isDeleting = true;
+        error = null;
+        try
+        {
+            using var request = Authorized(HttpMethod.Post, "/api/questionbank/delete",
+                new DeleteQuestionBankRequest(filter, deletePreview.QuestionIds));
+            using var response = await Http.SendAsync(request);
+            deletePreview = null;
+            if (!response.IsSuccessStatusCode)
+            {
+                error = await response.Content.ReadAsStringAsync();
+                return;
+            }
+            var result = await response.Content.ReadFromJsonAsync<QuestionBankDeleteResponse>()
+                ?? throw new System.Text.Json.JsonException("The server returned an empty deletion result.");
+            deletionMessage = $"Deleted {result.DeletedCount} question(s).";
+            page = 1;
+            await LoadAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
+        {
+            deletePreview = null;
+            error = $"Deletion could not be confirmed. Refresh the bank before retrying: {ex.Message}";
+        }
+        finally
+        {
+            isDeleting = false;
+        }
     }
 
     private async Task CreateAsync(bool isDraft)
