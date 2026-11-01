@@ -88,6 +88,15 @@ the current page. Existing survey/trivia copies are unaffected, and import histo
 is retained. Questions imported before batch tracking was added have no historical
 batch association.
 
+### Generating a QR code for any URL
+
+The admin sidebar and overview list Surveys (01), Trivia (02), Forms (03),
+Question Bank (04), and QR Code Generator (05). Open **QR Code Generator**,
+paste a complete HTTP or HTTPS URL, and select **Generate QR Code**. Scan the
+result or select **Download PNG** to save it. Generation runs locally in the
+admin app without visiting the URL or sending it to a third-party service.
+Editing the URL clears the previous result so it cannot be mistaken for the new URL.
+
 ## Fully Implemented Features
 
 The following are currently implemented in this repository (and covered by project tests):

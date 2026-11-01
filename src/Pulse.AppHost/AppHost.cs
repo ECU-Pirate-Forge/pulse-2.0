@@ -116,7 +116,7 @@ if (!string.IsNullOrWhiteSpace(publicJoinBaseUrl))
     catch (OperationCanceledException exception) when (!lifetime.ApplicationStopping.IsCancellationRequested)
     {
         logger.LogError(exception, "Aspire resource startup exceeded the configured timeout.");
-        throw new TimeoutException("Aspire startup timed out. Check AppHost resource logs and that the Aspire CLI matches the project's 13.1 release family.", exception);
+        throw new TimeoutException("Aspire startup timed out. Check AppHost resource logs, DevTunnels:StartupTimeoutSeconds, and that the Aspire CLI matches the project's 13.1 release family.", exception);
     }
     catch (Exception exception) when (exception is TimeoutException or InvalidOperationException)
     {

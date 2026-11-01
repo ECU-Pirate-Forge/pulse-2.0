@@ -1,0 +1,55 @@
+.qr-generator {
+    width: min(100%, var(--pulse-content-width));
+    margin-inline: auto;
+}
+
+.qr-generator h1 {
+    color: var(--pulse-purple-900);
+}
+
+.qr-generator-card {
+    padding: 1.5rem;
+}
+
+.qr-generator form {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.qr-generator label {
+    font-weight: 700;
+}
+
+.qr-generator input {
+    width: 100%;
+    min-width: 0;
+    padding: 0.75rem;
+    border: 1px solid var(--pulse-border);
+    border-radius: 0.5rem;
+    font: inherit;
+}
+
+.qr-generator form p {
+    margin: 0;
+}
+
+.qr-generator form button {
+    justify-self: start;
+}
+
+.qr-generator-result {
+    display: grid;
+    justify-items: center;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+.qr-generator-result img {
+    width: min(100%, 20rem);
+    height: auto;
+}
+
+.qr-generator-result p {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+}

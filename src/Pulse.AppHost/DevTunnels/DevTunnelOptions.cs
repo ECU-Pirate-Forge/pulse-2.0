@@ -8,7 +8,7 @@ public sealed class DevTunnelOptions
 
     public bool Enabled { get; set; }
     public string CliPath { get; set; } = "devtunnel";
-    public int StartupTimeoutSeconds { get; set; } = 60;
+    public int StartupTimeoutSeconds { get; set; } = 75;
     public int ReconnectTimeoutSeconds { get; set; } = 60;
     public Dictionary<string, DevTunnelServiceOptions> Services { get; set; } = [];
 

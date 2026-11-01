@@ -303,7 +303,7 @@ If using an already installed compatible CLI, replace the final line with
 | --- | --- | --- |
 | `Enabled` | `false` | Enables public tunnels for Development runs only. |
 | `CliPath` | `devtunnel` | CLI executable name or absolute executable path. |
-| `StartupTimeoutSeconds` | `60` | Bounds provisioning, Aspire startup, and public verification phases individually. Increase for slow networks/first container image downloads. |
+| `StartupTimeoutSeconds` | `75` | Bounds provisioning, Aspire startup, and public verification phases individually. Increase for slow networks/first container image downloads. |
 | `ReconnectTimeoutSeconds` | `60` | Maximum sustained public outage before the enabled run fails. |
 | `Services:<service>:TunnelId` | `pulse-developer-<service>` | Replace the example with a personal, dedicated persistent tunnel ID (3-60 lowercase letters/digits/hyphens, no leading/trailing hyphen). |
 | `Services:<service>:Port` | API `5062`, Admin `5049`, WebApp `5243`, Scalar `8088` | Fixed local HTTP forwarding/proxy port. All four must be distinct and available. |
@@ -311,6 +311,11 @@ If using an already installed compatible CLI, replace the final line with
 An environment override uses double underscores, for example
 `$env:DevTunnels__Enabled = 'true'` or
 `$env:DevTunnels__Services__webapi__TunnelId = 'pulse-alex-webapi'`.
+
+The startup timeout defaults to 75 seconds (previously 60). To allow more time
+on initial startup, set `$env:DevTunnels__StartupTimeoutSeconds = '90'` before
+starting Aspire, or configure `DevTunnels:StartupTimeoutSeconds` in AppHost
+settings or user-secrets. The reconnect timeout remains 60 seconds.
 Do not commit account-specific IDs or credentials. Remove conflicting environment
 overrides before relying on user secrets or configuration files.
 

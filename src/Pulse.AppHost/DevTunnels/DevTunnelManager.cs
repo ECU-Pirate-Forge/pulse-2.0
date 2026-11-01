@@ -220,7 +220,7 @@ public sealed class DevTunnelManager(
         catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)
         {
             throw new TimeoutException(
-                "Public tunnel readiness timed out. Check resource health, Host/Origin preservation, and whether a reused host targets this machine. " +
+                "Public tunnel readiness timed out. Check resource health, Host/Origin preservation, whether a reused host targets this machine, and DevTunnels:StartupTimeoutSeconds. " +
                 string.Join("; ", _probeErrors.Select(pair => $"{pair.Key}: {pair.Value}")), exception);
         }
     }
