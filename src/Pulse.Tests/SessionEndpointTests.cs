@@ -97,7 +97,9 @@ public class SessionEndpointTests
     {
         repo ??= new FakeSessionRepository();
         var client = new WebApplicationFactory<ApiAssemblyMarker>()
-            .WithWebHostBuilder(b => b.ConfigureServices(services =>
+            .WithWebHostBuilder(b => b
+                .UseSetting("Security:InstructorCode", "TEST-INSTRUCTOR-CODE")
+                .ConfigureServices(services =>
             {
                 services.AddSingleton(repo);
             }))
@@ -110,7 +112,9 @@ public class SessionEndpointTests
     {
         repo ??= new FakeSessionRepository();
         return new WebApplicationFactory<ApiAssemblyMarker>()
-            .WithWebHostBuilder(b => b.ConfigureServices(services =>
+            .WithWebHostBuilder(b => b
+                .UseSetting("Security:InstructorCode", "TEST-INSTRUCTOR-CODE")
+                .ConfigureServices(services =>
             {
                 services.AddSingleton(repo);
             }))

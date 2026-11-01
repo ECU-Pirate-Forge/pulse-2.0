@@ -1,6 +1,22 @@
-﻿<Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
-    <Found Context="routeData">
-        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
-        <FocusOnNavigate RouteData="routeData" Selector="h1" />
-    </Found>
-</Router>
+﻿@inject IConfiguration Configuration
+
+@if (string.IsNullOrWhiteSpace(Configuration["Security:InstructorCode"]) ||
+    string.IsNullOrWhiteSpace(Configuration["Security:AdminCode"]))
+{
+    <LayoutView Layout="typeof(Layout.MainLayout)">
+        <div class="pulse-card admin-error" role="alert">
+            <h1>Security codes need to be configured</h1>
+            <p>Configure Security:InstructorCode and Security:AdminCode in Pulse.AppHost user-secrets,
+                or in Pulse.Admin user-secrets when they are not provided by AppHost. Restart the application after configuring the codes.</p>
+        </div>
+    </LayoutView>
+}
+else
+{
+    <Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
+        <Found Context="routeData">
+            <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+            <FocusOnNavigate RouteData="routeData" Selector="h1" />
+        </Found>
+    </Router>
+}

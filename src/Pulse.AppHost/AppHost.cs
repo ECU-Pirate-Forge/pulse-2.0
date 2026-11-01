@@ -13,8 +13,11 @@ var publicJoinBaseUrl = builder.Configuration["Pulse:PublicJoinBaseUrl"];
 var ollamaBaseUrl = builder.Configuration["Ollama:BaseUrl"];
 var ollamaModel = builder.Configuration["Ollama:Model"];
 var ollamaEmbeddingModel = builder.Configuration["Ollama:EmbeddingModel"];
-var securityInstructorCode = builder.Configuration["Security:InstructorCode"];
-var securityAdminCode = builder.Configuration["Security:AdminCode"];
+var securityConfiguration = new ConfigurationBuilder()
+    .AddUserSecrets<Program>(optional: true)
+    .Build();
+var securityInstructorCode = securityConfiguration["Security:InstructorCode"];
+var securityAdminCode = securityConfiguration["Security:AdminCode"];
 var pulseDbConnectionString = builder.Configuration.GetConnectionString("pulse-db");
 
 if (!string.IsNullOrWhiteSpace(publicJoinBaseUrl))
@@ -60,6 +63,11 @@ if (!string.IsNullOrWhiteSpace(publicJoinBaseUrl))
         .WithReference(webapi)
         .WithExternalHttpEndpoints()
         .WithHttpHealthCheck("/health");
+
+    if (!string.IsNullOrWhiteSpace(securityInstructorCode))
+        webadmin.WithEnvironment("Security__InstructorCode", securityInstructorCode);
+    if (!string.IsNullOrWhiteSpace(securityAdminCode))
+        webadmin.WithEnvironment("Security__AdminCode", securityAdminCode);
 
     var webapp = builder.AddProject<Projects.Pulse_WebApp>("webapp")
         .WaitFor(webapi)

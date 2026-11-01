@@ -4,6 +4,11 @@ using Pulse.Shared.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Configuration
+    .AddUserSecrets(typeof(App).Assembly, optional: true)
+    .AddEnvironmentVariables()
+    .AddCommandLine(args);
+
 builder.AddServiceDefaults();
 
 // Add services to the container.
@@ -33,6 +38,12 @@ builder.Services.AddScoped(sp => new SessionRealtimeConnectionFactory(
     () => sp.GetRequiredService<IHttpMessageHandlerFactory>().CreateHandler("webapi")));
 
 var app = builder.Build();
+
+foreach (var key in new[] { "Security:InstructorCode", "Security:AdminCode" })
+{
+    if (string.IsNullOrWhiteSpace(app.Configuration[key]))
+        app.Logger.LogError("{ConfigurationKey} is missing. Configure it in Pulse.AppHost or Pulse.Admin user-secrets.", key);
+}
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

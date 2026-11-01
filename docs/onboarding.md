@@ -40,6 +40,28 @@ From the repository root:
 
 ## 4. Running the Solution
 
+Configure both security codes in AppHost user-secrets before running the full solution:
+
+```powershell
+dotnet user-secrets set "Security:InstructorCode" "<your-instructor-code>" --project .\src\Pulse.AppHost\Pulse.AppHost.csproj
+dotnet user-secrets set "Security:AdminCode" "<your-admin-code>" --project .\src\Pulse.AppHost\Pulse.AppHost.csproj
+```
+
+AppHost reads these codes from its user-secrets store and supplies them to WebApi
+and Admin through environment variables. No security codes belong in appsettings files.
+Admin falls back to its own user-secrets for codes not supplied by AppHost:
+
+```powershell
+dotnet user-secrets set "Security:InstructorCode" "<your-instructor-code>" --project .\src\Pulse.Admin\Pulse.Admin.csproj
+dotnet user-secrets set "Security:AdminCode" "<your-admin-code>" --project .\src\Pulse.Admin\Pulse.Admin.csproj
+```
+
+AppHost-provided environment values take precedence over Admin user-secrets.
+If either code is missing or blank, Admin displays a configuration error instead
+of its workspace and logs which setting is missing. Restart after configuring the
+codes. When running WebApi separately, supply matching `Security__InstructorCode`
+and `Security__AdminCode` environment variables.
+
 Recommended path (full local experience): run AppHost
 
 - `aspire run --project .\src\Pulse.AppHost\Pulse.AppHost.csproj` (Aspire CLI 13.1.x)
