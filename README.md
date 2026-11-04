@@ -233,9 +233,9 @@ High-level repository layout:
 ### Prerequisites
 
 - .NET SDK 10.0+
-- Aspire CLI 13.1.x (matching this repository's AppHost; see [onboarding](docs/onboarding.md#7-persistent-anonymous-dev-tunnels))
+- Aspire CLI 13.6.4+ (latest version; see [onboarding](docs/onboarding.md#7-persistent-anonymous-dev-tunnels))
 - Git
-- (Optional) Visual Studio 2022 or VS Code with C# Dev Kit
+- (Optional) Visual Studio 2022, Visual Studio 2025, or VS Code with C# Dev Kit
 
 ### 1. Clone
 
@@ -244,25 +244,33 @@ git clone https://github.com/ECU-Pirate-Forge/pulse-2.0.git
 cd pulse-2.0
 ```
 
-### 2. Restore Dependencies
+### 2. Configure user-secrets
+
+These are the codes that will be entered on the Admin Website when logging in
+```bash
+dotnet user-secrets set Security:InstructorCode  <Enter your Instructor Code>
+dotnet user-secrets set Security:AdminCoce  <Enter your Admin Code>
+```
+
+### 3. Restore Dependencies
 
 ```bash
 dotnet restore Pulse.slnx
 ```
 
-### 3. Build
+### 4. Build
 
 ```bash
 dotnet build Pulse.slnx -c Debug
 ```
 
-### 4. Run Tests
+### 5 Run Tests
 
 ```bash
 dotnet test .\Pulse.slnx
 ```
 
-### 5. Run the Full Local Stack (Recommended)
+### 6. Run the Full Local Stack (Recommended)
 
 ```powershell
 aspire run --project .\src\Pulse.AppHost\Pulse.AppHost.csproj
@@ -275,11 +283,20 @@ In tunnel mode, API requests and QR join links use public HTTPS tunnel addresses
 the Aspire dashboard stays private. Anonymous tunnels expose the selected services
 to the internet: use test data and retain application authorization.
 
-### 6. Test on a Phone through a Dev Tunnel
+### 7. Test on a Phone through a Dev Tunnel
 
 AppHost orchestrates a persistent anonymous dev tunnel for the API and student
-app. Sign in once, then start AppHost normally:
+app. 
 
+Set DevTunnels:Enbled = true inside `AppSettings.json` and `AppSettings.Development.json`
+
+```json
+  "DevTunnels": {
+    "Enabled": true,
+    ...
+```
+
+Sign in once, then start AppHost normally:
 ```powershell
 devtunnel user login
 aspire start --apphost .\src\Pulse.AppHost\Pulse.AppHost.csproj
@@ -294,7 +311,21 @@ stop hosting after testing. See the [onboarding guide](docs/onboarding.md) for
 verification, optional tunnel ID configuration, and the alternative manual
 launcher, and use the [mobile acceptance matrix](docs/mobile-acceptance.md).
 
-### 7. Run Individual Services (Optional)
+### 8. Using AI for question generation and RAG
+
+Install latest version of Ollama.
+
+Ollama must be running with Gemma:latest running
+
+Ollama must have GemmaEmbedding model downloaded
+```
+ollama pull Gemma:latest
+ollama pull GemmaEmbedding
+
+ollama run Gemma:latest --keep-alive -1m  # run indefinately
+```
+
+### 8. Run Individual Services (Optional)
 
 ```bash
 dotnet run --project src/Pulse.WebApi/Pulse.WebApi.csproj
