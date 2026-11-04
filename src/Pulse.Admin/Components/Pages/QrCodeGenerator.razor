@@ -1,0 +1,78 @@
+@page "/qr-code-generator"
+@using QRCoder
+@using QRCoder.Exceptions
+
+<PageTitle>QR Code Generator - Pulse</PageTitle>
+
+<div class="qr-generator">
+    <header>
+        <p class="pulse-eyebrow">Instructor workspace</p>
+        <h1>QR Code Generator</h1>
+        <p>Paste a URL to generate a QR code that anyone can scan.</p>
+    </header>
+
+    <section class="pulse-card qr-generator-card" aria-label="Generate a QR code">
+        <form @onsubmit="Generate" @onsubmit:preventDefault>
+            <label for="qr-url">URL</label>
+            <input id="qr-url" type="url" placeholder="https://example.com"
+                   @bind="Url" @bind:event="oninput" @bind:after="ClearResult"
+                   aria-describedby="qr-url-help qr-url-error"
+                   aria-invalid="@(_error is not null ? "true" : "false")" />
+            <p id="qr-url-help">Enter a complete HTTP or HTTPS URL. The URL is not visited or sent to a third-party service.</p>
+            @if (_error is not null)
+            {
+                <p id="qr-url-error" class="validation-message" role="alert">@_error</p>
+            }
+            <button type="submit" class="pulse-button">Generate QR Code</button>
+        </form>
+
+        @if (_imageData is not null)
+        {
+            <div class="qr-generator-result" aria-live="polite">
+                <img src="@_imageData" alt="QR code for @_generatedUrl" />
+                <p>@_generatedUrl</p>
+                <a class="pulse-button pulse-button-outline" href="@_imageData" download="qr-code.png">Download PNG</a>
+            </div>
+        }
+    </section>
+</div>
+
+@code {
+    private string Url { get; set; } = string.Empty;
+    private string? _error;
+    private string? _imageData;
+    private string? _generatedUrl;
+
+    private void ClearResult()
+    {
+        _error = null;
+        _imageData = null;
+        _generatedUrl = null;
+    }
+
+    private void Generate()
+    {
+        ClearResult();
+        var url = Url.Trim();
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
+            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) ||
+            string.IsNullOrWhiteSpace(uri.Host))
+        {
+            _error = "Enter a valid, complete HTTP or HTTPS URL.";
+            return;
+        }
+
+        try
+        {
+            using var generator = new QRCodeGenerator();
+            using var data = generator.CreateQrCode(url, QRCodeGenerator.ECCLevel.Q);
+            using var png = new PngByteQRCode(data);
+            _imageData = $"data:image/png;base64,{Convert.ToBase64String(png.GetGraphic(10))}";
+            _generatedUrl = url;
+        }
+        catch (DataTooLongException)
+        {
+            _error = "This URL is too long for a QR code. Please use a shorter URL.";
+        }
+    }
+}

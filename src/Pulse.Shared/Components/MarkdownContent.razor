@@ -1,0 +1,53 @@
+@namespace Pulse.Shared.Components
+@using Markdig
+@using Markdig.Renderers
+@using Markdig.Renderers.Html.Inlines
+@using Markdig.Syntax.Inlines
+@using Microsoft.AspNetCore.Components
+
+<div class="pulse-markdown">@_html</div>
+
+@code {
+    [Parameter] public string? Text { get; set; }
+
+    private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder().DisableHtml().Build();
+    private MarkupString _html;
+
+    protected override void OnParametersSet()
+    {
+        using var writer = new StringWriter();
+        var renderer = new HtmlRenderer(writer);
+        Pipeline.Setup(renderer);
+        renderer.ObjectRenderers.Insert(0, new SafeLinkRenderer());
+        renderer.Render(Markdown.Parse(Text ?? string.Empty, Pipeline));
+        _html = new MarkupString(writer.ToString());
+    }
+
+    private sealed class SafeLinkRenderer : LinkInlineRenderer
+    {
+        protected override void Write(HtmlRenderer renderer, LinkInline link)
+        {
+            var url = link.GetDynamicUrl?.Invoke() ?? link.Url;
+            if (IsSafeUrl(url, link.IsImage))
+            {
+                base.Write(renderer, link);
+            }
+            else
+            {
+                renderer.WriteChildren(link);
+            }
+        }
+
+        private static bool IsSafeUrl(string? url, bool isImage)
+        {
+            if (url is null || url.Any(char.IsControl) ||
+                !Uri.TryCreate(url, UriKind.RelativeOrAbsolute, out var uri))
+                return false;
+
+            return !uri.IsAbsoluteUri ||
+                uri.Scheme == Uri.UriSchemeHttp ||
+                uri.Scheme == Uri.UriSchemeHttps ||
+                (!isImage && uri.Scheme == Uri.UriSchemeMailto);
+        }
+    }
+}

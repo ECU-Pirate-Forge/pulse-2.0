@@ -16,6 +16,7 @@ public class QuestionBankRepository : IQuestionBankRepository
         _col.EnsureIndex(x => x.Course);
         _col.EnsureIndex(x => x.Topic);
         _col.EnsureIndex(x => x.ModerationStatus);
+        _col.EnsureIndex(x => x.ImportBatchId);
     }
 
     public QuestionBankItem Insert(QuestionBankItem item)
@@ -63,19 +64,43 @@ public class QuestionBankRepository : IQuestionBankRepository
         if (query.ModerationStatus is not null)
             all = all.Where(x => x.ModerationStatus == query.ModerationStatus);
 
+        if (query.IsDraft is not null)
+            all = all.Where(x => x.IsDraft == query.IsDraft);
+        else if (query.ModerationStatus == QuestionModerationStatus.Approved)
+            all = all.Where(x => !x.IsDraft);
+
         if (query.Source is not null)
             all = all.Where(x => x.Source == query.Source);
 
         if (query.TriviaEligible is not null)
             all = all.Where(x => x.TriviaEligible == query.TriviaEligible);
 
+        if (query.ImportBatchId.HasValue)
+            all = all.Where(x => x.ImportBatchId == query.ImportBatchId);
+
+        if (!string.IsNullOrWhiteSpace(query.CorrectAnswer))
+            all = all.Where(x => x.CorrectAnswers.Any(answer =>
+                answer.Contains(query.CorrectAnswer, StringComparison.OrdinalIgnoreCase)));
+
+        if (!string.IsNullOrWhiteSpace(query.Option))
+            all = all.Where(x => AnswerOptions(x).Any(option =>
+                option.Contains(query.Option, StringComparison.OrdinalIgnoreCase)));
+
+        if (query.CorrectAnswerPosition.HasValue)
+            all = all.Where(x => AnswerOptions(x)
+                .Where((_, index) => index + 1 == query.CorrectAnswerPosition)
+                .Any(option => x.CorrectAnswers.Contains(option, StringComparer.OrdinalIgnoreCase)));
+
         return query.Sort switch
         {
-            QuestionBankSort.Oldest => all.OrderBy(x => x.CreatedAt),
-            QuestionBankSort.Text => all.OrderBy(x => x.Text, StringComparer.OrdinalIgnoreCase),
-            _ => all.OrderByDescending(x => x.CreatedAt)
+            QuestionBankSort.Oldest => all.OrderBy(x => x.CreatedAt).ThenBy(x => x.Id),
+            QuestionBankSort.Text => all.OrderBy(x => x.Text, StringComparer.OrdinalIgnoreCase).ThenBy(x => x.Id),
+            _ => all.OrderByDescending(x => x.CreatedAt).ThenBy(x => x.Id)
         };
     }
+
+    private static IEnumerable<string> AnswerOptions(QuestionBankItem item) =>
+        item.Type == QuestionType.TrueFalse ? ["True", "False"] : item.Options;
 
     private static void CopyStructuredData(QuestionBankItem item)
     {

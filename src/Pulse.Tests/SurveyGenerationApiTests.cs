@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Pulse.WebApi.Features.SurveyGeneration;
 using Pulse.Shared.Models;
 using Pulse.WebApi;
+using Pulse.Shared.Contracts.V1;
 
 namespace Pulse.Tests;
 
@@ -40,6 +41,7 @@ public class SurveyGenerationApiTests
     [InlineData("PUT", "grounding/context")]
     [InlineData("POST", "questions/generate")]
     [InlineData("POST", "questions/generated/00000000-0000-0000-0000-000000000001/accept")]
+    [InlineData("PUT", "questions/generated/00000000-0000-0000-0000-000000000001")]
     [InlineData("GET", "questions/instructor")]
     public async Task GenerationRoutes_RequireInstructorCode(string method, string suffix)
     {
@@ -83,14 +85,21 @@ public class SurveyGenerationApiTests
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add("InstructorCode", "INST");
         var sessionId = await CreateSession(client);
+        const string sourceText = "Photosynthesis converts light energy to chemical energy.";
         (await client.PutAsJsonAsync($"/api/sessions/{sessionId}/grounding/context",
-            new { additionalContext = "Photosynthesis converts light energy to chemical energy." })).EnsureSuccessStatusCode();
+            new { additionalContext = sourceText })).EnsureSuccessStatusCode();
 
         using var response = await client.PostAsJsonAsync($"/api/sessions/{sessionId}/questions/generate", new { count = 2 });
         response.EnsureSuccessStatusCode();
         var preview = await response.Content.ReadFromJsonAsync<JsonElement>();
         var id = preview.GetProperty("id").GetGuid();
         Assert.Equal(2, preview.GetProperty("questions").GetArrayLength());
+        Assert.All(preview.GetProperty("questions").EnumerateArray(), question =>
+        {
+            Assert.Equal("context:1", question.GetProperty("sourceId").GetString());
+            Assert.Equal(sourceText, question.GetProperty("sourceQuote").GetString());
+            Assert.False(question.TryGetProperty("passageId", out _));
+        });
         Assert.Equal("[]", await client.GetStringAsync($"/api/sessions/{sessionId}/questions/instructor"));
 
         using var accepted = await client.PostAsync($"/api/sessions/{sessionId}/questions/generated/{id}/accept", null);
@@ -98,7 +107,11 @@ public class SurveyGenerationApiTests
         var questions = await accepted.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(2, questions.GetArrayLength());
         Assert.Equal("Light", questions[0].GetProperty("correctAnswers")[0].GetString());
-        Assert.NotEmpty(questions[0].GetProperty("sourceQuote").GetString()!);
+        Assert.All(questions.EnumerateArray(), question =>
+        {
+            Assert.Equal("context:1", question.GetProperty("sourceId").GetString());
+            Assert.Equal(sourceText, question.GetProperty("sourceQuote").GetString());
+        });
         using var duplicate = await client.PostAsync($"/api/sessions/{sessionId}/questions/generated/{id}/accept", null);
         Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
         Assert.Equal(2, (await client.GetFromJsonAsync<JsonElement>($"/api/sessions/{sessionId}/questions/instructor")).GetArrayLength());
@@ -144,6 +157,53 @@ public class SurveyGenerationApiTests
         var response = await client.PostAsync($"/api/sessions/{sessionId}/grounding/documents", upload);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Empty(factory.Services.GetRequiredService<SurveyGenerationRepository>().GetGrounding(sessionId).Documents);
+    }
+
+    [Fact]
+    public async Task EditedPreview_RemovesQuestionsAndPreservesMarkdownTagsAnswerAndCitation()
+    {
+        using var factory = CreateFactory().WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+        {
+            services.RemoveAll<OllamaSurveyGenerator>();
+            services.AddSingleton(OllamaSurveyGeneratorTests.CreateGenerator(new OllamaSurveyGeneratorTests.OllamaHandler()));
+        }));
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("InstructorCode", "INST");
+        var sessionId = await CreateSession(client);
+        const string source = "Photosynthesis converts light energy to chemical energy.";
+        (await client.PutAsJsonAsync($"/api/sessions/{sessionId}/grounding/context",
+            new { additionalContext = source })).EnsureSuccessStatusCode();
+        using var response = await client.PostAsJsonAsync($"/api/sessions/{sessionId}/questions/generate", new { count = 2 });
+        response.EnsureSuccessStatusCode();
+        var preview = (await response.Content.ReadFromJsonAsync<GeneratedSurveyPreviewResponse>())!;
+        var question = preview.Questions[0];
+        var correctAnswer = question.CorrectAnswer;
+        question.CorrectAnswer = "Missing choice";
+        using var invalid = await client.PutAsJsonAsync($"/api/sessions/{sessionId}/questions/generated/{preview.Id}",
+            new UpdateGeneratedSurveyPreviewRequest([question]));
+        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+        var storedPreview = factory.Services.GetRequiredService<LiteDatabase>()
+            .GetCollection<SurveyGenerationPreview>("survey_generation_previews").FindById(preview.Id);
+        Assert.Equal(2, storedPreview.Questions.Count);
+        Assert.Equal(correctAnswer, storedPreview.Questions[0].CorrectAnswer);
+        question.Text = "What is **energy**?";
+        question.Options[0] = "```csharp\nvar energy = \"Light\";\n```";
+        question.CorrectAnswer = question.Options[0];
+        question.Tags = [" code ", "CODE", "biology"];
+        question.SourceId = "tampered";
+        question.SourceQuote = "tampered";
+        using var update = await client.PutAsJsonAsync($"/api/sessions/{sessionId}/questions/generated/{preview.Id}",
+            new UpdateGeneratedSurveyPreviewRequest([question]));
+        update.EnsureSuccessStatusCode();
+        using var accepted = await client.PostAsync($"/api/sessions/{sessionId}/questions/generated/{preview.Id}/accept", null);
+        accepted.EnsureSuccessStatusCode();
+        var saved = Assert.Single((await accepted.Content.ReadFromJsonAsync<List<Pulse.Domain.Entities.Question>>())!);
+        Assert.Equal(question.Text, saved.Text);
+        Assert.Equal(question.Options, saved.Options);
+        Assert.Equal([question.CorrectAnswer], saved.CorrectAnswers);
+        Assert.Equal(["code", "biology"], saved.Tags);
+        Assert.Equal("context:1", saved.SourceId);
+        Assert.Equal(source, saved.SourceQuote);
     }
 
     [Fact]

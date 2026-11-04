@@ -22,7 +22,9 @@ public sealed record SessionSummaryResponse(
     [property: JsonPropertyName("resultsVisibility")] ResultsVisibility ResultsVisibility);
 
 public sealed record StudentResultsStatusResponse(
-    [property: JsonPropertyName("resultsVisibility")] ResultsVisibility ResultsVisibility);
+    [property: JsonPropertyName("resultsVisibility")] ResultsVisibility ResultsVisibility,
+    [property: JsonPropertyName("resetVersion")] int ResetVersion = 0,
+    [property: JsonPropertyName("status")] SessionStatus Status = SessionStatus.Active);
 
 public sealed record OptionTallyResponse(
     [property: JsonPropertyName("value")] string Value,
@@ -33,19 +35,23 @@ public sealed record SurveyQuestionResultsResponse(
     [property: JsonPropertyName("text")] string Text,
     [property: JsonPropertyName("type")] string Type,
     [property: JsonPropertyName("tallies")] IReadOnlyList<OptionTallyResponse> Tallies,
-    [property: JsonPropertyName("responseCount")] int ResponseCount);
+    [property: JsonPropertyName("responseCount")] int ResponseCount,
+    [property: JsonPropertyName("correctAnswers")] IReadOnlyList<string>? CorrectAnswers = null);
 
 public sealed record InstructorSurveyResultsResponse(
     [property: JsonPropertyName("sessionId")] Guid SessionId,
     [property: JsonPropertyName("title")] string Title,
     [property: JsonPropertyName("participantCount")] int ParticipantCount,
     [property: JsonPropertyName("completedCount")] int CompletedCount,
-    [property: JsonPropertyName("questions")] IReadOnlyList<SurveyQuestionResultsResponse> Questions);
+    [property: JsonPropertyName("questions")] IReadOnlyList<SurveyQuestionResultsResponse> Questions,
+    [property: JsonPropertyName("sharedQuestionId")] Guid? SharedQuestionId = null,
+    [property: JsonPropertyName("revealedQuestionIds")] IReadOnlyList<Guid>? RevealedQuestionIds = null);
 
 public sealed record StudentSurveyResultsResponse(
     [property: JsonPropertyName("sessionId")] Guid SessionId,
     [property: JsonPropertyName("title")] string Title,
-    [property: JsonPropertyName("questions")] IReadOnlyList<SurveyQuestionResultsResponse> Questions);
+    [property: JsonPropertyName("questions")] IReadOnlyList<SurveyQuestionResultsResponse> Questions,
+    [property: JsonPropertyName("resetVersion")] int ResetVersion = 0);
 
 public sealed record SessionProgressUpdate(
     [property: JsonPropertyName("participantCount")] int ParticipantCount,

@@ -4,6 +4,7 @@ using Pulse.Common.Services;
 using Pulse.Domain.Entities;
 using Pulse.Shared.Contracts.V1;
 using Pulse.Shared.Models;
+using Pulse.Shared.Resources;
 
 namespace Pulse.WebApi;
 
@@ -31,9 +32,15 @@ public static class SurveySubmissionEndpointHandlers
         if (session.Status != SessionStatus.Active)
             return Results.Conflict("Session is not active.");
 
-        var questions = questionRepo.GetBySessionId(sessionId)
+        var surveyQuestions = questionRepo.GetBySessionId(sessionId)
             .OrderBy(question => question.SortOrder)
             .ToList();
+        var questions = session.SharedQuestionId is Guid sharedQuestionId
+            ? surveyQuestions.Where(question => question.Id == sharedQuestionId).ToList()
+            : surveyQuestions;
+        if (questions.Count == 0)
+            return Results.Conflict("The shared question is no longer available.");
+
         var validationError = ValidateAnswers(questions, request.Answers);
         if (validationError is not null)
             return Results.BadRequest(validationError);
@@ -54,14 +61,15 @@ public static class SurveySubmissionEndpointHandlers
             };
         }).ToList();
 
-        responseRepo.SubmitSurvey(
+        if (!responseRepo.TrySubmitSurvey(
             responses,
             new SurveySubmission
             {
                 SessionId = sessionId,
                 DeviceId = canonicalDeviceId,
                 SubmittedAt = submittedAt
-            });
+            }, session.ResetVersion))
+            return Results.Conflict(SurveyText.SubmissionChanged);
 
         if (eventPublisher is not null)
         {
@@ -69,10 +77,11 @@ public static class SurveySubmissionEndpointHandlers
                 .Select(response => response.DeviceId)
                 .Distinct(StringComparer.Ordinal)
                 .Count();
-            var completedCount = responseRepo.GetSubmissionsBySession(sessionId)
-                .Select(submission => submission.DeviceId)
-                .Distinct(StringComparer.Ordinal)
-                .Count();
+            var completedCount = SurveyProgress.CountCompleted(
+                sessionId,
+                surveyQuestions.Select(question => question.Id).ToList(),
+                responseRepo.GetSubmissionsBySession(sessionId),
+                responseRepo);
             await eventPublisher.PublishSubmissionUpdatedAsync(
                 sessionId,
                 new SessionProgressUpdate(participantCount, completedCount),

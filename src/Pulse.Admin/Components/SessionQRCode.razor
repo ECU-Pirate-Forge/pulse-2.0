@@ -165,8 +165,10 @@
 
         try
         {
-            // Construct the join URL from the application base URI so it works on any route
-            var baseUri = (Configuration["StudentApp:BaseUrl"] ?? NavManager.BaseUri).TrimEnd('/');
+            var configuredBaseUri = Configuration["App:JoinBaseUrl"];
+            var baseUri = (string.IsNullOrWhiteSpace(configuredBaseUri)
+                ? NavManager.BaseUri
+                : configuredBaseUri).TrimEnd('/');
             JoinUrl = $"{baseUri}/join/{JoinCode}";
 
             // Call the QR image endpoint

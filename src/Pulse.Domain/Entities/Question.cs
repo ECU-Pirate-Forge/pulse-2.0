@@ -17,6 +17,7 @@ public class Question
     public List<MatchingPair> MatchingPairs { get; set; } = new List<MatchingPair>();
     public int SortOrder { get; set; }
     public List<string> CorrectAnswers { get; set; } = [];
+    public List<string> Tags { get; set; } = [];
     public string Explanation { get; set; } = string.Empty;
     public string SourceId { get; set; } = string.Empty;
     public string SourceQuote { get; set; } = string.Empty;

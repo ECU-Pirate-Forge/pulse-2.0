@@ -94,6 +94,30 @@ public class InstructorDashboardTests : BunitContext
         });
     }
 
+    [Theory]
+    [InlineData(SessionStatus.Draft)]
+    [InlineData(SessionStatus.Active)]
+    [InlineData(SessionStatus.Closed)]
+    public void EditButton_IsAvailableInEverySurveyState(SessionStatus status)
+    {
+        var session = CreateSession();
+        session.Status = status;
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            if (request.RequestUri?.AbsolutePath == "/sessions")
+                return JsonResponse(HttpStatusCode.OK, new[] { session });
+            return JsonResponse(HttpStatusCode.OK, Array.Empty<object>());
+        });
+        Services.AddSingleton(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+        var cut = Render<InstructorDashboard>();
+        Authenticate(cut);
+        cut.WaitForAssertion(() => Assert.Contains(session.Title, cut.Markup));
+
+        FindButton(cut, "Edit survey").Click();
+
+        Assert.EndsWith($"/instructor/questions/{session.Id}", Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().Uri);
+    }
+
     private static Session CreateSession() => new()
     {
         Id = Guid.NewGuid(),

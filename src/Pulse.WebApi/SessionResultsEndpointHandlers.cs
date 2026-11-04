@@ -1,5 +1,6 @@
 using Pulse.Application.Services;
 using Pulse.Common.Services;
+using Pulse.Domain.Entities;
 using Pulse.Shared.Contracts.V1;
 using Pulse.Shared.Models;
 using Pulse.WebApi.Middleware;
@@ -43,14 +44,25 @@ public static class SessionResultsEndpointHandlers
         if (session is null)
             return Results.NotFound();
 
-        if (session.ResultsVisibility != ResultsVisibility.Revealed)
-            return TypedResults.Ok(new StudentResultsStatusResponse(ResultsVisibility.Blinded));
+        if (!session.IsUnblinded &&
+            !questionRepo.GetBySessionId(session.Id)
+                .Any(question => session.RevealedQuestionIds.Contains(question.Id)))
+        {
+            return TypedResults.Ok(new StudentResultsStatusResponse(
+                ResultsVisibility.Blinded,
+                session.ResetVersion,
+                session.Status));
+        }
 
         var instructorResults = BuildInstructorResults(session, questionRepo, responseRepo);
+        var revealedQuestionIds = instructorResults.RevealedQuestionIds ?? [];
         return TypedResults.Ok(new StudentSurveyResultsResponse(
             instructorResults.SessionId,
             instructorResults.Title,
-            instructorResults.Questions));
+            instructorResults.Questions
+                .Where(question => revealedQuestionIds.Contains(question.QuestionId))
+                .ToList(),
+            session.ResetVersion));
     }
 
     private static InstructorSurveyResultsResponse BuildInstructorResults(
@@ -76,23 +88,35 @@ public static class SessionResultsEndpointHandlers
                 aggregation.Tallies
                     .Select(tally => new OptionTallyResponse(tally.Option, tally.Count))
                     .ToList(),
-                responseCount);
+                responseCount,
+                question.Type == QuestionType.Matching
+                    ? question.MatchingPairs.Select(pair => $"{pair.Prompt}: {pair.Match}").ToList()
+                    : question.CorrectAnswers.ToList());
         }).ToList();
 
         var participantCount = responseRepo.GetBySession(session.Id)
             .Select(response => response.DeviceId)
             .Distinct(StringComparer.Ordinal)
             .Count();
-        var completedCount = responseRepo.GetSubmissionsBySession(session.Id)
-            .Select(submission => submission.DeviceId)
-            .Distinct(StringComparer.Ordinal)
-            .Count();
+        var completedCount = SurveyProgress.CountCompleted(
+            session.Id,
+            questions.Select(question => question.Id).ToList(),
+            responseRepo.GetSubmissionsBySession(session.Id),
+            responseRepo);
+        var revealedQuestionIds = session.IsUnblinded
+            ? questions.Select(question => question.Id).ToList()
+            : session.RevealedQuestionIds
+                .Where(questionId => questions.Any(question => question.Id == questionId))
+                .Distinct()
+                .ToList();
 
         return new InstructorSurveyResultsResponse(
             session.Id,
             session.Title,
             participantCount,
             completedCount,
-            questionResults);
+            questionResults,
+            session.SharedQuestionId,
+            revealedQuestionIds);
     }
 }

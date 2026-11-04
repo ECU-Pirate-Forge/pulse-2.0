@@ -228,6 +228,8 @@
             }
         </div>
 
+        <ContentTransfer InstructorCode="@_instructorCode" ImportUrl="/api/content/import/form"
+                         ImportLabel="Import form" Imported="LoadFormsAsync" />
         <MudText Typo="Typo.h5" Style="font-weight: 700; margin-bottom: 20px;">Your forms</MudText>
 
         @if (!string.IsNullOrEmpty(ActionError))
@@ -261,6 +263,7 @@
                             <div class="session-code">@form.JoinCode</div>
                         </div>
                         <div class="session-body">
+                            <ContentTransfer InstructorCode="@_instructorCode" ExportUrl="@($"/api/content/forms/{form.Id}")" />
                             <div class="session-info-row">
                                 <span class="session-label">Fields:</span>
                                 <span class="session-value">@form.FieldCount</span>
