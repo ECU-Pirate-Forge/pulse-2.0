@@ -46,7 +46,7 @@ public static class QuestionBankImportEndpointHandlers
             if (item is null)
                 return Results.BadRequest($"Question bank item {id} not found.");
 
-            if (item.ModerationStatus != QuestionModerationStatus.Approved)
+            if (item.IsDraft || item.ModerationStatus != QuestionModerationStatus.Approved)
                 return Results.BadRequest($"Question bank item {id} must be approved before it can be imported.");
 
             var validation = questionService.ValidateQuestion(new QuestionDTO
@@ -82,6 +82,10 @@ public static class QuestionBankImportEndpointHandlers
                     .ToList(),
                 SortOrder = existingMaxSortOrder + 1 + i,
                 CorrectAnswers = [.. item.CorrectAnswers],
+                Tags = [.. item.Tags],
+                Explanation = item.Explanation,
+                SourceId = item.SourceId,
+                SourceQuote = item.SourceQuote,
                 CreatedAt = DateTime.UtcNow
             };
             questionRepo.Insert(question);

@@ -50,6 +50,25 @@
     padding: clamp(1.5rem, 5vw, 3rem);
 }
 
+.pulse-footer {
+    display: flex;
+    justify-content: center;
+    padding: 1rem 1.25rem 1.75rem;
+    color: var(--pulse-purple-900);
+    background: var(--pulse-background);
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+.pulse-footer-admin {
+    background: var(--pulse-surface);
+}
+
+.pulse-footer-accent {
+    color: var(--pulse-purple-700);
+}
+
 .admin-error {
     max-width: 42rem;
     padding: 2rem;

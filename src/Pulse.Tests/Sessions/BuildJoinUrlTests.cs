@@ -6,6 +6,19 @@ namespace Pulse.Tests.Sessions;
 public class BuildJoinUrlTests
 {
     [Fact]
+    public void BuildJoinUrl_UsesWebAppTunnelInsteadOfApiRequestOrigin()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Scheme = "http";
+        context.Request.Host = new HostString("localhost", 5062);
+
+        var url = SessionEndpointHandlers.BuildJoinUrl(
+            "https://pulse-student-5243.use2.devtunnels.ms/", context.Request, "ABC123");
+
+        Assert.Equal("https://pulse-student-5243.use2.devtunnels.ms/join/ABC123", url);
+    }
+
+    [Fact]
     public void BuildJoinUrl_UsesConfiguredBaseUrl()
     {
         var context = new DefaultHttpContext();

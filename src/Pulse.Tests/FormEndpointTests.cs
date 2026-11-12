@@ -91,6 +91,47 @@ public sealed class FormEndpointTests : IDisposable
     }
 
     [Fact]
+    public void CreateForm_PersistsFiveThousandCharacterDescription()
+    {
+        var description = new string('a', 5000);
+
+        var result = FormEndpointHandlers.CreateForm(new SaveFormRequest("Signup", description), Context(), repository, joinCodes.Object);
+
+        Assert.Equal(description, repository.Get(Assert.IsType<Created<Form>>(result).Value!.Id)?.Description);
+    }
+
+    [Fact]
+    public void CreateForm_RejectsDescriptionAboveMaximum()
+    {
+        var request = new SaveFormRequest("Signup", new string('a', 5001));
+
+        var result = FormEndpointHandlers.CreateForm(request, Context(), repository, joinCodes.Object);
+
+        Assert.Equal("Description must be 5000 characters or fewer.", Assert.IsType<BadRequest<string>>(result).Value);
+    }
+
+    [Fact]
+    public void UpdateForm_PersistsFiveThousandCharacterDescription()
+    {
+        var form = CreateForm();
+        var description = new string('a', 5000);
+
+        FormEndpointHandlers.UpdateForm(form.Id, new SaveFormRequest("Signup", description), Context(), repository);
+
+        Assert.Equal(description, repository.Get(form.Id)?.Description);
+    }
+
+    [Fact]
+    public void UpdateForm_OverlongDescriptionPreservesSavedDescription()
+    {
+        var form = CreateForm();
+
+        FormEndpointHandlers.UpdateForm(form.Id, new SaveFormRequest("Signup", new string('a', 5001)), Context(), repository);
+
+        Assert.Equal("Join us", repository.Get(form.Id)?.Description);
+    }
+
+    [Fact]
     public void GetForms_ReturnsOnlyCallersFormsWithCounts()
     {
         var mine = CreateOpenForm();

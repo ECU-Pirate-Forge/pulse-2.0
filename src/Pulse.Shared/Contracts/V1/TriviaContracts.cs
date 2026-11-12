@@ -10,6 +10,8 @@ public sealed record CreateTriviaGameRequest(
     int QuestionDurationSeconds = 20);
 
 public sealed record AddTriviaQuestionRequest(Guid QuestionBankItemId);
+public sealed record AddTriviaQuestionsRequest(QuestionBankQuery Filter);
+public sealed record AddTriviaQuestionsResponse(int AddedCount, int AlreadyIncludedCount);
 public sealed record CreateTriviaTeamRequest(string Name);
 public sealed record JoinTriviaRequest(string DeviceId, string DisplayName, Guid? TeamId);
 public sealed record JoinTriviaResponse(Guid GameId, Guid ParticipantId, string Title, TriviaCompetitionMode CompetitionMode);

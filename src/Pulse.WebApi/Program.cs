@@ -17,19 +17,40 @@ var connectionString = builder.Configuration.GetConnectionString("pulse-db") ?? 
 
 builder.Services.AddPulseWebApiCoreServices(connectionString);
 
-builder.Services.AddOpenApi();
+var useDevTunnels = builder.Configuration.GetValue<bool>("DevTunnels:Enabled");
+// const string scalarTunnelCorsPolicy = "ScalarDevTunnel";
+// if (useDevTunnels)
+// {
+//     if (!Uri.TryCreate(builder.Configuration["DevTunnels:ScalarOrigin"], UriKind.Absolute, out var scalarOrigin) ||
+//         scalarOrigin.Scheme != "https" || !scalarOrigin.Host.EndsWith(".devtunnels.ms", StringComparison.OrdinalIgnoreCase) ||
+//         !scalarOrigin.IsDefaultPort || scalarOrigin.AbsolutePath != "/" || !string.IsNullOrEmpty(scalarOrigin.UserInfo) ||
+//         !string.IsNullOrEmpty(scalarOrigin.Query) || !string.IsNullOrEmpty(scalarOrigin.Fragment))
+//         throw new InvalidOperationException("DevTunnels:ScalarOrigin must be the HTTPS origin of the Scalar dev tunnel supplied by AppHost.");
+//     builder.Services.AddCors(options => options.AddPolicy(scalarTunnelCorsPolicy, policy =>
+//         policy.WithOrigins(scalarOrigin.GetLeftPart(UriPartial.Authority)).AllowAnyMethod().AllowAnyHeader()));
+// }
+
+//builder.Services.AddOpenApi(options => options.AddDocumentTransformer((document, _, _) =>
+//{
+//    if (useDevTunnels)
+//        document.Servers = [new() { Url = builder.Configuration["DevTunnels:PublicUrl"]! }];
+//    return Task.CompletedTask;
+//}));
+
 builder.Services.AddSignalR();
 
 var app = builder.Build();
 
 app.UseMiddleware<GlobalExceptionMiddleware>();
+// if (useDevTunnels)
+//     app.UseCors(scalarTunnelCorsPolicy);
 app.UseMiddleware<InstructorCodeMiddleware>();
-app.UseHttpsRedirection();
+app.UsePulseDevTunnels();
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
-    app.MapScalarApiReference();
+    //app.MapOpenApi();
+    // app.MapScalarApiReference();
 }
 
 app.MapGet("/", () =>
@@ -64,14 +85,15 @@ app.MapDelete("/questions/{id:guid}", QuestionEndpointHandlers.DeleteQuestionFor
 app.MapPut("/api/questions/reorder", QuestionEndpointHandlers.ReorderQuestionsForInstructor);
 
 // Session-specific question endpoints
-app.MapGet("/api/sessions/{sessionId:guid}/questions", (Guid sessionId, QuestionRepository questionRepo) =>
-{
-    var questions = questionRepo.GetBySessionId(sessionId).OrderBy(q => q.SortOrder).ToList();
-    return Results.Ok(questions.Select(StudentQuestionResponse.FromQuestion));
-});
+app.MapGet("/api/sessions/{sessionId:guid}/questions", SurveyQuestionEndpointHandlers.GetStudentQuestions);
+app.MapPut("/api/sessions/{sessionId:guid}/questions/{questionId:guid}/share", SurveyQuestionEndpointHandlers.ShareQuestion);
+app.MapDelete("/api/sessions/{sessionId:guid}/questions/shared", SurveyQuestionEndpointHandlers.ClearSharedQuestion);
+app.MapPut("/api/sessions/{sessionId:guid}/questions/{questionId:guid}/reveal", SurveyQuestionEndpointHandlers.RevealQuestion);
 
 app.MapPost("/api/sessions/{sessionId:guid}/questions", QuestionEndpointHandlers.CreateQuestionForSession);
 app.MapSurveyGeneration();
+app.MapContentTransfer();
+app.MapQuestionBankManagement();
 
 app.MapPost("/api/questionbank", QuestionBankEndpointHandlers.CreateQuestionBankItem);
 app.MapGet("/api/questionbank", QuestionBankEndpointHandlers.GetQuestionBankItems);
@@ -90,18 +112,23 @@ app.MapGet("/api/sessions/{id:guid}/results/student", SessionResultsEndpointHand
 app.MapPut("/api/sessions/{id:guid}/unblind", SessionEndpointHandlers.UnblindSession);
 app.MapPut("/api/sessions/{id:guid}/activate", SessionEndpointHandlers.ActivateSession);
 app.MapPut("/api/sessions/{id:guid}/close", SessionEndpointHandlers.CloseSession);
+app.MapPut("/api/sessions/{id:guid}/reset", SessionEndpointHandlers.ResetSurveyAsync);
+app.MapPut("/api/sessions/{id:guid}/edit", SessionEndpointHandlers.BeginSurveyEditAsync);
 app.MapGet("/api/admin/export-db", AdminEndpointHandlers.ExportDb);
 app.MapPost("/api/questionbank/import/preview", CsvPreviewEndpointHandlers.PreviewImport).DisableAntiforgery();
 app.MapPost("/api/sessions/{sessionId:guid}/questions/import", QuestionBankImportEndpointHandlers.ImportQuestions);
 app.MapHub<SessionHub>("/hubs/session");
 app.MapGet("/api/trivia", TriviaEndpointHandlers.GetGames);
 app.MapPost("/api/trivia", TriviaEndpointHandlers.CreateGame);
+app.MapDelete("/api/trivia/{gameId:guid}", TriviaEndpointHandlers.DeleteGame);
 app.MapGet("/api/trivia/join/{joinCode}", TriviaEndpointHandlers.GetJoinInfo);
 app.MapPost("/api/trivia/join/{joinCode}", TriviaEndpointHandlers.Join);
 app.MapGet("/api/trivia/{gameId:guid}/state/{participantId:guid}", TriviaEndpointHandlers.GetState);
 app.MapGet("/api/trivia/{gameId:guid}/control", TriviaEndpointHandlers.GetInstructorState);
 app.MapPost("/api/trivia/{gameId:guid}/teams", TriviaEndpointHandlers.AddTeam);
 app.MapPost("/api/trivia/{gameId:guid}/questions", TriviaEndpointHandlers.AddQuestion);
+app.MapPost("/api/trivia/{gameId:guid}/questions/bulk", TriviaEndpointHandlers.AddFilteredQuestions);
+app.MapDelete("/api/trivia/{gameId:guid}/questions/{questionId:guid}", TriviaEndpointHandlers.RemoveQuestion);
 app.MapPut("/api/trivia/{gameId:guid}/questions/{questionId:guid}/open", TriviaEndpointHandlers.OpenQuestion);
 app.MapPut("/api/trivia/{gameId:guid}/question/close", TriviaEndpointHandlers.CloseQuestion);
 app.MapPut("/api/trivia/{gameId:guid}/finish", TriviaEndpointHandlers.FinishGame);

@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using MudBlazor.Services;
 using System.Net.Http.Json;
 using AdminHome = Pulse.Admin.Components.Pages.Home;
+using AdminNavMenu = Pulse.Admin.Components.Layout.NavMenu;
 using JoinSurveyForm = Pulse.WebApp.Components.JoinSurveyForm;
 using JoinSessionPage = Pulse.WebApp.Components.Pages.JoinSessionPage;
 
@@ -50,6 +51,34 @@ public class SurveyFirstNavigationTests : BunitContext
         Assert.True(text.IndexOf("Surveys", StringComparison.Ordinal) <
                     text.IndexOf("Trivia", StringComparison.Ordinal));
         Assert.DoesNotContain("Hello MudBlazor", text);
+    }
+
+    [Fact]
+    public void AdminHome_OrdersAndNumbersAllFiveWorkspaces()
+    {
+        var cut = Render<AdminHome>();
+        var cards = cut.FindAll(".workspace-card");
+
+        Assert.Equal(["Surveys", "Trivia", "Forms", "Question Bank", "QR Code Generator"],
+            cards.Select(card => card.QuerySelector("h2")!.TextContent));
+        Assert.Equal(["01", "02", "03", "04", "05"],
+            cards.Select(card => card.QuerySelector(".workspace-number")!.TextContent));
+        Assert.Equal(["/surveys", "/trivia", "/forms", "/question-bank", "/qr-code-generator"],
+            cards.Select(card => card.QuerySelector("a")!.GetAttribute("href")));
+    }
+
+    [Fact]
+    public void AdminNav_OrdersAndNumbersAllFiveWorkspaces()
+    {
+        var cut = Render<AdminNavMenu>();
+        var links = cut.FindAll("a").Take(5).ToArray();
+
+        Assert.Equal(["surveys", "trivia", "forms", "question-bank", "qr-code-generator"],
+            links.Select(link => link.GetAttribute("href")));
+        Assert.Equal(["01", "02", "03", "04", "05"],
+            links.Select(link => link.QuerySelector("span")!.TextContent));
+        Assert.Contains("Question Bank", links[3].TextContent);
+        Assert.Contains("QR Code Generator", links[4].TextContent);
     }
 
     [Fact]

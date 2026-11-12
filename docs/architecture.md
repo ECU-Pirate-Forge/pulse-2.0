@@ -4,6 +4,37 @@
 
 ## Solution Architecture
 
+### Optional development tunnel topology
+
+The current AppHost runs separate WebApi, WebApp, Admin, MigrationManager, and
+Scalar resources. For remote-device testing, `DevTunnels:Enabled` adds one named
+persistent anonymous tunnel per HTTP application (WebApi, WebApp, Admin, Scalar).
+The dashboard, telemetry, management endpoints, and MigrationManager stay private.
+This mode is for Development only and is disabled by default.
+
+AppHost provisions and checks tunnel definitions through the devtunnel CLI,
+preserves fixed forwarding ports, reads service-reported HTTPS addresses, reuses
+verified running hosts, and owns only the processes it starts. Public readiness
+is checked against a per-launch application marker and configured HTTPS origin.
+Persistent definitions survive shutdown; prolonged public outages fail the run.
+
+API clients use the API tunnel. Both QR handlers encode the WebApp tunnel's
+`/join/<code>` URL, and the component displays the same configured join origin.
+Scalar reaches the public API directly for OpenAPI documents and requests.
+Development tunnel mode enables CORS only for the configured Scalar tunnel
+origin, with no credentialed CORS. Its built-in 0.8.63 proxy is disabled in this
+mode because forwarding the incoming Scalar Host header misroutes cross-tunnel
+requests. Aspire health checks and forwarding transport still use local
+endpoints. Public TLS terminates at the tunnel; the applications normalize
+scheme/host only for the configured public host arriving through a loopback
+proxy, retaining antiforgery and application authorization.
+
+See [setup/lifecycle](onboarding.md#7-persistent-anonymous-dev-tunnels) and
+[troubleshooting](troubleshooting.md#persistent-dev-tunnel-issues).
+
+The diagrams below describe the broader conceptual architecture and workflows.
+
+This diagram shows the full deployment topology of Pulse: how the Aspire AppHost orchestrates the Web server and Foundry Local, what lives inside the Web process, and how instructor and student browsers interact with it.
 This diagram shows the Pulse deployment topology. The repository has separate WebApp, Admin, WebApi, and Aspire projects. Instructor session, question, QR, and live-results workflows live in Admin, while anonymous survey participation and revealed aggregate results live in WebApp. SignalR distributes live progress, closure, and reveal events without breaking existing join links.
 
 ```mermaid
@@ -227,7 +258,9 @@ sequenceDiagram
 
 ## Local document-grounded question generation
 
-Ollama runs independently on the API host at `http://localhost:11434`.
+Ollama runs independently on the API host with OpenAI-compatible base URL
+`http://localhost:11434/v1`. AppHost passes this configuration to the API;
+Ollama is not part of dev tunnel provisioning or public readiness checks.
 `gemma4:latest` generates structured multiple-choice questions and
 `all-minilm:latest` embeds grounding passages. No new Aspire resource or cloud
 service is required. The feature is grouped under
@@ -237,7 +270,11 @@ ownership, draft lifecycle, question persistence, and instructor UI.
 Original documents and extracted text are stored with a grounding revision in
 LiteDB. Generation embeds overlapping chunks, ranks them by cosine similarity,
 and selects at most 12 passages, reserving coverage for every document.
-Question count, choices, answer keys, and exact source quotes are validated.
+The model returns a `passageId` referencing one of those selected chunks, not a
+model-written quote. The server validates the ID and populates the existing
+`SourceId` and `SourceQuote` fields from the original chunk ID and text.
+Question count, choices, and answer keys remain validated. Citation text is
+verbatim by construction; instructors still review whether it supports the answer.
 Previews are server-stored and expire after one hour; approval is transactional.
 Student APIs project questions without answer keys, explanations, or citations.
 
@@ -254,12 +291,12 @@ sequenceDiagram
         API->>DB: Persist original documents, extracted text, revision
         IB->>API: POST /api/sessions/{id}/questions/generate\n{count}
         API->>AiSvc: GenerateAsync(material, title, count)
-        AiSvc->>OL: POST /api/embed (chunks and query)
+        AiSvc->>OL: POST /v1/embeddings (chunks and query)
         OL-->>AiSvc: Local embeddings
         Note over AiSvc: Retrieve relevant passages
-        AiSvc->>OL: POST /api/chat (gemma4:latest, JSON schema)
-        OL-->>AiSvc: Questions, choices, answer keys, citations
-        Note over AiSvc: Validate exact count and source quotes
+        AiSvc->>OL: POST /v1/chat/completions (gemma4:latest, JSON schema)
+        OL-->>AiSvc: Questions, choices, answer keys, passage IDs
+        Note over AiSvc: Validate questions and passage IDs; copy original citations
         AiSvc-->>API: Validated questions
         API->>DB: Store preview with grounding revision
         API-->>IB: 200 preview ID and questions

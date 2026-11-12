@@ -85,13 +85,21 @@ public class SessionEndpointTests
         {
             return Task.FromResult(_store.Remove(id));
         }
+
+        public bool ResetSurvey(Guid id) =>
+            throw new NotSupportedException("Survey reset tests require a database-backed repository.");
+
+        public bool BeginSurveyEdit(Guid id, bool clearResponses) =>
+            throw new NotSupportedException("Survey editing tests require a database-backed repository.");
     }
 
     private HttpClient CreateClient(ISessionRepository? repo = null)
     {
         repo ??= new FakeSessionRepository();
         var client = new WebApplicationFactory<ApiAssemblyMarker>()
-            .WithWebHostBuilder(b => b.ConfigureServices(services =>
+            .WithWebHostBuilder(b => b
+                .UseSetting("Security:InstructorCode", "TEST-INSTRUCTOR-CODE")
+                .ConfigureServices(services =>
             {
                 services.AddSingleton(repo);
             }))
@@ -104,7 +112,9 @@ public class SessionEndpointTests
     {
         repo ??= new FakeSessionRepository();
         return new WebApplicationFactory<ApiAssemblyMarker>()
-            .WithWebHostBuilder(b => b.ConfigureServices(services =>
+            .WithWebHostBuilder(b => b
+                .UseSetting("Security:InstructorCode", "TEST-INSTRUCTOR-CODE")
+                .ConfigureServices(services =>
             {
                 services.AddSingleton(repo);
             }))

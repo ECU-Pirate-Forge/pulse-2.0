@@ -20,7 +20,11 @@
 
     @if (!string.IsNullOrWhiteSpace(error))
     {
-        <div class="pulse-alert pulse-alert-error" role="alert">@error</div>
+        <div class="pulse-alert pulse-alert-error trivia-message" role="alert">
+            <p>@error</p>
+            <button type="button" class="pulse-button pulse-button-outline"
+                    aria-label="Close message" @onclick="() => error = null">Close</button>
+        </div>
     }
 
     @if (participantId == Guid.Empty)
@@ -56,7 +60,7 @@
         {
             <section class="pulse-card trivia-question">
                 <p class="pulse-eyebrow">Question open</p>
-                <h2>@state.CurrentQuestion.Text</h2>
+                <div role="heading" aria-level="2"><Pulse.Shared.Components.MarkdownContent Text="@state.CurrentQuestion.Text" /></div>
                 @foreach (var option in state.CurrentQuestion.Options)
                 {
                     <label class="trivia-option">
@@ -64,7 +68,7 @@
                                checked="@selectedAnswers.Contains(option)"
                                disabled="@answerSubmitted"
                                @onchange="_ => ToggleAnswer(option)" />
-                        <span>@option</span>
+                        <Pulse.Shared.Components.MarkdownContent Text="@option" />
                     </label>
                 }
                 <button class="pulse-button pulse-button-primary" disabled="@(selectedAnswers.Count == 0 || answerSubmitted)" @onclick="SubmitAnswerAsync">

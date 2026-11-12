@@ -21,6 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Pulse.AppHost\Pulse.AppHost.csproj" IsAspireProjectResource="false" />
     <Compile Include="..\Pulse.AppHost\PublicJoinUrl.cs" Link="AppHost\PublicJoinUrl.cs" />
     <ProjectReference Include="..\Pulse.WebApi\Pulse.WebApi.csproj" />
     <ProjectReference Include="..\Pulse.WebApp\Pulse.WebApp.csproj" />
@@ -34,6 +35,11 @@
     <Using Include="Aspire.Hosting.ApplicationModel" />
     <Using Include="Aspire.Hosting.Testing" />
     <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\docs\examples\questions.json" Link="ContentTransfer\questions.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\docs\schemas\questions.schema.json" Link="ContentTransfer\questions.schema.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

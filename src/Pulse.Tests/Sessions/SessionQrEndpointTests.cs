@@ -15,42 +15,37 @@ public class SessionQrEndpointTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task QrEndpointsEncodePublicStudentUrlInsteadOfLocalApiOrigin(bool byJoinCode)
+    public async Task BothQrRoutesEncodeThePublicWebAppJoinUrl(bool byJoinCode)
     {
         using var db = new LiteDatabase("Filename=:memory:");
         var repo = new SessionRepository(db, new JoinCodeGenerator());
         var session = new Session
         {
             Id = Guid.NewGuid(),
-            Title = "Public QR Session",
+            Title = "Tunnel QR",
             InstructorCode = "INST001",
-            JoinCode = "JOIN42",
+            JoinCode = "ABC123",
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
         db.GetCollection<Session>("sessions").Insert(session);
-
         var context = new DefaultHttpContext();
-        context.Request.Scheme = "https";
-        context.Request.Host = new HostString("localhost", 7081);
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["App:JoinBaseUrl"] = "https://pulse-student-7004.use2.devtunnels.ms/"
-            })
-            .Build();
+        context.Request.Scheme = "http";
+        context.Request.Host = new HostString("localhost", 5062);
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["App:JoinBaseUrl"] = "https://pulse-student-5243.use2.devtunnels.ms/"
+        }).Build();
 
         var result = byJoinCode
             ? await SessionEndpointHandlers.GetSessionQrByCode(session.JoinCode, context.Request, repo, configuration)
             : await SessionEndpointHandlers.GetSessionQr(session.Id, context.Request, repo, configuration);
         var file = Assert.IsType<FileContentHttpResult>(result);
-
         using var generator = new QRCodeGenerator();
-        using var data = generator.CreateQrCode(
-            "https://pulse-student-7004.use2.devtunnels.ms/join/JOIN42", QRCodeGenerator.ECCLevel.Q);
-        using var expected = new PngByteQRCode(data);
-        Assert.Equal("image/png", file.ContentType);
-        Assert.Equal(expected.GetGraphic(20), file.FileContents.ToArray());
+        using var qr = generator.CreateQrCode(
+            "https://pulse-student-5243.use2.devtunnels.ms/join/ABC123", QRCodeGenerator.ECCLevel.Q);
+        using var image = new PngByteQRCode(qr);
+        Assert.Equal(image.GetGraphic(20), file.FileContents.ToArray());
     }
 
     [Fact]

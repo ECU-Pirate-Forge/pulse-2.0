@@ -62,9 +62,25 @@
     background: white;
 }
 
+.trivia-question-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+}
+
+.trivia-question-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
 @media (max-width: 48rem) {
     .trivia-form-grid,
     .trivia-control-grid {
         grid-template-columns: 1fr;
+    }
+
+    .trivia-question-actions {
+        flex-wrap: wrap;
     }
 }

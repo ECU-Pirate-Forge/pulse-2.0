@@ -1,0 +1,123 @@
+@using Pulse.Domain.Entities
+@using Pulse.Shared.Models
+
+<div class="question-filters">
+    <label>Question text <input @bind="text" /></label>
+    <label>Type
+        <select @bind="type">
+            <option value="">All types</option>
+            @foreach (var value in Enum.GetValues<QuestionType>().Distinct())
+            {
+                <option value="@((int)value)">@value</option>
+            }
+        </select>
+    </label>
+    <label>Course <input @bind="course" /></label>
+    <label>Topic <input @bind="topic" /></label>
+    <label>Tag <input @bind="tag" /></label>
+    <label>Source
+        <select @bind="source">
+            <option value="">All sources</option>
+            @foreach (var value in Enum.GetValues<QuestionSource>())
+            {
+                <option value="@value">@value</option>
+            }
+        </select>
+    </label>
+    <label>Import
+        <select @bind="importId">
+            <option value="">All imports and other questions</option>
+            @foreach (var batch in Imports)
+            {
+                <option value="@batch.Id">@batch.FileName - @batch.ImportedAt.ToLocalTime().ToString("g") (@batch.RemainingCount remaining, @batch.Id.ToString()[..8])</option>
+            }
+        </select>
+    </label>
+    <label>Correct answer contains <input @bind="correctAnswer" /></label>
+    <label>Answer option contains <input @bind="option" /></label>
+    <label>Correct answer position (1 = A)
+        <input type="number" min="1" @bind="position" />
+    </label>
+    @if (!TriviaOnly)
+    {
+        <label>Status
+            <select data-testid="bank-status-filter" @bind="status">
+                <option value="">All statuses</option>
+                <option value="Draft">Draft</option>
+                <option value="Pending">Pending</option>
+                <option value="Approved">Approved</option>
+                <option value="Rejected">Rejected</option>
+            </select>
+        </label>
+        <label>Trivia eligibility
+            <select @bind="triviaEligible">
+                <option value="">Any eligibility</option>
+                <option value="true">Eligible</option>
+                <option value="false">Not eligible</option>
+            </select>
+        </label>
+    }
+    <label>Sort
+        <select @bind="sort">
+            <option value="@QuestionBankSort.Newest">Newest</option>
+            <option value="@QuestionBankSort.Oldest">Oldest</option>
+            <option value="@QuestionBankSort.Text">Question text</option>
+        </select>
+    </label>
+</div>
+<button type="button" class="pulse-button pulse-button-secondary" disabled="@Disabled" @onclick="ApplyAsync">Apply filters</button>
+<button type="button" class="pulse-button pulse-button-secondary" disabled="@Disabled" @onclick="ResetAsync">Clear filters</button>
+
+@code {
+    [Parameter] public QuestionBankQuery Value { get; set; } = new();
+    [Parameter] public EventCallback<QuestionBankQuery> ValueChanged { get; set; }
+    [Parameter] public IReadOnlyList<QuestionImportSummary> Imports { get; set; } = [];
+    [Parameter] public bool TriviaOnly { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+
+    private QuestionBankQuery? previousValue;
+    private string? text, course, topic, tag, correctAnswer, option;
+    private int? type, position;
+    private QuestionSource? source;
+    private Guid? importId;
+    private string status = string.Empty;
+    private string triviaEligible = string.Empty;
+    private QuestionBankSort sort;
+
+    protected override void OnParametersSet()
+    {
+        if (Value == previousValue)
+            return;
+        previousValue = Value;
+        text = Value.Text;
+        course = Value.Course;
+        topic = Value.Topic;
+        tag = Value.Tag;
+        type = Value.Type;
+        source = Value.Source;
+        importId = Value.ImportBatchId;
+        correctAnswer = Value.CorrectAnswer;
+        position = Value.CorrectAnswerPosition;
+        option = Value.Option;
+        status = Value.IsDraft == true ? "Draft" : Value.ModerationStatus?.ToString() ?? string.Empty;
+        triviaEligible = Value.TriviaEligible?.ToString().ToLowerInvariant() ?? string.Empty;
+        sort = Value.Sort;
+    }
+
+    private Task ApplyAsync() => ValueChanged.InvokeAsync(new QuestionBankQuery(
+        Text: text, Type: type, Course: course, Topic: topic, Tag: tag, Source: source,
+        ImportBatchId: importId, CorrectAnswer: correctAnswer, CorrectAnswerPosition: position,
+        Option: option, Sort: sort,
+        IsDraft: TriviaOnly ? false : status == "Draft" ? true : status.Length > 0 ? false : null,
+        ModerationStatus: TriviaOnly ? QuestionModerationStatus.Approved :
+            Enum.TryParse<QuestionModerationStatus>(status, out var moderation) ? moderation : null,
+        TriviaEligible: TriviaOnly ? true : bool.TryParse(triviaEligible, out var eligible) ? eligible : null));
+
+    private Task ResetAsync()
+    {
+        previousValue = null;
+        return ValueChanged.InvokeAsync(TriviaOnly
+            ? new QuestionBankQuery(ModerationStatus: QuestionModerationStatus.Approved, TriviaEligible: true, IsDraft: false)
+            : new QuestionBankQuery());
+    }
+}

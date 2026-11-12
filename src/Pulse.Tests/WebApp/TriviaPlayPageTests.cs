@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using AngleSharp.Html.Dom;
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 using Pulse.Shared.Contracts.V1;
@@ -58,6 +59,40 @@ public class TriviaPlayPageTests : BunitContext
     }
 
     [Theory]
+    [InlineData(HttpStatusCode.Conflict, "The answer arrived after the question deadline.")]
+    [InlineData(HttpStatusCode.InternalServerError, "Unable to submit answer.")]
+    public void RejectedAnswer_ShowsStyledMessageUntilStudentClosesIt(
+        HttpStatusCode status, string message)
+    {
+        var handler = new TriviaHandler(status, message);
+        Services.AddSingleton(new HttpClient(handler) { BaseAddress = new Uri("http://localhost") });
+        var cut = Render<TriviaPlay>(parameters => parameters.Add(p => p.JoinCode, "ABC123"));
+
+        cut.WaitForElement("input[maxlength='30']").Change("Ada");
+        cut.Find("button").Click();
+        cut.WaitForElement("input[type='checkbox']").Change(true);
+        cut.Find(".trivia-question button").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            var alert = cut.Find("[role='alert']");
+            Assert.Contains("trivia-message", alert.ClassList);
+            Assert.Contains(message, alert.TextContent);
+            Assert.DoesNotContain("Answer submitted", cut.Markup);
+        });
+
+        cut.Find("button[aria-label='Close message']").Click();
+
+        Assert.Empty(cut.FindAll("[role='alert']"));
+        Assert.True(Assert.IsAssignableFrom<IHtmlInputElement>(
+            cut.Find("input[type='checkbox']")).IsChecked);
+        Assert.False(cut.Find(".trivia-question button").HasAttribute("disabled"));
+
+        cut.Find(".trivia-question button").Click();
+        cut.WaitForAssertion(() => Assert.Contains(message, cut.Find("[role='alert']").TextContent));
+    }
+
+    [Theory]
     [InlineData(HttpStatusCode.NotFound, false, "That trivia code was not found.")]
     [InlineData(HttpStatusCode.InternalServerError, false, "could not check that trivia game")]
     [InlineData(HttpStatusCode.OK, true, "could not connect")]
@@ -91,7 +126,9 @@ public class TriviaPlayPageTests : BunitContext
         public Task<string> GetDeviceIdAsync() => Task.FromResult(deviceId);
     }
 
-    private sealed class TriviaHandler : HttpMessageHandler
+    private sealed class TriviaHandler(
+        HttpStatusCode answerStatus = HttpStatusCode.OK,
+        string answerError = "Unable to submit answer.") : HttpMessageHandler
     {
         public SubmitTriviaAnswerRequest? SubmittedAnswer { get; private set; }
 
@@ -141,6 +178,13 @@ public class TriviaPlayPageTests : BunitContext
             {
                 SubmittedAnswer = await request.Content!.ReadFromJsonAsync<SubmitTriviaAnswerRequest>(
                     cancellationToken: cancellationToken);
+                if (answerStatus != HttpStatusCode.OK)
+                {
+                    return new HttpResponseMessage(answerStatus)
+                    {
+                        Content = new StringContent(answerError)
+                    };
+                }
                 return Json(new SubmitTriviaAnswerResponse(true, 125));
             }
 

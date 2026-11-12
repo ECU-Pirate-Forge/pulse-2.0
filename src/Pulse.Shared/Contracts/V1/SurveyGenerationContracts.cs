@@ -9,15 +9,18 @@ public sealed record SaveGroundingContextRequest(string AdditionalContext);
 public sealed record GenerateSurveyQuestionsRequest(int Count);
 public sealed record GeneratedSurveyPreviewResponse(
     Guid Id, IReadOnlyList<GeneratedSurveyQuestion> Questions);
+public sealed record UpdateGeneratedSurveyPreviewRequest(List<GeneratedSurveyQuestion> Questions);
 
 public sealed class GeneratedSurveyQuestion
 {
+    public Guid Id { get; set; } = Guid.NewGuid();
     public string Text { get; set; } = string.Empty;
     public List<string> Options { get; set; } = [];
     public string CorrectAnswer { get; set; } = string.Empty;
     public string Explanation { get; set; } = string.Empty;
     public string SourceId { get; set; } = string.Empty;
     public string SourceQuote { get; set; } = string.Empty;
+    public List<string> Tags { get; set; } = [];
 }
 
 public sealed record StudentQuestionResponse(

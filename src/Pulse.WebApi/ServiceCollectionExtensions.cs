@@ -28,7 +28,7 @@ public static class ServiceCollectionExtensions
         services.AddHttpClient<OllamaSurveyGenerator>((provider, client) =>
         {
             var configuration = provider.GetRequiredService<IConfiguration>();
-            var address = new Uri(configuration["Ollama:BaseUrl"] ?? "http://localhost:11434");
+            var address = new Uri((configuration["Ollama:BaseUrl"] ?? "http://localhost:11434/v1").TrimEnd('/') + "/");
             // if (!address.IsLoopback || address.Scheme is not ("http" or "https"))
             //     throw new InvalidOperationException("Ollama:BaseUrl must be a local loopback HTTP endpoint.");
             client.BaseAddress = address;

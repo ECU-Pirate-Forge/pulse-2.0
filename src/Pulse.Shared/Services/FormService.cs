@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Net.Mail;
+using System.Resources;
 using System.Text;
 using System.Text.RegularExpressions;
 using Pulse.Shared.Contracts.V1;
@@ -11,6 +12,8 @@ public static partial class FormService
 {
     public const int MaxFields = 50;
     public const int MaxValueLength = 4000;
+    public const int MaxDescriptionLength = 5000;
+    private static readonly ResourceManager ValidationMessages = new(typeof(FormService));
 
     public static readonly IReadOnlyList<string> YesNoOptions = ["Yes", "No"];
 
@@ -23,6 +26,11 @@ public static partial class FormService
             return "Request body is required.";
         if (string.IsNullOrWhiteSpace(request.Title))
             return "Form title is required.";
+        if (request.Description?.Length > MaxDescriptionLength)
+            return string.Format(CultureInfo.CurrentCulture,
+                ValidationMessages.GetString("DescriptionTooLong", CultureInfo.CurrentUICulture)
+                    ?? throw new InvalidOperationException("Missing form description validation resource."),
+                MaxDescriptionLength);
 
         var fields = request.Fields ?? [];
         if (fields.Count > MaxFields)
