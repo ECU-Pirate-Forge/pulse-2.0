@@ -1,5 +1,7 @@
 using MudBlazor.Services;
 using Pulse.WebApp.Components;
+using Pulse.WebApp.Services;
+using Pulse.Shared.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,6 +12,7 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 builder.Services.AddMudServices();
+builder.Services.AddScoped<IDeviceIdService, DeviceIdService>();
 
 builder.Services.AddHttpClient("webapi", client =>
 {
@@ -18,6 +21,11 @@ builder.Services.AddHttpClient("webapi", client =>
 });
 builder.Services.AddScoped(sp =>
     sp.GetRequiredService<IHttpClientFactory>().CreateClient("webapi"));
+builder.Services.AddScoped(sp => new SessionRealtimeConnectionFactory(
+    builder.Configuration["WebApi:HubBaseUrl"]
+        ?? builder.Configuration["WebApi:BaseUrl"]
+        ?? "http://webapi",
+    () => sp.GetRequiredService<IHttpMessageHandlerFactory>().CreateHandler("webapi")));
 
 var app = builder.Build();
 
@@ -29,7 +37,7 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
-app.UseHttpsRedirection();
+app.UsePulseDevTunnels();
 
 app.UseAntiforgery();
 

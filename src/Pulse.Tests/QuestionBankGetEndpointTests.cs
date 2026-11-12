@@ -19,14 +19,14 @@ public class QuestionBankGetEndpointTests
     private Mock<IQuestionBankRepository> BuildRepo(List<QuestionBankItem>? items = null)
     {
         var repo = new Mock<IQuestionBankRepository>();
-        repo.Setup(r => r.Search(It.IsAny<string?>(), It.IsAny<int?>()))
-            .Returns((string? text, int? type) =>
+        repo.Setup(r => r.Search(It.IsAny<QuestionBankQuery>()))
+            .Returns((QuestionBankQuery query) =>
             {
                 var all = items ?? _items;
-                if (!string.IsNullOrWhiteSpace(text))
-                    all = all.Where(x => x.Text.Contains(text, StringComparison.OrdinalIgnoreCase)).ToList();
-                if (type is not null)
-                    all = all.Where(x => (int)x.Type == type.Value).ToList();
+                if (!string.IsNullOrWhiteSpace(query.Text))
+                    all = all.Where(x => x.Text.Contains(query.Text, StringComparison.OrdinalIgnoreCase)).ToList();
+                if (query.Type is not null)
+                    all = all.Where(x => (int)x.Type == query.Type.Value).ToList();
                 return all;
             });
         return repo;

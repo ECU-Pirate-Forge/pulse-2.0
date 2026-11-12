@@ -94,4 +94,76 @@ public class ResponseRepositoryTests
         Assert.Single(repo.GetByQuestionId(questionId1).ToList());
         Assert.Single(repo.GetByQuestionId(questionId2).ToList());
     }
+
+    [Fact]
+    public void Constructor_LegacyDuplicateResponses_KeepsLatestRecord()
+    {
+        using var database = new LiteDatabase("Filename=:memory:");
+        var collection = database.GetCollection<Response>("responses");
+        var questionId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid().ToString();
+        collection.Insert(new Response
+        {
+            QuestionId = questionId,
+            SessionId = sessionId,
+            DeviceId = deviceId,
+            Value = "old",
+            SubmittedAt = DateTime.UtcNow.AddMinutes(-1)
+        });
+        collection.Insert(new Response
+        {
+            QuestionId = questionId,
+            SessionId = sessionId,
+            DeviceId = deviceId,
+            Value = "new",
+            SubmittedAt = DateTime.UtcNow
+        });
+
+        var repository = new ResponseRepository(database);
+
+        var response = Assert.Single(repository.GetByQuestionId(questionId));
+        Assert.Equal("new", response.Value);
+    }
+
+    [Fact]
+    public void SubmitSurvey_WhenAWriteFails_RollsBackEveryResponse()
+    {
+        using var database = new LiteDatabase("Filename=:memory:");
+        var repository = new ResponseRepository(database);
+        var duplicateId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid().ToString();
+        var responses = new[]
+        {
+            new Response
+            {
+                Id = duplicateId,
+                QuestionId = Guid.NewGuid(),
+                SessionId = sessionId,
+                DeviceId = deviceId,
+                Value = "[\"A\"]"
+            },
+            new Response
+            {
+                Id = duplicateId,
+                QuestionId = Guid.NewGuid(),
+                SessionId = sessionId,
+                DeviceId = deviceId,
+                Value = "[\"B\"]"
+            }
+        };
+
+        Assert.Throws<LiteException>(() => repository.SubmitSurvey(
+            responses,
+            new SurveySubmission
+            {
+                SessionId = sessionId,
+                DeviceId = deviceId,
+                SubmittedAt = DateTime.UtcNow
+            }));
+
+        Assert.Empty(repository.GetBySessionAndDevice(sessionId, deviceId));
+        Assert.Empty(repository.GetSubmissionsBySession(sessionId));
+    }
 }

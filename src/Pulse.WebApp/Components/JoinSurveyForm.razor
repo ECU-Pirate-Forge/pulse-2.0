@@ -1,0 +1,51 @@
+@inject NavigationManager Navigation
+
+<form class="join-survey-form" @onsubmit="JoinSurvey" @onsubmit:preventDefault>
+    <div>
+        <label id="join-code-label" class="pulse-field-label" for="join-code">Survey code</label>
+        <input id="join-code"
+               class="pulse-input join-code-input"
+               value="@JoinCode"
+               @oninput="UpdateJoinCode"
+               inputmode="text"
+               autocomplete="off"
+               autocapitalize="characters"
+               maxlength="6"
+               aria-describedby="join-code-help"
+               placeholder="ABC123" />
+        <p id="join-code-help" class="pulse-help">
+            Enter the six-character code from your instructor. Your responses are anonymous.
+        </p>
+    </div>
+    <button class="pulse-button pulse-button-secondary"
+            type="submit"
+            disabled="@(!CanJoin)">
+        Join anonymous survey
+    </button>
+</form>
+
+@code {
+    private string JoinCode { get; set; } = string.Empty;
+
+    private bool CanJoin => NormalizeCode(JoinCode).Length == 6;
+
+    private void UpdateJoinCode(ChangeEventArgs args)
+    {
+        JoinCode = args.Value?.ToString() ?? string.Empty;
+    }
+
+    private void JoinSurvey()
+    {
+        var normalizedCode = NormalizeCode(JoinCode);
+        if (normalizedCode.Length == 6)
+        {
+            Navigation.NavigateTo($"/join/{normalizedCode}");
+        }
+    }
+
+    private static string NormalizeCode(string value) =>
+        new(value.Where(char.IsLetterOrDigit)
+            .Take(6)
+            .Select(char.ToUpperInvariant)
+            .ToArray());
+}

@@ -1,0 +1,33 @@
+@page "/instructor"
+@page "/instructor/{*Path}"
+@inject NavigationManager Navigation
+@inject IConfiguration Configuration
+
+<PageTitle>Opening Pulse Instructor</PageTitle>
+
+<main id="main-content" class="pulse-page">
+    <div class="pulse-card redirect-card">
+        <h1>Opening the instructor workspace</h1>
+        <p>If you are not redirected, use the button below.</p>
+        <a class="pulse-button pulse-button-primary" href="@Destination">Open Pulse Instructor</a>
+    </div>
+</main>
+
+@code {
+    [Parameter]
+    public string? Path { get; set; }
+
+    private string AdminBaseUrl =>
+        (Configuration["Admin:BaseUrl"] ?? "https://localhost:7019").TrimEnd('/');
+
+    private string Destination =>
+        string.IsNullOrWhiteSpace(Path) ? $"{AdminBaseUrl}/surveys" : $"{AdminBaseUrl}/instructor/{Path}";
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            Navigation.NavigateTo(Destination, forceLoad: true);
+        }
+    }
+}

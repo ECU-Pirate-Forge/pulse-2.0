@@ -1,0 +1,10 @@
+.redirect-card {
+    max-width: 40rem;
+    padding: 2rem;
+    border-top: 0.25rem solid var(--pulse-gold-500);
+}
+
+.redirect-card h1 {
+    margin-top: 0;
+    color: var(--pulse-purple-900);
+}

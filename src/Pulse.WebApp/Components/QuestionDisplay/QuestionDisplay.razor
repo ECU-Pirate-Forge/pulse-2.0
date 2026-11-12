@@ -1,11 +1,12 @@
 @using Pulse.Domain.Entities
+@using Pulse.Shared.Components
 @using System.ComponentModel.DataAnnotations
 
 <div class="question-display">
     @if (Question != null)
     {
         <div class="question-container">
-            <h3 class="question-text">@Question.Text</h3>
+            <div class="question-text"><MarkdownContent Text="@Question.Text" /></div>
 
             @if (!string.IsNullOrEmpty(ValidationError))
             {
@@ -43,7 +44,7 @@
                                     value="@option" 
                                     @onchange="@((ChangeEventArgs e) => SelectedResponse = e.Value?.ToString() ?? string.Empty)" />
                                 <label class="form-check-label" for="option_@(Question.Id)_@index">
-                                    @option
+                                    <MarkdownContent Text="@option" />
                                 </label>
                             </div>
                         }

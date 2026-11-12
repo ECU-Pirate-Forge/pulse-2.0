@@ -1,0 +1,130 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": ".NET Core Attach",
+            "type": "coreclr",
+            "request": "attach"
+
+        },
+        {
+            "name": "C#: Launch Startup Project",
+            "type": "dotnet",
+            "request": "launch",
+            "__csdevkitLaunchStartupProject": true
+        },
+        {
+            "name": "C#: Pulse.Admin [Default Configuration]",
+            "type": "dotnet",
+            "request": "launch",
+            "projectPath": "C:\\code\\pirate-forge\\pulse\\src\\Pulse.Admin\\Pulse.Admin.csproj"
+        },
+        {
+            "name": "C#: Pulse.Admin [http]",
+            "type": "dotnet",
+            "request": "launch",
+            "projectPath": "C:\\code\\pirate-forge\\pulse\\src\\Pulse.Admin\\Pulse.Admin.csproj",
+            "launchProfileName": "http",
+            "launchConfigurationId": "http"
+        },
+        {
+            "name": "C#: Pulse.Admin [https]",
+            "type": "dotnet",
+            "request": "launch",
+            "projectPath": "C:\\code\\pirate-forge\\pulse\\src\\Pulse.Admin\\Pulse.Admin.csproj",
+            "launchProfileName": "https",
+            "launchConfigurationId": "https"
+        },
+        {
+            "name": "C#: Pulse.AppHost [Default Configuration]",
+            "type": "dotnet",
+            "request": "launch",
+            "projectPath": "C:\\code\\pirate-forge\\pulse\\src\\Pulse.AppHost\\Pulse.AppHost.csproj"
+        },
+        {
+            "name": "C#: Pulse.AppHost [https]",
+            "type": "dotnet",
+            "request": "launch",
+            "projectPath": "C:\\code\\pirate-forge\\pulse\\src\\Pulse.AppHost\\Pulse.AppHost.csproj",
+            "launchProfileName": "https",
+            "launchConfigurationId": "https"
+        },
+        {
+            "name": "C#: Pulse.AppHost [http]",
+            "type": "dotnet",
+            "request": "launch",
+            "projectPath": "C:\\code\\pirate-forge\\pulse\\src\\Pulse.AppHost\\Pulse.AppHost.csproj",
+            "launchProfileName": "http",
+            "launchConfigurationId": "http"
+        },
+        {
+            "name": "C#: Pulse.MigrationManager",
+            "type": "dotnet",
+            "request": "launch",
+            "projectPath": "C:\\code\\pirate-forge\\pulse\\src\\Pulse.MigrationManager\\Pulse.MigrationManager.csproj",
+            "launchProfileName": "Pulse.MigrationManager",
+            "launchConfigurationId": "Pulse.MigrationManager"
+        },
+        {
+            "name": "C#: Pulse.Tests",
+            "type": "dotnet",
+            "request": "launch",
+            "projectPath": "C:\\code\\pirate-forge\\pulse\\src\\Pulse.Tests\\Pulse.Tests.csproj",
+            "launchProfileName": "Pulse.Tests",
+            "launchConfigurationId": "Pulse.Tests"
+        },
+        {
+            "name": "C#: Pulse.WebApi [Default Configuration]",
+            "type": "dotnet",
+            "request": "launch",
+            "projectPath": "C:\\code\\pirate-forge\\pulse\\src\\Pulse.WebApi\\Pulse.WebApi.csproj"
+        },
+        {
+            "name": "C#: Pulse.WebApi [http]",
+            "type": "dotnet",
+            "request": "launch",
+            "projectPath": "C:\\code\\pirate-forge\\pulse\\src\\Pulse.WebApi\\Pulse.WebApi.csproj",
+            "launchProfileName": "http",
+            "launchConfigurationId": "http"
+        },
+        {
+            "name": "C#: Pulse.WebApi [https]",
+            "type": "dotnet",
+            "request": "launch",
+            "projectPath": "C:\\code\\pirate-forge\\pulse\\src\\Pulse.WebApi\\Pulse.WebApi.csproj",
+            "launchProfileName": "https",
+            "launchConfigurationId": "https"
+        },
+        {
+            "name": "C#: Pulse.WebApp [Default Configuration]",
+            "type": "dotnet",
+            "request": "launch",
+            "projectPath": "C:\\code\\pirate-forge\\pulse\\src\\Pulse.WebApp\\Pulse.WebApp.csproj"
+        },
+        {
+            "name": "C#: Pulse.WebApp [http]",
+            "type": "dotnet",
+            "request": "launch",
+            "projectPath": "C:\\code\\pirate-forge\\pulse\\src\\Pulse.WebApp\\Pulse.WebApp.csproj",
+            "launchProfileName": "http",
+            "launchConfigurationId": "http"
+        },
+        {
+            "name": "C#: Pulse.WebApp [https]",
+            "type": "dotnet",
+            "request": "launch",
+            "projectPath": "C:\\code\\pirate-forge\\pulse\\src\\Pulse.WebApp\\Pulse.WebApp.csproj",
+            "launchProfileName": "https",
+            "launchConfigurationId": "https"
+        },
+        {
+            "name": "C#: Debug Active File",
+            "type": "dotnet",
+            "request": "launch",
+            "projectPath": "${file}"
+        }
+    ]
+}

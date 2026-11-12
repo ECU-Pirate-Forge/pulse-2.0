@@ -1,4 +1,5 @@
 using LiteDB;
+using Pulse.Domain.Entities;
 using Pulse.Shared.Models;
 using Pulse.Common.Services;
 using Pulse.Shared.Services;
@@ -110,5 +111,64 @@ public class SessionRepositoryTests
         Assert.NotEqual(code1, code2);
         Assert.NotEqual("DUPLICATE", code1);
         Assert.NotEqual("DUPLICATE", code2);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_RemovesSessionQuestionsAndResponses()
+    {
+        using var db = new LiteDatabase("Filename=:memory:");
+        var repo = new SessionRepository(db, new JoinCodeGenerator());
+        var deletedSession = repo.Insert(new Session
+        {
+            Title = "Delete me",
+            InstructorCode = "INST001",
+            JoinCode = "DELETE"
+        });
+        var retainedSession = repo.Insert(new Session
+        {
+            Title = "Keep me",
+            InstructorCode = "INST001",
+            JoinCode = "RETAIN"
+        });
+
+        var questions = db.GetCollection<Question>("questions");
+        var deletedQuestion = new Question
+        {
+            SessionId = deletedSession.Id,
+            Text = "Deleted question"
+        };
+        var retainedQuestion = new Question
+        {
+            SessionId = retainedSession.Id,
+            Text = "Retained question"
+        };
+        questions.Insert(deletedQuestion);
+        questions.Insert(retainedQuestion);
+
+        var responses = db.GetCollection<Response>("responses");
+        responses.Insert(new Response
+        {
+            SessionId = deletedSession.Id,
+            QuestionId = deletedQuestion.Id,
+            DeviceId = "deleted-device",
+            Value = "A"
+        });
+        responses.Insert(new Response
+        {
+            SessionId = retainedSession.Id,
+            QuestionId = retainedQuestion.Id,
+            DeviceId = "retained-device",
+            Value = "B"
+        });
+
+        var deleted = await repo.DeleteAsync(deletedSession.Id);
+
+        Assert.True(deleted);
+        Assert.Null(repo.GetById(deletedSession.Id));
+        Assert.Empty(questions.Find(q => q.SessionId == deletedSession.Id));
+        Assert.Empty(responses.Find(r => r.SessionId == deletedSession.Id));
+        Assert.NotNull(repo.GetById(retainedSession.Id));
+        Assert.Single(questions.Find(q => q.SessionId == retainedSession.Id));
+        Assert.Single(responses.Find(r => r.SessionId == retainedSession.Id));
     }
 }

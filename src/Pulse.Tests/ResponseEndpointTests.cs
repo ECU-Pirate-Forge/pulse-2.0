@@ -47,7 +47,7 @@ public class ResponseEndpointTests
     [Fact]
     public async Task Respond_ValidRequest_Returns200WithSubmittedAt()
     {
-        var session = new Session { Id = _sessionId, InstructorCode = "INST", Status = "Active" };
+        var session = new Session { Id = _sessionId, InstructorCode = "INST", Status = SessionStatus.Active };
         var request = new RespondRequest { DeviceId = _validDeviceId, Value = "A" };
 
         var result = await ResponseEndpointHandlers.Respond(
@@ -134,13 +134,59 @@ public class ResponseEndpointTests
     [Fact]
     public async Task Respond_UnknownQuestion_Returns404()
     {
-        var session = new Session { Id = _sessionId, InstructorCode = "INST", Status = "Active" };
+        var session = new Session { Id = _sessionId, InstructorCode = "INST", Status = SessionStatus.Active };
         var request = new RespondRequest { DeviceId = _validDeviceId, Value = "A" };
 
         var result = await ResponseEndpointHandlers.Respond(
             _sessionId, _questionId, request,
             BuildSessionRepo(session).Object,
             BuildQuestionRepo(withQuestion: false),
+            BuildResponseRepo().Object,
+            _deviceIdService,
+            NullLogger(),
+            EmptyContext());
+
+        Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.NotFound<string>>(result);
+    }
+
+    [Theory]
+    [InlineData(SessionStatus.Draft)]
+    [InlineData(SessionStatus.Closed)]
+    public async Task Respond_SessionNotActive_Returns409(SessionStatus status)
+    {
+        var session = new Session { Id = _sessionId, InstructorCode = "INST", Status = status };
+        var request = new RespondRequest { DeviceId = _validDeviceId, Value = "A" };
+
+        var result = await ResponseEndpointHandlers.Respond(
+            _sessionId, _questionId, request,
+            BuildSessionRepo(session).Object,
+            BuildQuestionRepo(),
+            BuildResponseRepo().Object,
+            _deviceIdService,
+            NullLogger(),
+            EmptyContext());
+
+        Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.Conflict<string>>(result);
+    }
+
+    [Fact]
+    public async Task Respond_QuestionBelongsToDifferentSession_Returns404()
+    {
+        var session = new Session { Id = _sessionId, InstructorCode = "INST", Status = SessionStatus.Active };
+        var request = new RespondRequest { DeviceId = _validDeviceId, Value = "A" };
+        var questionRepo = BuildQuestionRepo(withQuestion: false);
+        questionRepo.Insert(new Question
+        {
+            Id = _questionId,
+            SessionId = Guid.NewGuid(),
+            Text = "Another survey's question",
+            Type = QuestionType.TrueFalse
+        });
+
+        var result = await ResponseEndpointHandlers.Respond(
+            _sessionId, _questionId, request,
+            BuildSessionRepo(session).Object,
+            questionRepo,
             BuildResponseRepo().Object,
             _deviceIdService,
             NullLogger(),

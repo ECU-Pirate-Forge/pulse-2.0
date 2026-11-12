@@ -51,15 +51,15 @@ public class QuestionCreateEndpointTests
     }
 
     [Fact]
-    public void PostCreateReturnsOkForNonMcQuestionWithNoOptions()
+    public void PostCreateReturnsOkForTrueFalseQuestionWithNoOptions()
     {
         using var db = new LiteDB.LiteDatabase("Filename=:memory:");
         var repo = new QuestionRepository(db);
 
         var question = new Question
         {
-            Text = "How do you feel?",
-            Type = QuestionType.OpenEnded,
+            Text = "The statement is true.",
+            Type = QuestionType.TrueFalse,
             Options = new List<string>()
         };
 

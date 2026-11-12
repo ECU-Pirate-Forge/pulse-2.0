@@ -31,7 +31,27 @@ public class QuestionModelTests
         Assert.NotEqual(Guid.Empty, question.Id);
         Assert.NotNull(question.Options);
         Assert.Empty(question.Options);
+        Assert.NotNull(question.MatchingPairs);
+        Assert.Empty(question.MatchingPairs);
         Assert.InRange(question.CreatedAt, before, after);
+    }
+
+    [Fact]
+    public void MatchingPairsPreservePromptAndMatch()
+    {
+        var question = new Question
+        {
+            Text = "Match each term",
+            Type = QuestionType.Matching,
+            MatchingPairs =
+            [
+                new MatchingPair { Prompt = "HTTP", Match = "Web protocol" },
+                new MatchingPair { Prompt = "HTML", Match = "Markup language" }
+            ]
+        };
+
+        Assert.Equal("HTTP", question.MatchingPairs[0].Prompt);
+        Assert.Equal("Markup language", question.MatchingPairs[1].Match);
     }
 
     [Fact]

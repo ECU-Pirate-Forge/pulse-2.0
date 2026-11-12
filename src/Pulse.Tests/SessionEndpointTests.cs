@@ -81,18 +81,25 @@ public class SessionEndpointTests
             return Task.FromResult<IEnumerable<Session>>(sessions);
         }
 
-        public Task DeleteAsync(Guid id)
+        public Task<bool> DeleteAsync(Guid id)
         {
-            _store.Remove(id);
-            return Task.CompletedTask;
+            return Task.FromResult(_store.Remove(id));
         }
+
+        public bool ResetSurvey(Guid id) =>
+            throw new NotSupportedException("Survey reset tests require a database-backed repository.");
+
+        public bool BeginSurveyEdit(Guid id, bool clearResponses) =>
+            throw new NotSupportedException("Survey editing tests require a database-backed repository.");
     }
 
     private HttpClient CreateClient(ISessionRepository? repo = null)
     {
         repo ??= new FakeSessionRepository();
         var client = new WebApplicationFactory<ApiAssemblyMarker>()
-            .WithWebHostBuilder(b => b.ConfigureServices(services =>
+            .WithWebHostBuilder(b => b
+                .UseSetting("Security:InstructorCode", "TEST-INSTRUCTOR-CODE")
+                .ConfigureServices(services =>
             {
                 services.AddSingleton(repo);
             }))
@@ -105,7 +112,9 @@ public class SessionEndpointTests
     {
         repo ??= new FakeSessionRepository();
         return new WebApplicationFactory<ApiAssemblyMarker>()
-            .WithWebHostBuilder(b => b.ConfigureServices(services =>
+            .WithWebHostBuilder(b => b
+                .UseSetting("Security:InstructorCode", "TEST-INSTRUCTOR-CODE")
+                .ConfigureServices(services =>
             {
                 services.AddSingleton(repo);
             }))
@@ -200,6 +209,53 @@ public class SessionEndpointTests
         var request = new HttpRequestMessage(HttpMethod.Get, $"/api/sessions/{Guid.NewGuid()}");
         request.Headers.Add("InstructorCode", "ANYCODE");
         var response = await client.SendAsync(request, ct);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Delete_WithOwnedSession_RemovesSessionAndReturns204()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var repo = new FakeSessionRepository();
+        var session = repo.Insert(new Session
+        {
+            Title = "Delete me",
+            InstructorCode = "TEST-INSTRUCTOR-CODE"
+        });
+        var client = CreateClient(repo);
+
+        var response = await client.DeleteAsync($"/api/sessions/{session.Id}", ct);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Null(repo.GetById(session.Id));
+    }
+
+    [Fact]
+    public async Task Delete_WithSessionOwnedByAnotherInstructor_Returns403()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var repo = new FakeSessionRepository();
+        var session = repo.Insert(new Session
+        {
+            Title = "Do not delete",
+            InstructorCode = "ANOTHER-INSTRUCTOR"
+        });
+        var client = CreateClient(repo);
+
+        var response = await client.DeleteAsync($"/api/sessions/{session.Id}", ct);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.NotNull(repo.GetById(session.Id));
+    }
+
+    [Fact]
+    public async Task Delete_WithNonExistentSession_Returns404()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var client = CreateClient();
+
+        var response = await client.DeleteAsync($"/api/sessions/{Guid.NewGuid()}", ct);
+
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 

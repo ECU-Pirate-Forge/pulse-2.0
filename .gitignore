@@ -489,3 +489,5 @@ $RECYCLE.BIN/
 # Vim temporary swap files
 *.swp
 *.db
+# Playwright CLI output (may contain credentials)
+.playwright-cli/

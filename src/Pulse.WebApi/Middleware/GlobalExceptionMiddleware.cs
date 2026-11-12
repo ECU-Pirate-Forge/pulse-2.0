@@ -36,8 +36,9 @@ public sealed class GlobalExceptionMiddleware
             }))
             {
                 _logger.LogError(
-                    ex,
-                    "Unhandled exception. CorrelationId: {CorrelationId}, Method: {Method}, Path: {Path}",
+                    "Unhandled exception. ExceptionType: {ExceptionType}, StackTrace: {SanitizedStackTrace}, CorrelationId: {CorrelationId}, Method: {Method}, Path: {Path}",
+                    ex.GetType().Name,
+                    ex.StackTrace ?? "(stack trace unavailable)",
                     correlationId,
                     context.Request.Method,
                     context.Request.Path.Value ?? string.Empty);

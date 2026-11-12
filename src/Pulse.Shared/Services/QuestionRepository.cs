@@ -17,11 +17,21 @@ public class QuestionRepository
     {
         // Make a defensive copy of Options to avoid serialization issues with LiteDB
         q.Options = new List<string>(q.Options ?? new List<string>());
+        q.MatchingPairs = (q.MatchingPairs ?? [])
+            .Select(pair => new MatchingPair { Prompt = pair.Prompt, Match = pair.Match })
+            .ToList();
         _col.Insert(q);
         return q;
     }
     public Question? GetById(Guid id) => _col.FindById(id);
-    public bool Update(Question q) => _col.Update(q);
+    public bool Update(Question q)
+    {
+        q.Options = new List<string>(q.Options ?? []);
+        q.MatchingPairs = (q.MatchingPairs ?? [])
+            .Select(pair => new MatchingPair { Prompt = pair.Prompt, Match = pair.Match })
+            .ToList();
+        return _col.Update(q);
+    }
     public bool Delete(Guid id) => _col.Delete(id);
     public IEnumerable<Question> GetBySessionId(Guid sessionId) => _col.Find(q => q.SessionId == sessionId);
 }

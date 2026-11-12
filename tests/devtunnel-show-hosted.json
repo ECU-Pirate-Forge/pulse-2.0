@@ -1,0 +1,19 @@
+{
+  "tunnel": {
+    "tunnelId": "pulse-student-test",
+    "accessControl": [
+      {
+        "type": "Anonymous",
+        "subjects": [],
+        "scopes": [ "connect" ]
+      }
+    ],
+    "ports": [
+      {
+        "portNumber": 7004,
+        "protocol": "https",
+        "portUri": "https://pulse-student-test.example.devtunnels.ms"
+      }
+    ]
+  }
+}
