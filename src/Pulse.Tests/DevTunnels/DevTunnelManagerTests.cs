@@ -38,6 +38,19 @@ public class DevTunnelManagerTests
     }
 
     [Fact]
+    public async Task FollowUpCommandsUseClusterQualifiedTunnelIdFromShow()
+    {
+        var options = Options();
+        var cli = new FakeCli();
+        using var http = new HttpClient();
+        await using var manager = Manager(options, cli, http);
+        await manager.PrepareAsync(TestContext.Current.CancellationToken);
+        var portScoped = cli.Commands.Where(command => command.StartsWith("access list ") && command.Contains("--port-number")).ToArray();
+        Assert.Equal(4, portScoped.Length);
+        Assert.All(portScoped, command => Assert.Contains(".use2", command));
+    }
+
+    [Fact]
     public async Task ExistingStoppedDefinitionsKeepTheirUrlsAcrossRestarts()
     {
         var options = Options();
@@ -440,6 +453,10 @@ public class DevTunnelManagerTests
                 Definitions.Add(service.TunnelId, new() { Port = service.Port, HostConnections = running ? 1 : 0 });
         }
 
+        // The real CLI resolves bare tunnel names everywhere except port-scoped 'access list',
+        // which requires the cluster-qualified ID ('name.use2').
+        private static string Resolve(string id) => id.Split('.')[0];
+
         public Task<DevTunnelCommandResult> ExecuteAsync(CancellationToken cancellationToken, params string[] args)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -451,12 +468,12 @@ public class DevTunnelManagerTests
             {
                 if (ShowFailure is not null)
                     return Task.FromResult(ShowFailure);
-                if (FailOnSecondService && args[1].EndsWith("webadmin"))
+                if (FailOnSecondService && Resolve(args[1]).EndsWith("webadmin"))
                     return Task.FromResult(new DevTunnelCommandResult(3, "", "Provisioning denied"));
-                if (!Definitions.TryGetValue(args[1], out var definition))
+                if (!Definitions.TryGetValue(Resolve(args[1]), out var definition))
                     return Task.FromResult(new DevTunnelCommandResult(2, "", "Not found"));
                 if (OmitEmptyPorts && definition.Port == 0)
-                    return Task.FromResult(Json(new { tunnel = new { tunnelId = args[1] + ".use2", hostConnections = 0 } }));
+                    return Task.FromResult(Json(new { tunnel = new { tunnelId = Resolve(args[1]) + ".use2", hostConnections = 0 } }));
                 var hostConnections = definition.HostConnections;
                 if (StaleHostReads > 0)
                 {
@@ -467,12 +484,12 @@ public class DevTunnelManagerTests
                 {
                     tunnel = new
                     {
-                        tunnelId = args[1] + ".use2",
+                        tunnelId = Resolve(args[1]) + ".use2",
                         hostConnections,
                         ports = definition.Port == 0 ? [] : new[]
                         {
                             new { portNumber = definition.Port, protocol = "http",
-                                portUri = $"https://{args[1]}-{definition.Port}.use2.devtunnels.ms/" }
+                                portUri = $"https://{Resolve(args[1])}-{definition.Port}.use2.devtunnels.ms/" }
                         }
                     }
                 }));
@@ -484,22 +501,26 @@ public class DevTunnelManagerTests
             }
             if (args[0] == "port" && args[1] == "create")
             {
-                Definitions[args[2]].Port = int.Parse(args[4], System.Globalization.CultureInfo.InvariantCulture);
+                Definitions[Resolve(args[2])].Port = int.Parse(args[4], System.Globalization.CultureInfo.InvariantCulture);
                 return Task.FromResult(Json(new { }));
             }
             if (args[0] == "port" && args[1] == "update")
                 return Task.FromResult(Json(new { }));
             if (args[0] == "access" && args[1] == "list")
+            {
+                if (args.Contains("--port-number") && !args[2].Contains('.'))
+                    return Task.FromResult(new DevTunnelCommandResult(1, "", "Tunnel service error: Not Found The requested tunnel was not found."));
                 return Task.FromResult(Json(new
                 {
-                    accessControlEntries = !Definitions[args[2]].Anonymous ? [] : new[]
+                    accessControlEntries = !Definitions[Resolve(args[2])].Anonymous ? [] : new[]
                     {
                         new { type = "Anonymous", scopes = new[] { "connect" }, isDeny = Deny }
                     }
                 }));
+            }
             if (args[0] == "access" && args[1] == "create")
             {
-                Definitions[args[2]].Anonymous = true;
+                Definitions[Resolve(args[2])].Anonymous = true;
                 return Task.FromResult(Json(new { }));
             }
             throw new InvalidOperationException("Unexpected fake CLI command: " + string.Join(" ", args));
@@ -507,8 +528,9 @@ public class DevTunnelManagerTests
 
         public IDevTunnelHost StartHost(string tunnelId)
         {
-            Definitions[tunnelId].HostConnections = 1;
-            var host = new FakeHost(() => Definitions[tunnelId].HostConnections = 0);
+            var definition = Definitions[Resolve(tunnelId)];
+            definition.HostConnections = 1;
+            var host = new FakeHost(() => definition.HostConnections = 0);
             Hosts.Add(host);
             return host;
         }

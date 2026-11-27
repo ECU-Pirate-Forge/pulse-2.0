@@ -13,6 +13,7 @@ public sealed class DevTunnelManager(
 {
     private readonly Dictionary<string, IDevTunnelHost> _ownedHosts = [];
     private readonly List<FileStream> _locks = [];
+    private readonly Dictionary<string, string> _resolvedTunnelIds = [];
     private readonly Dictionary<string, Uri> _publicUrls = [];
     private readonly Dictionary<string, string> _probeErrors = [];
     public IReadOnlyDictionary<string, Uri> PublicUrls => _publicUrls;
@@ -76,6 +77,14 @@ public sealed class DevTunnelManager(
         }
 
         var tunnel = ReadTunnel(Check(result, $"show {service.TunnelId}"));
+        // The CLI resolves bare tunnel names for most commands, but port-scoped 'access list' fails with
+        // "tunnel not found" unless the cluster-qualified ID (for example 'name.usw3') is used. Use the
+        // fully qualified ID reported by 'show' for every follow-up command.
+        var tunnelId = tunnel.TryGetProperty("tunnelId", out var qualifiedId) &&
+            qualifiedId.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(qualifiedId.GetString())
+            ? qualifiedId.GetString()!
+            : service.TunnelId;
+        _resolvedTunnelIds[name] = tunnelId;
         var running = tunnel.GetProperty("hostConnections").GetInt32() > 0;
         var ports = tunnel.TryGetProperty("ports", out var configuredPorts)
             ? configuredPorts.EnumerateArray().ToArray()
@@ -89,9 +98,9 @@ public sealed class DevTunnelManager(
         {
             if (running)
                 throw new InvalidOperationException($"Running tunnel '{service.TunnelId}' does not forward configured port {service.Port}. Stop its host and correct the mapping.");
-            Check(await cli.ExecuteAsync(cancellationToken, "port", "create", service.TunnelId,
+            Check(await cli.ExecuteAsync(cancellationToken, "port", "create", tunnelId,
                 "--port-number", service.Port.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                "--protocol", "http", "--host-header", "unchanged", "--origin-header", "unchanged", "--json"), $"port create {service.TunnelId}");
+                "--protocol", "http", "--host-header", "unchanged", "--origin-header", "unchanged", "--json"), $"port create {tunnelId}");
         }
         else if (port.GetProperty("protocol").GetString() != "http")
         {
@@ -99,36 +108,36 @@ public sealed class DevTunnelManager(
         }
         else if (!running)
         {
-            Check(await cli.ExecuteAsync(cancellationToken, "port", "update", service.TunnelId,
+            Check(await cli.ExecuteAsync(cancellationToken, "port", "update", tunnelId,
                 "--port-number", service.Port.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 "--host-header", "unchanged", "--origin-header", "unchanged", "--json"), "port update");
         }
 
-        var access = Parse(Check(await cli.ExecuteAsync(cancellationToken, "access", "list", service.TunnelId, "--json"), "access list"))
+        var access = Parse(Check(await cli.ExecuteAsync(cancellationToken, "access", "list", tunnelId, "--json"), "access list"))
             .GetProperty("accessControlEntries");
-        RejectDenyRules(access, service.TunnelId);
-        var portAccess = Parse(Check(await cli.ExecuteAsync(cancellationToken, "access", "list", service.TunnelId,
+        RejectDenyRules(access, tunnelId);
+        var portAccess = Parse(Check(await cli.ExecuteAsync(cancellationToken, "access", "list", tunnelId,
             "--port-number", service.Port.ToString(System.Globalization.CultureInfo.InvariantCulture), "--json"), "port access list"))
             .GetProperty("accessControlEntries");
-        RejectDenyRules(portAccess, service.TunnelId);
+        RejectDenyRules(portAccess, tunnelId);
 
         if (!HasPersistentAnonymousAccess(access))
         {
             if (running)
                 throw new InvalidOperationException($"Running tunnel '{service.TunnelId}' lacks persistent anonymous connect access. Stop its host before AppHost configures access.");
-            Check(await cli.ExecuteAsync(cancellationToken, "access", "create", service.TunnelId, "--anonymous", "--json"), "access create");
+            Check(await cli.ExecuteAsync(cancellationToken, "access", "create", tunnelId, "--anonymous", "--json"), "access create");
         }
 
         if (running)
-            Logger.LogInformation("Reusing active tunnel {TunnelId}; its local target will be verified before declaring readiness", service.TunnelId);
+            Logger.LogInformation("Reusing active tunnel {TunnelId}; its local target will be verified before declaring readiness", tunnelId);
         else
-            _ownedHosts.Add(name, cli.StartHost(service.TunnelId));
+            _ownedHosts.Add(name, cli.StartHost(tunnelId));
 
         // A new port's public address is allocated by the service only after its host connects.
         string? url;
         do
         {
-            tunnel = ReadTunnel(Check(await cli.ExecuteAsync(cancellationToken, "show", service.TunnelId, "--json"), "show"));
+            tunnel = ReadTunnel(Check(await cli.ExecuteAsync(cancellationToken, "show", tunnelId, "--json"), "show"));
             port = tunnel.GetProperty("ports").EnumerateArray().Single(p => p.GetProperty("portNumber").GetInt32() == service.Port);
             url = port.TryGetProperty("portUri", out var portUri) ? portUri.GetString() : null;
             if (url is null)
@@ -301,6 +310,7 @@ public sealed class DevTunnelManager(
 
                 if (_ownedHosts.TryGetValue(name, out var host) && host.HasExited)
                 {
+                    var tunnelId = _resolvedTunnelIds.GetValueOrDefault(name, service.TunnelId);
                     await host.DisposeAsync();
                     _ownedHosts.Remove(name);
                     using var recovery = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -312,15 +322,15 @@ public sealed class DevTunnelManager(
                     {
                         while (true)
                         {
-                            var tunnel = ReadTunnel(Check(await cli.ExecuteAsync(recovery.Token, "show", service.TunnelId, "--json"), "show"));
+                            var tunnel = ReadTunnel(Check(await cli.ExecuteAsync(recovery.Token, "show", tunnelId, "--json"), "show"));
                             if (tunnel.GetProperty("hostConnections").GetInt32() == 0)
                                 break;
                             // The service can briefly retain the exited host's connection metadata.
-                            Logger.LogDebug("Waiting for tunnel {TunnelId} to report no active host before restarting", service.TunnelId);
+                            Logger.LogDebug("Waiting for tunnel {TunnelId} to report no active host before restarting", tunnelId);
                             await Task.Delay(TimeSpan.FromSeconds(1), recovery.Token);
                         }
                         recovery.Token.ThrowIfCancellationRequested();
-                        _ownedHosts.Add(name, cli.StartHost(service.TunnelId));
+                        _ownedHosts.Add(name, cli.StartHost(tunnelId));
                     }
                     catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)
                     {
